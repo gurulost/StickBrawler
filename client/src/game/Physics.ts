@@ -1,9 +1,9 @@
 // Constants for physics calculations
-export const GRAVITY = 0.02; // Reduced from 0.03 for slower falling
-export const JUMP_FORCE = 0.8; // Increased from 0.5 for more noticeable jumping
-export const PLAYER_SPEED = 0.04;  // Reduced from 0.08
-export const CPU_SPEED = 0.03;  // Reduced from 0.06
-export const DRAG = 0.95;
+export const GRAVITY = 0.015; // Reduced for smoother jumping
+export const JUMP_FORCE = 0.6; // Decreased for more controlled jumping
+export const PLAYER_SPEED = 0.05; // Slightly increased for better responsiveness
+export const CPU_SPEED = 0.04; // Slightly increased to match player
+export const DRAG = 0.92; // Increased drag for smoother movement
 export const FLOOR_Y = 0;
 export const ARENA_WIDTH = 10;
 export const ARENA_HALF_WIDTH = ARENA_WIDTH / 2;
@@ -12,11 +12,15 @@ export const ARENA_HALF_WIDTH = ARENA_WIDTH / 2;
 export const PLAYER_WIDTH = 0.5;
 export const PLAYER_HEIGHT = 1.8;
 
-// Attack parameters
-export const PUNCH_DAMAGE = 10;
-export const KICK_DAMAGE = 15;
-export const SPECIAL_DAMAGE = 25;
-export const ATTACK_RANGE = 1.5; // Increased from 1.2 for easier hit detection
+// Attack parameters (drastically reduced damage per hit)
+export const PUNCH_DAMAGE = 3; // Reduced from 10
+export const KICK_DAMAGE = 5;  // Reduced from 15
+export const SPECIAL_DAMAGE = 8; // Reduced from 25
+export const ATTACK_RANGE = 1.5; // Kept the same for consistent hit detection
+
+// Combo system constants
+export const COMBO_WINDOW = 800; // Time window in ms to chain attacks for combos
+export const COMBO_MULTIPLIER = 1.2; // Damage multiplier for each hit in a combo
 
 /**
  * Applies gravity to a vertical position and velocity

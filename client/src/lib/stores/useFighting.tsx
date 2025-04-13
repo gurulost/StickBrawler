@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { COMBO_WINDOW, COMBO_MULTIPLIER } from '../../game/Physics';
 
 export type GamePhase = 'menu' | 'fighting' | 'round_end' | 'match_end';
 export type Character = 'stick_hero' | 'stick_villain';
@@ -15,9 +16,18 @@ export interface CharacterState {
   isTaunting: boolean;    // Taunt animation
   isAirAttacking: boolean; // Aerial attack
   airJumpsLeft: number;   // Double/triple jump capability (Smash Bros style)
+  
+  // Cooldowns
   attackCooldown: number;
   dodgeCooldown: number;  // Cooldown for dodge
   grabCooldown: number;   // Cooldown for grab
+  moveCooldown: number;   // Small cooldown between moves
+  
+  // Combo system
+  comboCount: number;     // Current combo counter
+  comboTimer: number;     // Time remaining in combo window
+  lastMoveType: string;   // Last move performed (to prevent same-move spam)
+  
   velocity: [number, number, number];
 }
 
@@ -89,9 +99,18 @@ const createDefaultCharacterState = (position: [number, number, number], directi
   isTaunting: false,
   isAirAttacking: false,
   airJumpsLeft: 2, // Allow 2 additional jumps (triple jump total - Smash Bros style)
+  
+  // Cooldowns
   attackCooldown: 0,
   dodgeCooldown: 0,
   grabCooldown: 0,
+  moveCooldown: 0,  // Small cooldown between moves
+  
+  // Combo system
+  comboCount: 0,
+  comboTimer: 0,
+  lastMoveType: '',
+  
   velocity: [0, 0, 0],
 });
 
@@ -199,7 +218,21 @@ export const useFighting = create<FightingState>((set) => ({
   
   damagePlayer: (amount) => set((state) => {
     // If player is blocking, reduce damage by 80%
-    const actualDamage = state.player.isBlocking ? amount * 0.2 : amount;
+    let actualDamage = state.player.isBlocking ? amount * 0.2 : amount;
+    
+    // If player is dodging, reduce damage by 95%
+    if (state.player.isDodging) {
+      actualDamage = amount * 0.05;
+      console.log("DODGE! Player takes greatly reduced damage!");
+    }
+    
+    // If CPU has a combo going, apply combo multiplier
+    if (state.cpu.comboCount > 0) {
+      const comboMultiplier = 1 + (state.cpu.comboCount * 0.2);
+      actualDamage = actualDamage * comboMultiplier;
+      console.log(`CPU COMBO x${state.cpu.comboCount + 1}! Damage multiplier: ${comboMultiplier.toFixed(1)}x`);
+    }
+    
     const newHealth = Math.max(0, state.player.health - actualDamage);
     
     // If health is 0, end the round
@@ -278,8 +311,38 @@ export const useFighting = create<FightingState>((set) => ({
   
   damageCPU: (amount) => set((state) => {
     // If CPU is blocking, reduce damage by 80%
-    const actualDamage = state.cpu.isBlocking ? amount * 0.2 : amount;
+    let actualDamage = state.cpu.isBlocking ? amount * 0.2 : amount;
+    
+    // If CPU is dodging, reduce damage by 95%
+    if (state.cpu.isDodging) {
+      actualDamage = amount * 0.05;
+      console.log("DODGE! CPU takes greatly reduced damage!");
+    }
+    
+    // If player has a combo going, apply combo multiplier
+    if (state.player.comboCount > 0) {
+      const comboMultiplier = 1 + (state.player.comboCount * 0.2);
+      actualDamage = actualDamage * comboMultiplier;
+      console.log(`COMBO x${state.player.comboCount + 1}! Damage multiplier: ${comboMultiplier.toFixed(1)}x`);
+    }
+    
+    // Apply the damage
     const newHealth = Math.max(0, state.cpu.health - actualDamage);
+    
+    // Update player's combo counter
+    let updatedPlayer = {...state.player};
+    
+    // If this is another hit within the combo window, increment combo counter
+    if (state.player.comboTimer > 0) {
+      updatedPlayer.comboCount = state.player.comboCount + 1;
+      updatedPlayer.comboTimer = COMBO_WINDOW; // Reset combo timer
+      console.log(`Combo hit! Combo counter increased to ${updatedPlayer.comboCount}`);
+    } else {
+      // Start a new combo
+      updatedPlayer.comboCount = 1;
+      updatedPlayer.comboTimer = COMBO_WINDOW;
+      console.log("New combo started!");
+    }
     
     // If health is 0, end the round
     if (newHealth === 0 && state.gamePhase === 'fighting') {
@@ -288,6 +351,7 @@ export const useFighting = create<FightingState>((set) => ({
           ...state.cpu,
           health: newHealth
         },
+        player: updatedPlayer,
         gamePhase: 'round_end',
         playerScore: state.playerScore + 1
       };
@@ -297,7 +361,8 @@ export const useFighting = create<FightingState>((set) => ({
       cpu: {
         ...state.cpu,
         health: newHealth
-      }
+      },
+      player: updatedPlayer
     };
   }),
   
@@ -499,6 +564,23 @@ export const useFighting = create<FightingState>((set) => ({
     const newGrabCooldown = state.player.grabCooldown > 0
       ? Math.max(0, state.player.grabCooldown - 1)
       : 0;
+      
+    const newMoveCooldown = state.player.moveCooldown > 0
+      ? Math.max(0, state.player.moveCooldown - 1)
+      : 0;
+    
+    // Update combo timer and reset combo if timeout
+    let newComboTimer = state.player.comboTimer > 0
+      ? state.player.comboTimer - 1
+      : 0;
+    
+    let newComboCount = state.player.comboCount;
+    
+    // If combo timer expired, reset combo
+    if (state.player.comboTimer > 0 && newComboTimer === 0 && state.player.comboCount > 0) {
+      console.log("Player combo reset - timeout!");
+      newComboCount = 0;
+    }
     
     // Debug output for cooldowns
     if (state.player.attackCooldown > 0) {
@@ -510,7 +592,10 @@ export const useFighting = create<FightingState>((set) => ({
         ...state.player,
         attackCooldown: newAttackCooldown,
         dodgeCooldown: newDodgeCooldown,
-        grabCooldown: newGrabCooldown
+        grabCooldown: newGrabCooldown,
+        moveCooldown: newMoveCooldown,
+        comboTimer: newComboTimer,
+        comboCount: newComboCount
       }
     };
   }),
@@ -529,13 +614,33 @@ export const useFighting = create<FightingState>((set) => ({
     const newGrabCooldown = state.cpu.grabCooldown > 0
       ? Math.max(0, state.cpu.grabCooldown - 1)
       : 0;
+      
+    const newMoveCooldown = state.cpu.moveCooldown > 0
+      ? Math.max(0, state.cpu.moveCooldown - 1)
+      : 0;
+    
+    // Update combo timer and reset combo if timeout
+    let newComboTimer = state.cpu.comboTimer > 0
+      ? state.cpu.comboTimer - 1
+      : 0;
+    
+    let newComboCount = state.cpu.comboCount;
+    
+    // If combo timer expired, reset combo
+    if (state.cpu.comboTimer > 0 && newComboTimer === 0 && state.cpu.comboCount > 0) {
+      console.log("CPU combo reset - timeout!");
+      newComboCount = 0;
+    }
     
     return {
       cpu: {
         ...state.cpu,
         attackCooldown: newAttackCooldown,
         dodgeCooldown: newDodgeCooldown,
-        grabCooldown: newGrabCooldown
+        grabCooldown: newGrabCooldown,
+        moveCooldown: newMoveCooldown,
+        comboTimer: newComboTimer,
+        comboCount: newComboCount
       }
     };
   }),

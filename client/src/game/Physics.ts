@@ -16,7 +16,7 @@ export const PLAYER_HEIGHT = 1.8;
 export const PUNCH_DAMAGE = 10;
 export const KICK_DAMAGE = 15;
 export const SPECIAL_DAMAGE = 25;
-export const ATTACK_RANGE = 1.2;
+export const ATTACK_RANGE = 1.5; // Increased from 1.2 for easier hit detection
 
 /**
  * Applies gravity to a vertical position and velocity

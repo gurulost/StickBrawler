@@ -70,9 +70,18 @@ const GameManager = () => {
         const { punch, kick, special } = getKeyboardState();
         
         let damage = PUNCH_DAMAGE;
-        if (kick) damage = KICK_DAMAGE;
-        if (special) damage = SPECIAL_DAMAGE;
+        let attackName = "PUNCH";
         
+        if (kick) {
+          damage = KICK_DAMAGE;
+          attackName = "KICK";
+        }
+        if (special) {
+          damage = SPECIAL_DAMAGE;
+          attackName = "SPECIAL ATTACK";
+        }
+        
+        console.log(`Player hit CPU with a ${attackName} for ${damage} damage!`);
         damageCPU(damage);
         playHit();
       }
@@ -87,8 +96,25 @@ const GameManager = () => {
       );
       
       if (hit) {
-        // CPU always does basic punch damage for now
-        damagePlayer(PUNCH_DAMAGE);
+        // Randomly determine CPU attack damage based on attack type
+        const attackType = Math.random();
+        let damageAmount = PUNCH_DAMAGE;
+        
+        if (attackType < 0.7) {
+          // Punch - most common
+          damageAmount = PUNCH_DAMAGE;
+          console.log("CPU hit player with a PUNCH for", damageAmount, "damage!");
+        } else if (attackType < 0.9) {
+          // Kick - medium chance
+          damageAmount = KICK_DAMAGE;
+          console.log("CPU hit player with a KICK for", damageAmount, "damage!");
+        } else {
+          // Special - rare but powerful
+          damageAmount = SPECIAL_DAMAGE;
+          console.log("CPU hit player with a SPECIAL ATTACK for", damageAmount, "damage!");
+        }
+        
+        damagePlayer(damageAmount);
         playHit();
       }
     }
@@ -219,6 +245,12 @@ const GameManager = () => {
     if (Math.random() < 0.01) {
       console.log("Player attack cooldown:", player.attackCooldown);
       console.log("CPU attack cooldown:", cpu.attackCooldown);
+      
+      // Debug the distance between characters to help with attack range tuning
+      const [playerX] = player.position;
+      const [cpuX] = cpu.position;
+      const distance = Math.abs(playerX - cpuX);
+      console.log("Distance between player and CPU:", distance.toFixed(2), "Attack range:", ATTACK_RANGE);
     }
     
     // Update CPU behavior

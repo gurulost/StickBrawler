@@ -177,6 +177,14 @@ const GameManager = () => {
       console.log("Forward key pressed, playerY:", playerY, "isJumping:", player.isJumping);
     }
     
+    // Force-fix jumping by adding a direct jump keypress handler here
+    const jumpPressed = useKeyboardControls(state => state.forward);
+    if (jumpPressed && !player.isJumping && playerY <= 0.01) {
+      console.log("FORCE JUMP detected");
+      updatePlayerVelocity(newVX, JUMP_FORCE, playerVZ);
+      setPlayerJumping(true);
+    }
+    
     // Apply gravity to player
     const [newY, newVY] = applyGravity(playerY, playerVY);
     

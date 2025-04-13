@@ -5,42 +5,50 @@ export const colorThemes = {
   blue: {
     primary: '#2980b9',
     secondary: '#3498db',
-    tertiary: '#1abc9c'
+    tertiary: '#1abc9c',
+    emissive: '#4aa3df'
   },
   red: {
     primary: '#c0392b',
     secondary: '#e74c3c',
-    tertiary: '#e67e22'
+    tertiary: '#e67e22',
+    emissive: '#ff6b6b'
   },
   green: {
     primary: '#27ae60',
     secondary: '#2ecc71',
-    tertiary: '#16a085'
+    tertiary: '#16a085',
+    emissive: '#55efc4'
   },
   purple: {
     primary: '#8e44ad',
     secondary: '#9b59b6',
-    tertiary: '#6c3483'
+    tertiary: '#6c3483',
+    emissive: '#a29bfe'
   },
   orange: {
     primary: '#d35400',
     secondary: '#e67e22',
-    tertiary: '#f39c12'
+    tertiary: '#f39c12',
+    emissive: '#ffa502'
   },
   pink: {
     primary: '#e84393',
     secondary: '#fd79a8',
-    tertiary: '#ff7675'
+    tertiary: '#ff7675',
+    emissive: '#ff9ff3'
   },
   black: {
     primary: '#2c3e50',
     secondary: '#34495e',
-    tertiary: '#212121'
+    tertiary: '#212121',
+    emissive: '#636e72'
   },
   white: {
     primary: '#ecf0f1',
     secondary: '#bdc3c7',
-    tertiary: '#7f8c8d'
+    tertiary: '#7f8c8d',
+    emissive: '#dfe6e9'
   }
 };
 
@@ -52,7 +60,8 @@ export const figureStyles = {
     limbThickness: 0.08,
     shoulderWidth: 0.4,
     metalness: 0.1,
-    roughness: 0.7
+    roughness: 0.7,
+    bodyScale: 1.0
   },
   bulky: {
     headSize: 0.3,
@@ -60,7 +69,8 @@ export const figureStyles = {
     limbThickness: 0.12,
     shoulderWidth: 0.6,
     metalness: 0.2,
-    roughness: 0.8
+    roughness: 0.8,
+    bodyScale: 1.2
   },
   slim: {
     headSize: 0.22,
@@ -68,7 +78,8 @@ export const figureStyles = {
     limbThickness: 0.06,
     shoulderWidth: 0.3,
     metalness: 0.05,
-    roughness: 0.6
+    roughness: 0.6,
+    bodyScale: 0.9
   },
   cartoonish: {
     headSize: 0.35,
@@ -76,7 +87,8 @@ export const figureStyles = {
     limbThickness: 0.09,
     shoulderWidth: 0.5,
     metalness: 0.3,
-    roughness: 0.5
+    roughness: 0.5,
+    bodyScale: 1.1
   },
   robot: {
     headSize: 0.28,
@@ -84,7 +96,8 @@ export const figureStyles = {
     limbThickness: 0.1,
     shoulderWidth: 0.45,
     metalness: 0.8,
-    roughness: 0.2
+    roughness: 0.2,
+    bodyScale: 1.05
   }
 };
 

@@ -208,21 +208,25 @@ const StickFigure = ({
       scale={[direction, 1, 1]} 
       rotation={[0, direction < 0 ? Math.PI : 0, 0]}
     >
-      {/* Head */}
-      <mesh position={[0, 1.5, 0]}>
-        <sphereGeometry args={[0.2, 16, 16]} />
+      {/* Head - enhanced size for the bigger arena */}
+      <mesh position={[0, 1.8, 0]} castShadow>
+        <sphereGeometry args={[0.3, 24, 24]} />
         <meshStandardMaterial 
           color={isPlayer ? "#3498db" : "#e74c3c"} 
           emissive={isAttacking ? "#ffff00" : "#000000"}
           emissiveIntensity={isAttacking ? 0.5 : 0}
+          metalness={0.2}
+          roughness={0.6}
         />
       </mesh>
 
-      {/* Body */}
-      <mesh position={[0, 0.9, 0]}>
-        <cylinderGeometry args={[0.05, 0.05, 0.8, 8]} />
+      {/* Body - enhanced size and improved materials for better visuals */}
+      <mesh position={[0, 1.0, 0]} castShadow>
+        <cylinderGeometry args={[0.08, 0.08, 1.0, 12]} />
         <meshStandardMaterial 
           color={isPlayer ? "#3498db" : "#e74c3c"} 
+          metalness={0.1}
+          roughness={0.7}
         />
       </mesh>
 

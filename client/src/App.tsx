@@ -70,16 +70,18 @@ function App() {
               <Canvas
                 shadows
                 camera={{
-                  position: [0, 2, 8],
-                  fov: 45,
+                  position: [0, 10, 20], // Higher and further back position for larger arena view
+                  fov: 60,               // Wider field of view
                   near: 0.1,
-                  far: 1000
+                  far: 1000              // Increased far plane for larger environment
                 }}
                 gl={{
-                  antialias: true,
-                  powerPreference: "default"
+                  antialias: true,      // Better graphics quality
+                  alpha: true,          // Transparent background
+                  powerPreference: "high-performance" // Better performance for enhanced graphics
                 }}
               >
+                <fog attach="fog" color="#E6F0FF" near={30} far={60} /> {/* Atmospheric fog effect */}
                 <color attach="background" args={["#87CEEB"]} />
 
                 {/* Game Manager handles all game elements */}

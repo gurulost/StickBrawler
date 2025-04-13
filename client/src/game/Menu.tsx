@@ -1,11 +1,13 @@
 import { useState, useEffect } from "react";
 import { useFighting } from "../lib/stores/useFighting";
 import { useAudio } from "../lib/stores/useAudio";
+import { CharacterCustomizer } from "../components/ui/character-customizer";
 
 const Menu = () => {
   const { startGame } = useFighting();
   const { backgroundMusic, toggleMute, isMuted } = useAudio();
   const [isAnimating, setIsAnimating] = useState(false);
+  const [showCustomizer, setShowCustomizer] = useState(false);
   
   // Start background music when component mounts
   useEffect(() => {
@@ -76,14 +78,28 @@ const Menu = () => {
             PLAY GAME
           </button>
           
-          <div>
+          <div className="flex flex-wrap justify-center gap-4">
             <button 
-              className="bg-gray-700 hover:bg-gray-800 text-white font-bold py-2 px-6 rounded-full transition-colors mt-4"
+              className="bg-purple-600 hover:bg-purple-700 text-white font-bold py-2 px-6 rounded-full transition-colors"
+              onClick={() => setShowCustomizer(!showCustomizer)}
+            >
+              {showCustomizer ? "HIDE CUSTOMIZER" : "CUSTOMIZE CHARACTERS"}
+            </button>
+            
+            <button 
+              className="bg-gray-700 hover:bg-gray-800 text-white font-bold py-2 px-6 rounded-full transition-colors"
               onClick={toggleMute}
             >
               {isMuted ? "UNMUTE 🔇" : "MUTE 🔊"}
             </button>
           </div>
+          
+          {/* Character Customization Panel */}
+          {showCustomizer && (
+            <div className="mt-6 max-w-4xl mx-auto">
+              <CharacterCustomizer />
+            </div>
+          )}
         </div>
         
         <div className="mt-12 text-white text-opacity-80">

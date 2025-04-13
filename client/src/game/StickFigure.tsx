@@ -339,11 +339,11 @@ const StickFigure = ({
           attackType === 'air_attack' ? -0.15 - animationPhase * 0.15 : // Downward position
           0
         ]} castShadow>
-          <cylinderGeometry args={[0.07, 0.07, 0.7, 12]} />
+          <cylinderGeometry args={[characterStyle.limbThickness, characterStyle.limbThickness, 0.7, 12]} />
           <meshStandardMaterial 
-            color={isPlayer ? "#2980b9" : "#c0392b"} 
-            metalness={0.1}
-            roughness={0.7}
+            color={characterColors.secondary} 
+            metalness={characterStyle.metalness}
+            roughness={characterStyle.roughness}
           />
         </mesh>
       </group>
@@ -388,11 +388,11 @@ const StickFigure = ({
           attackType === 'dodge' ? 0.15 - animationPhase * 0.25 : // Dodge movement
           0
         ]} castShadow>
-          <cylinderGeometry args={[0.08, 0.08, 0.7, 12]} />
+          <cylinderGeometry args={[characterStyle.limbThickness, characterStyle.limbThickness, 0.7, 12]} />
           <meshStandardMaterial 
-            color={isPlayer ? "#2980b9" : "#c0392b"} 
-            metalness={0.1}
-            roughness={0.7}
+            color={characterColors.secondary} 
+            metalness={characterStyle.metalness}
+            roughness={characterStyle.roughness}
           />
         </mesh>
       </group>
@@ -436,11 +436,11 @@ const StickFigure = ({
           attackType === 'dodge' ? -0.15 + animationPhase * 0.25 : // Dodge movement
           0
         ]} castShadow>
-          <cylinderGeometry args={[0.08, 0.08, 0.7, 12]} />
+          <cylinderGeometry args={[characterStyle.limbThickness, characterStyle.limbThickness, 0.7, 12]} />
           <meshStandardMaterial 
-            color={isPlayer ? "#2980b9" : "#c0392b"} 
-            metalness={0.1}
-            roughness={0.7}
+            color={characterColors.secondary} 
+            metalness={characterStyle.metalness}
+            roughness={characterStyle.roughness}
           />
         </mesh>
       </group>

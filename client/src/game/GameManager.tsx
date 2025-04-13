@@ -63,7 +63,21 @@ const GameManager = () => {
   } = useFighting();
   
   const { debugMode } = useControls();
-  const { playHit } = useAudio();
+  const { 
+    playHit, 
+    playPunch, 
+    playKick, 
+    playSpecial, 
+    playBlock, 
+    playJump,
+    playLand,
+    playDodge,
+    playGrab,
+    playThrow,
+    playTaunt,
+    playComboHit,
+    playSuccess
+  } = useAudio();
 
   // Initialize CPU controller
   const [cpuController] = useState(() => new CPUController(CPUDifficulty.MEDIUM));
@@ -221,6 +235,7 @@ const GameManager = () => {
       // Apply a strong upward velocity
       newVY = JUMP_FORCE;
       setPlayerJumping(true);
+      playJump(); // Play jump sound
       // Reset air jumps when starting a new jump
       resetPlayerAirJumps();
     }
@@ -232,7 +247,7 @@ const GameManager = () => {
         // Slightly weaker jump for air jumps
         newVY = JUMP_FORCE * 0.8;
         usePlayerAirJump();
-        playHit(); // Play a sound for air jumps
+        playJump(); // Play jump sound for air jumps too
       }
     }
     
@@ -258,6 +273,8 @@ const GameManager = () => {
       setPlayerJumping(false);
       // Reset air jumps when landing
       resetPlayerAirJumps();
+      // Play landing sound effect
+      playLand();
       console.log("Player landed on platform at height:", platformHeight);
     }
     
@@ -269,7 +286,7 @@ const GameManager = () => {
       if (attack1 && player.attackCooldown <= 0) {
         console.log("Player QUICK ATTACK");
         setPlayerAttacking(true);
-        playHit();
+        playPunch(); // Use specific punch sound effect
         
         // Set cooldown to limit attack frequency
         console.log("Setting new player attack cooldown:", 15);
@@ -285,7 +302,7 @@ const GameManager = () => {
       else if (attack2 && player.attackCooldown <= 0) {
         console.log("Player STRONG ATTACK");
         setPlayerAttacking(true);
-        playHit();
+        playKick(); // Use specific kick sound effect
         
         // Set cooldown to limit attack frequency
         console.log("Setting new player attack cooldown:", 20);
@@ -301,7 +318,7 @@ const GameManager = () => {
       else if (special && player.attackCooldown <= 0) {
         console.log("Player SPECIAL");
         setPlayerAttacking(true);
-        playHit();
+        playSpecial(); // Use specific special attack sound effect
         
         // Set cooldown to limit attack frequency
         console.log("Setting new player attack cooldown:", 30);
@@ -317,6 +334,7 @@ const GameManager = () => {
       else if (grab && player.grabCooldown <= 0) {
         console.log("Player GRAB");
         setPlayerGrabbing(true);
+        playGrab(); // Play grab sound
         
         // Set grab cooldown
         console.log("Setting grab cooldown:", 25);
@@ -332,6 +350,7 @@ const GameManager = () => {
             console.log("Player GRAB CONNECTED!");
             // Apply throw damage
             damageCPU(20);
+            playThrow(); // Play throw sound when successful
             
             // Throw CPU away from player
             const throwDirection = player.direction * 0.4; // Throw in facing direction
@@ -346,6 +365,7 @@ const GameManager = () => {
       else if (taunt && !player.isTaunting) {
         console.log("Player TAUNT");
         setPlayerTaunting(true);
+        playTaunt(); // Play taunt sound
         
         // End taunt after delay
         setTimeout(() => {
@@ -359,7 +379,7 @@ const GameManager = () => {
       if (airAttack || attack1 || attack2) {
         console.log("Player AIR ATTACK");
         setPlayerAirAttacking(true);
-        playHit();
+        playPunch(); // Use punch sound for air attacks
         
         // Set cooldown to limit attack frequency
         console.log("Setting air attack cooldown:", 18);
@@ -374,7 +394,7 @@ const GameManager = () => {
       else if (special) {
         console.log("Player AIR SPECIAL");
         setPlayerAirAttacking(true);
-        playHit();
+        playSpecial(); // Use special sound for air specials
         
         // Set cooldown to limit attack frequency
         console.log("Setting air special cooldown:", 25);
@@ -391,6 +411,9 @@ const GameManager = () => {
     
     // Handle blocking with shield key
     if (shield && canAct) {
+      if (!player.isBlocking) {
+        playBlock(); // Play block sound when starting to block
+      }
       setPlayerBlocking(true);
     } else if (player.isBlocking) {
       setPlayerBlocking(false);
@@ -400,6 +423,7 @@ const GameManager = () => {
     if (dodge && canAct && player.dodgeCooldown <= 0) {
       console.log("Player DODGE");
       setPlayerDodging(true);
+      playDodge(); // Play dodge sound
       
       // Give a small burst of movement when dodging in a direction
       if (leftward) {

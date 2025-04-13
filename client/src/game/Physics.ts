@@ -1,8 +1,8 @@
 // Constants for physics calculations
 export const GRAVITY = 0.03;
 export const JUMP_FORCE = 0.5;
-export const PLAYER_SPEED = 0.15;
-export const CPU_SPEED = 0.12;
+export const PLAYER_SPEED = 0.08;  // Reduced from 0.15
+export const CPU_SPEED = 0.06;  // Reduced from 0.12
 export const DRAG = 0.95;
 export const FLOOR_Y = 0;
 export const ARENA_WIDTH = 10;

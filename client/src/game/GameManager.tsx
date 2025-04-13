@@ -143,7 +143,12 @@ const GameManager = () => {
       console.log("Player JUMPING");
       updatePlayerVelocity(newVX, JUMP_FORCE, playerVZ);
       setPlayerJumping(true);
-    } 
+    }
+    
+    // Debug message - should help us understand jump state
+    if (forward) {
+      console.log("Forward key pressed, playerY:", playerY, "isJumping:", player.isJumping);
+    }
     
     // Apply gravity to player
     const [newY, newVY] = applyGravity(playerY, playerVY);

@@ -144,13 +144,25 @@ export const useFighting = create<FightingState>((set) => ({
     }
   })),
   
-  setPlayerAttacking: (isAttacking) => set((state) => ({
-    player: {
-      ...state.player,
-      isAttacking,
-      attackCooldown: isAttacking ? 20 : state.player.attackCooldown // 20 frames cooldown
+  setPlayerAttacking: (isAttacking) => set((state) => {
+    // When starting an attack, set a cooldown, but when ending the attack keep the cooldown
+    // This way player can't spam attacks too quickly, but can still attack after cooldown
+    let newCooldown = state.player.attackCooldown;
+    
+    if (isAttacking && !state.player.isAttacking) {
+      // Only set a cooldown when first starting an attack
+      newCooldown = 10; // Reduced cooldown so player can attack more frequently
+      console.log("Setting new player attack cooldown:", newCooldown);
     }
-  })),
+    
+    return {
+      player: {
+        ...state.player,
+        isAttacking,
+        attackCooldown: newCooldown
+      }
+    };
+  }),
   
   setPlayerBlocking: (isBlocking) => set((state) => ({
     player: {
@@ -213,13 +225,23 @@ export const useFighting = create<FightingState>((set) => ({
     }
   })),
   
-  setCPUAttacking: (isAttacking) => set((state) => ({
-    cpu: {
-      ...state.cpu,
-      isAttacking,
-      attackCooldown: isAttacking ? 20 : state.cpu.attackCooldown // 20 frames cooldown
+  setCPUAttacking: (isAttacking) => set((state) => {
+    // When starting an attack, set a cooldown, but when ending the attack keep the cooldown
+    let newCooldown = state.cpu.attackCooldown;
+    
+    if (isAttacking && !state.cpu.isAttacking) {
+      // Only set a cooldown when first starting an attack
+      newCooldown = 10; // Reduced cooldown for faster attacks
     }
-  })),
+    
+    return {
+      cpu: {
+        ...state.cpu,
+        isAttacking,
+        attackCooldown: newCooldown
+      }
+    };
+  }),
   
   setCPUBlocking: (isBlocking) => set((state) => ({
     cpu: {
@@ -255,8 +277,8 @@ export const useFighting = create<FightingState>((set) => ({
   
   // Update player cooldowns
   updatePlayerCooldowns: (delta) => set((state) => {
-    // Only update cooldowns if the player is not currently attacking
-    if (!state.player.isAttacking) {
+    if (state.player.attackCooldown > 0) {
+      console.log("Reducing player cooldown from", state.player.attackCooldown);
       return {
         player: {
           ...state.player,
@@ -264,13 +286,12 @@ export const useFighting = create<FightingState>((set) => ({
         }
       };
     }
-    return {}; // No changes if attacking
+    return {}; // No changes if cooldown is already 0
   }),
   
   // Update CPU cooldowns
   updateCPUCooldowns: (delta) => set((state) => {
-    // Only update cooldowns if the CPU is not currently attacking
-    if (!state.cpu.isAttacking) {
+    if (state.cpu.attackCooldown > 0) {
       return {
         cpu: {
           ...state.cpu,
@@ -278,7 +299,7 @@ export const useFighting = create<FightingState>((set) => ({
         }
       };
     }
-    return {}; // No changes if attacking
+    return {}; // No changes if cooldown is already 0
   }),
   
   // Game time

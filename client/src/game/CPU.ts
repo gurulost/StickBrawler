@@ -47,21 +47,21 @@ export class CPUController {
     switch (difficulty) {
       case CPUDifficulty.EASY:
         this.targetDistance = 2.0; // Stays further away
-        this.attackChance = 0.03;  // Attacks less frequently
-        this.blockChance = 0.02;   // Blocks less frequently
-        this.jumpChance = 0.02;    // Jumps less frequently
+        this.attackChance = 0.06;  // Doubled from 0.03
+        this.blockChance = 0.04;   // Doubled from 0.02
+        this.jumpChance = 0.03;    // Increased from 0.02
         break;
       case CPUDifficulty.HARD:
         this.targetDistance = 1.0; // Gets closer to player
-        this.attackChance = 0.12;  // Attacks more frequently
-        this.blockChance = 0.09;   // Blocks more frequently
-        this.jumpChance = 0.07;    // Jumps more frequently
+        this.attackChance = 0.25;  // Doubled from 0.12
+        this.blockChance = 0.15;   // Increased from 0.09
+        this.jumpChance = 0.10;    // Increased from 0.07
         break;
       default: // MEDIUM
         this.targetDistance = 1.5;
-        this.attackChance = 0.08;  // Increased from 0.03
-        this.blockChance = 0.06;   // Increased from 0.02
-        this.jumpChance = 0.04;    // Increased from 0.02
+        this.attackChance = 0.15;  // Significantly increased from 0.08
+        this.blockChance = 0.08;   // Slightly increased from 0.06
+        this.jumpChance = 0.05;    // Slightly increased from 0.04
     }
 
     // Log the CPU configuration for debugging
@@ -138,16 +138,16 @@ export class CPUController {
           const attackType = Math.random();
           let attackDuration = 400; // default punch duration
           
-          if (attackType < 0.6) {
-            // Basic punch - 60% chance
+          if (attackType < 0.5) {
+            // Basic punch - 50% chance
             console.log("CPU performs a PUNCH");
             attackDuration = 400;
-          } else if (attackType < 0.9) {
-            // Kick - 30% chance
+          } else if (attackType < 0.85) {
+            // Kick - 35% chance
             console.log("CPU performs a KICK");
             attackDuration = 500;
           } else {
-            // Special - 10% chance
+            // Special - 15% chance
             console.log("CPU performs a SPECIAL ATTACK");
             attackDuration = 600;
           }
@@ -155,6 +155,22 @@ export class CPUController {
           // Reset attack after delay
           setTimeout(() => {
             onAttackingChange(false);
+            
+            // Force CPU to attack again quickly as part of a combo
+            // 30% chance to perform a combo attack
+            if (Math.random() < 0.3 && distanceToPlayer <= ATTACK_RANGE) {
+              setTimeout(() => {
+                if (!cpuState.isAttacking && cpuState.attackCooldown <= 0) {
+                  console.log("CPU performs a COMBO FOLLOW-UP ATTACK!");
+                  onAttackingChange(true);
+                  
+                  // Reset attack after delay
+                  setTimeout(() => {
+                    onAttackingChange(false);
+                  }, 400); // Quick follow-up attack
+                }
+              }, 200); // Small pause between combo attacks
+            }
           }, attackDuration);
         }
         break;
@@ -236,15 +252,17 @@ export class CPUController {
     
     // Within attack range - most likely attack or block
     if (distanceToPlayer <= ATTACK_RANGE * 1.1 && distanceToPlayer >= ATTACK_RANGE * 0.7) {
-      if (rand < this.attackChance * 2) { // Doubled chance to attack when in range
+      // Force CPU to attack much more frequently when in perfect range
+      // This is a 70% chance to attack when in perfect range
+      if (rand < 0.7) {
         this.currentAction = CPUAction.ATTACK;
         this.actionTimer = 10;
         console.log('CPU decided to ATTACK because in perfect range');
-      } else if (rand < this.attackChance * 2 + this.blockChance) {
+      } else if (rand < 0.7 + this.blockChance) {
         this.currentAction = CPUAction.BLOCK;
         this.actionTimer = 15 + Math.floor(Math.random() * 15);
         console.log('CPU decided to BLOCK');
-      } else if (rand < this.attackChance * 2 + this.blockChance + this.jumpChance) {
+      } else if (rand < 0.7 + this.blockChance + this.jumpChance) {
         this.currentAction = CPUAction.JUMP;
         this.actionTimer = 5;
         console.log('CPU decided to JUMP');

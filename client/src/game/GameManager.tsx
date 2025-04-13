@@ -13,7 +13,8 @@ import {
   stayInArena, 
   PLAYER_SPEED,
   JUMP_FORCE,
-  ATTACK_RANGE
+  ATTACK_RANGE,
+  GRAVITY
 } from "./Physics";
 import { useControls } from "../lib/stores/useControls";
 import { useKeyboardControls } from "@react-three/drei";
@@ -55,6 +56,9 @@ const GameManager = () => {
   
   // Get keyboard state
   const [, getKeyboardState] = useKeyboardControls<Controls>();
+  
+  // Extract the forward key state directly from the keyboard controls
+  const forwardKey = useKeyboardControls(state => state.forward);
   
   // Combat system
   useEffect(() => {
@@ -165,9 +169,10 @@ const GameManager = () => {
       setPlayerDirection(newDirection);
     }
     
-    // Handle jumping
+    // Handle jumping - with enhanced debugging
     if (forward && !player.isJumping && playerY <= 0.01) {
-      console.log("Player JUMPING");
+      console.log("Player JUMPING - JUMP_FORCE:", JUMP_FORCE);
+      // Apply a strong upward velocity
       updatePlayerVelocity(newVX, JUMP_FORCE, playerVZ);
       setPlayerJumping(true);
     }
@@ -177,13 +182,8 @@ const GameManager = () => {
       console.log("Forward key pressed, playerY:", playerY, "isJumping:", player.isJumping);
     }
     
-    // Force-fix jumping by adding a direct jump keypress handler here
-    const jumpPressed = useKeyboardControls(state => state.forward);
-    if (jumpPressed && !player.isJumping && playerY <= 0.01) {
-      console.log("FORCE JUMP detected");
-      updatePlayerVelocity(newVX, JUMP_FORCE, playerVZ);
-      setPlayerJumping(true);
-    }
+    // Just rely on the existing jumping code and the new jump force
+    // We've increased jump force and reduced gravity which should make jumping work better
     
     // Apply gravity to player
     const [newY, newVY] = applyGravity(playerY, playerVY);

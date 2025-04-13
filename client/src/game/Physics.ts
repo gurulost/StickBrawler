@@ -1,6 +1,6 @@
 // Constants for physics calculations
-export const GRAVITY = 0.015; // Reduced for smoother jumping
-export const JUMP_FORCE = 0.6; // Decreased for more controlled jumping
+export const GRAVITY = 0.012; // Reduced for smoother jumping
+export const JUMP_FORCE = 0.4; // Decreased for more controlled jumping with lower height
 export const PLAYER_SPEED = 0.06; // Increased for better movement across larger arena
 export const CPU_SPEED = 0.05; // Increased to match player in larger arena
 export const DRAG = 0.92; // Increased drag for smoother movement
@@ -24,18 +24,129 @@ export const ATTACK_RANGE = 1.5; // Kept the same for consistent hit detection
 export const COMBO_WINDOW = 800; // Time window in ms to chain attacks for combos
 export const COMBO_MULTIPLIER = 1.2; // Damage multiplier for each hit in a combo
 
+// Platform system for multi-level combat
+export interface Platform {
+  x1: number;  // Left edge
+  x2: number;  // Right edge
+  z1: number;  // Front edge
+  z2: number;  // Back edge 
+  y: number;   // Height of platform
+}
+
+// Define platforms in the arena (coordinates are in world space)
+export const PLATFORMS: Platform[] = [
+  // Main floor platform is implicit at y=0
+  
+  // Medium height platform in the center
+  {
+    x1: -4,
+    x2: 4,
+    z1: -3,
+    z2: 3,
+    y: 3
+  },
+  
+  // Small platform to the left side
+  {
+    x1: -10,
+    x2: -6,
+    z1: -2,
+    z2: 2,
+    y: 2
+  },
+  
+  // Small platform to the right side
+  {
+    x1: 6,
+    x2: 10,
+    z1: -2,
+    z2: 2,
+    y: 2
+  },
+  
+  // Upper platform on one side
+  {
+    x1: 8,
+    x2: 11,
+    z1: 4,
+    z2: 6,
+    y: 5
+  },
+  
+  // Upper platform on other side
+  {
+    x1: -11,
+    x2: -8,
+    z1: 4,
+    z2: 6,
+    y: 5
+  }
+];
+
 /**
- * Applies gravity to a vertical position and velocity
+ * Check if a point is on a platform
  */
-export function applyGravity(y: number, velocityY: number): [number, number] {
+export function isOnPlatform(x: number, y: number, z: number, platformY: number = 0): boolean {
+  // First check the main floor (implicit platform at y=0)
+  if (Math.abs(y - FLOOR_Y) < 0.1 && y >= 0) {
+    return true;
+  }
+  
+  // Then check all other platforms
+  for (const platform of PLATFORMS) {
+    // Check if within the platform boundaries (with a small margin)
+    const onPlatformX = x >= platform.x1 && x <= platform.x2;
+    const onPlatformZ = z >= platform.z1 && z <= platform.z2;
+    const onPlatformY = Math.abs(y - platform.y) < 0.1 && y >= platform.y;
+    
+    if (onPlatformX && onPlatformZ && onPlatformY) {
+      return true;
+    }
+  }
+  
+  return false;
+}
+
+/**
+ * Find the platform height at a given x,z position
+ * Returns the height of the highest platform at this position
+ * or FLOOR_Y if no platform exists there
+ */
+export function getPlatformHeight(x: number, z: number): number {
+  let highestY = FLOOR_Y;
+  
+  for (const platform of PLATFORMS) {
+    if (x >= platform.x1 && x <= platform.x2 && 
+        z >= platform.z1 && z <= platform.z2 && 
+        platform.y > highestY) {
+      highestY = platform.y;
+    }
+  }
+  
+  return highestY;
+}
+
+/**
+ * Applies gravity to a vertical position and velocity,
+ * with platform collision detection
+ */
+export function applyGravity(y: number, velocityY: number, x: number = 0, z: number = 0): [number, number] {
   // Apply gravity to the velocity
   const newVelocityY = velocityY - GRAVITY;
   
   // Calculate new position
   const newY = y + newVelocityY;
   
-  // Check if on ground
-  if (newY <= FLOOR_Y) {
+  // Find the height of the platform at the current x,z position
+  const platformHeight = getPlatformHeight(x, z);
+  
+  // Check if on a platform or the ground
+  if (newY <= platformHeight && y > platformHeight - 0.5) {
+    // We're landing on a platform from above
+    return [platformHeight, 0]; // Reset velocity when on platform
+  }
+  // Check if on main ground
+  else if (newY <= FLOOR_Y) {
     return [FLOOR_Y, 0]; // Reset velocity when on ground
   }
   

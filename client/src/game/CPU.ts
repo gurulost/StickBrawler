@@ -363,8 +363,8 @@ export class CPUController {
       onDirectionChange(newDirection);
     }
     
-    // Apply gravity
-    const [newY, newVY] = applyGravity(y, vy);
+    // Apply gravity with platform collision detection
+    const [newY, newVY] = applyGravity(y, vy, x, z);
     
     // Calculate the new X position, staying within arena bounds
     const newX = stayInArena(x + newVX);
@@ -376,9 +376,11 @@ export class CPUController {
     onPositionChange(newX, newY, newZ);
     onVelocityChange(newVX, newVY, newVZ);
     
-    // Update jumping state
-    if (isJumping && newY <= 0.01) {
+    // Update jumping state when landing on a platform or ground
+    const platformHeight = getPlatformHeight(newX, newZ);
+    if (isJumping && (Math.abs(newY - platformHeight) < 0.1 || newY <= 0.01)) {
       onJumpingChange(false);
+      console.log("CPU landed on platform at height:", platformHeight);
     }
     
     // Check if player is attacking and close enough to block

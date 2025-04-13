@@ -15,7 +15,9 @@ import {
   PLAYER_SPEED,
   JUMP_FORCE,
   ATTACK_RANGE,
-  GRAVITY
+  GRAVITY,
+  getPlatformHeight,
+  isOnPlatform
 } from "./Physics";
 import { useControls } from "../lib/stores/useControls";
 import { useKeyboardControls } from "@react-three/drei";
@@ -240,15 +242,17 @@ const GameManager = () => {
       console.log("Forward key pressed, playerY:", playerY, "isJumping:", player.isJumping, "airJumpsLeft:", player.airJumpsLeft);
     }
     
-    // Apply gravity to player
-    const [newY, gravityVY] = applyGravity(playerY, newVY);
+    // Apply gravity to player with platform collision detection
+    const [newY, gravityVY] = applyGravity(playerY, newVY, playerX, playerZ);
     newVY = gravityVY; // Update with gravity effect
     
-    // Update jumping state when landing
-    if (player.isJumping && newY <= 0.01) {
+    // Update jumping state when landing on a platform or ground
+    const platformHeight = getPlatformHeight(playerX, playerZ);
+    if (player.isJumping && (Math.abs(newY - platformHeight) < 0.1 || newY <= 0.01)) {
       setPlayerJumping(false);
       // Reset air jumps when landing
       resetPlayerAirJumps();
+      console.log("Player landed on platform at height:", platformHeight);
     }
     
     // --- ATTACK SYSTEM (SMASH BROS STYLE) ---

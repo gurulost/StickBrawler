@@ -238,7 +238,7 @@ const StickFigure = ({
 
       {/* Body - enhanced size and improved materials for better visuals */}
       <mesh position={[0, 1.0, 0]} castShadow scale={[characterStyle.bodyScale, characterStyle.bodyScale, characterStyle.bodyScale]}>
-        <cylinderGeometry args={[0.08, 0.08, 1.0, 12]} />
+        <cylinderGeometry args={[characterStyle.limbThickness, characterStyle.limbThickness, characterStyle.bodyLength, 12]} />
         <meshStandardMaterial 
           color={characterColors.primary}
           metalness={characterStyle.metalness}

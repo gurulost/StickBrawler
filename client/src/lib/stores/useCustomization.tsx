@@ -1,201 +1,181 @@
 import { create } from 'zustand';
 
-// Set of predefined color themes
+// Define color themes for characters
 export const colorThemes = {
-  // Default blue theme
   blue: {
-    primary: "#3498db",
-    secondary: "#2980b9",
-    accent: "#1a5276",
-    emissive: "#73c0fb"
+    primary: '#2980b9',
+    secondary: '#3498db',
+    tertiary: '#1abc9c'
   },
-  // Default red theme (for CPU)
   red: {
-    primary: "#e74c3c",
-    secondary: "#c0392b",
-    accent: "#922b21",
-    emissive: "#f1948a"
+    primary: '#c0392b',
+    secondary: '#e74c3c',
+    tertiary: '#e67e22'
   },
-  // Additional fun themes
   green: {
-    primary: "#2ecc71",
-    secondary: "#27ae60",
-    accent: "#1e8449",
-    emissive: "#7dcea0"
+    primary: '#27ae60',
+    secondary: '#2ecc71',
+    tertiary: '#16a085'
   },
   purple: {
-    primary: "#9b59b6",
-    secondary: "#8e44ad",
-    accent: "#6c3483",
-    emissive: "#d2b4de"
+    primary: '#8e44ad',
+    secondary: '#9b59b6',
+    tertiary: '#6c3483'
   },
   orange: {
-    primary: "#e67e22",
-    secondary: "#d35400",
-    accent: "#a04000",
-    emissive: "#f5b041"
-  },
-  yellow: {
-    primary: "#f1c40f",
-    secondary: "#f39c12",
-    accent: "#b7950b",
-    emissive: "#f9e79f"
+    primary: '#d35400',
+    secondary: '#e67e22',
+    tertiary: '#f39c12'
   },
   pink: {
-    primary: "#ff69b4",
-    secondary: "#ff1493",
-    accent: "#c71585",
-    emissive: "#ffb6c1"
+    primary: '#e84393',
+    secondary: '#fd79a8',
+    tertiary: '#ff7675'
   },
-  teal: {
-    primary: "#00ced1",
-    secondary: "#008b8b",
-    accent: "#005757",
-    emissive: "#7fffd4"
+  black: {
+    primary: '#2c3e50',
+    secondary: '#34495e',
+    tertiary: '#212121'
   },
-  gold: {
-    primary: "#ffd700",
-    secondary: "#daa520",
-    accent: "#b8860b",
-    emissive: "#ffec8b"
-  },
-  silver: {
-    primary: "#c0c0c0",
-    secondary: "#a9a9a9",
-    accent: "#808080",
-    emissive: "#f5f5f5"
-  },
-  neon: {
-    primary: "#39ff14",
-    secondary: "#00ff00",
-    accent: "#00cc00",
-    emissive: "#7fff00"
-  },
-  rainbow: {
-    primary: "#ff0000",
-    secondary: "#00ff00",
-    accent: "#0000ff",
-    emissive: "#ffff00"
+  white: {
+    primary: '#ecf0f1',
+    secondary: '#bdc3c7',
+    tertiary: '#7f8c8d'
   }
 };
 
-// Set of predefined styles
+// Define stick figure style variations
 export const figureStyles = {
-  standard: {
-    bodyScale: 1.0,
-    headSize: 0.3,
-    limbThickness: 0.07,
+  normal: {
+    headSize: 0.25,
+    bodyLength: 0.8,
+    limbThickness: 0.08,
+    shoulderWidth: 0.4,
     metalness: 0.1,
     roughness: 0.7
   },
-  buff: {
-    bodyScale: 1.2,
-    headSize: 0.35,
-    limbThickness: 0.09,
+  bulky: {
+    headSize: 0.3,
+    bodyLength: 0.7,
+    limbThickness: 0.12,
+    shoulderWidth: 0.6,
     metalness: 0.2,
-    roughness: 0.6
-  },
-  slim: {
-    bodyScale: 0.9,
-    headSize: 0.28,
-    limbThickness: 0.06,
-    metalness: 0.05,
     roughness: 0.8
   },
-  chibi: {
-    bodyScale: 0.8,
-    headSize: 0.4,
+  slim: {
+    headSize: 0.22,
+    bodyLength: 0.9,
     limbThickness: 0.06,
-    metalness: 0.1,
-    roughness: 0.7
+    shoulderWidth: 0.3,
+    metalness: 0.05,
+    roughness: 0.6
+  },
+  cartoonish: {
+    headSize: 0.35,
+    bodyLength: 0.6,
+    limbThickness: 0.09,
+    shoulderWidth: 0.5,
+    metalness: 0.3,
+    roughness: 0.5
   },
   robot: {
-    bodyScale: 1.1,
     headSize: 0.28,
-    limbThickness: 0.08,
-    metalness: 0.9,
+    bodyLength: 0.75,
+    limbThickness: 0.1,
+    shoulderWidth: 0.45,
+    metalness: 0.8,
     roughness: 0.2
-  },
-  ghost: {
-    bodyScale: 1.0,
-    headSize: 0.32,
-    limbThickness: 0.07,
-    metalness: 0.0,
-    roughness: 0.3
   }
 };
 
-// Additional accessories
+// Define accessories that can be added to the characters
 export const accessories = {
-  none: { name: "None", apply: () => ({}) },
+  none: {
+    name: 'None',
+    geometry: null
+  },
   hat: {
-    name: "Hat", 
-    apply: (color: string) => ({
-      hat: true,
-      hatColor: color || "#333333"
-    })
+    name: 'Hat',
+    geometry: {
+      type: 'cone',
+      args: [0.15, 0.3, 16],
+      position: [0, 0.3, 0]
+    }
   },
-  sunglasses: { 
-    name: "Sunglasses", 
-    apply: (color: string) => ({
-      sunglasses: true,
-      sunglassesColor: color || "#000000"
-    })
+  glasses: {
+    name: 'Glasses',
+    geometry: {
+      type: 'torusGeometry',
+      args: [0.08, 0.02, 12, 24],
+      rotation: [0, 0, 0],
+      position: [0, 0.05, 0.2]
+    }
   },
-  cape: { 
-    name: "Cape", 
-    apply: (color: string) => ({
-      cape: true,
-      capeColor: color || "#cc0000"
-    })
+  cape: {
+    name: 'Cape',
+    geometry: {
+      type: 'planeGeometry',
+      args: [0.4, 0.8],
+      position: [0, -0.4, -0.2],
+      rotation: [0.2, 0, 0]
+    }
   },
-  sword: { 
-    name: "Sword", 
-    apply: (color: string) => ({
-      sword: true,
-      swordColor: color || "#cccccc"
-    })
+  sword: {
+    name: 'Sword',
+    geometry: {
+      type: 'boxGeometry',
+      args: [0.05, 0.6, 0.05],
+      position: [0.4, 0.2, 0],
+      rotation: [0, 0, Math.PI / 4]
+    }
   },
-  crown: { 
-    name: "Crown", 
-    apply: (color: string) => ({
-      crown: true,
-      crownColor: color || "#ffd700"
-    })
-  },
-  wings: { 
-    name: "Wings", 
-    apply: (color: string) => ({
-      wings: true,
-      wingsColor: color || "#ffffff"
-    })
-  },
-  aura: { 
-    name: "Aura", 
-    apply: (color: string) => ({
-      aura: true,
-      auraColor: color || "#ffff00"
-    })
+  shield: {
+    name: 'Shield',
+    geometry: {
+      type: 'circleGeometry',
+      args: [0.2, 16],
+      position: [-0.3, 0.2, 0.1],
+      rotation: [0, 0.3, 0]
+    }
   }
 };
 
-// Animation styles
+// Animation style variations
 export const animationStyles = {
-  standard: "standard",
-  martial_arts: "martial_arts",
-  boxer: "boxer",
-  ninja: "ninja",
-  robot: "robot",
-  silly: "silly"
+  normal: {
+    attackSpeed: 1.0,
+    jumpHeight: 1.0,
+    idleIntensity: 1.0
+  },
+  fast: {
+    attackSpeed: 1.5,
+    jumpHeight: 1.2,
+    idleIntensity: 1.3
+  },
+  powerful: {
+    attackSpeed: 0.8,
+    jumpHeight: 1.0,
+    idleIntensity: 0.8
+  },
+  acrobatic: {
+    attackSpeed: 1.2,
+    jumpHeight: 1.4,
+    idleIntensity: 1.1
+  },
+  robotic: {
+    attackSpeed: 0.9,
+    jumpHeight: 0.9,
+    idleIntensity: 0.5
+  }
 };
 
-// Define the store types
+// Type definitions for our customization options
 export type ColorTheme = keyof typeof colorThemes;
 export type FigureStyle = keyof typeof figureStyles;
 export type Accessory = keyof typeof accessories;
 export type AnimationStyle = keyof typeof animationStyles;
 
-// Create a type for all customization options
+// Interface for all customization options
 export interface CustomizationOptions {
   playerColorTheme: ColorTheme;
   playerFigureStyle: FigureStyle;
@@ -210,7 +190,7 @@ export interface CustomizationOptions {
   cpuAnimationStyle: string;
 }
 
-// Interface for the customization store
+// Zustand store interface with customization options and actions
 interface CustomizationState extends CustomizationOptions {
   // Actions to update customization options
   setPlayerColorTheme: (theme: ColorTheme) => void;
@@ -236,70 +216,77 @@ interface CustomizationState extends CustomizationOptions {
   resetCustomizations: () => void;
 }
 
-// Default customization options
+// Default customization settings
 const DEFAULT_CUSTOMIZATION: CustomizationOptions = {
   playerColorTheme: 'blue',
-  playerFigureStyle: 'standard',
+  playerFigureStyle: 'normal',
   playerAccessory: 'none',
   playerAccessoryColor: '#ffffff',
-  playerAnimationStyle: 'standard',
+  playerAnimationStyle: 'normal',
   
   cpuColorTheme: 'red',
-  cpuFigureStyle: 'standard',
+  cpuFigureStyle: 'normal',
   cpuAccessory: 'none',
   cpuAccessoryColor: '#ffffff',
-  cpuAnimationStyle: 'standard'
+  cpuAnimationStyle: 'normal'
 };
 
-// Create the customization store
+// Create the Zustand store
 export const useCustomization = create<CustomizationState>((set, get) => ({
+  // Initial state
   ...DEFAULT_CUSTOMIZATION,
   
-  // Player customization actions
+  // Actions for player customization
   setPlayerColorTheme: (theme) => set({ playerColorTheme: theme }),
   setPlayerFigureStyle: (style) => set({ playerFigureStyle: style }),
-  setPlayerAccessory: (accessory, color) => set({ 
+  setPlayerAccessory: (accessory, color = '#ffffff') => set({ 
     playerAccessory: accessory,
-    playerAccessoryColor: color || '#ffffff'
+    playerAccessoryColor: color 
   }),
   setPlayerAnimationStyle: (style) => set({ playerAnimationStyle: style }),
   
-  // CPU customization actions
+  // Actions for CPU customization
   setCPUColorTheme: (theme) => set({ cpuColorTheme: theme }),
   setCPUFigureStyle: (style) => set({ cpuFigureStyle: style }),
-  setCPUAccessory: (accessory, color) => set({ 
+  setCPUAccessory: (accessory, color = '#ffffff') => set({ 
     cpuAccessory: accessory,
-    cpuAccessoryColor: color || '#ffffff'
+    cpuAccessoryColor: color 
   }),
   setCPUAnimationStyle: (style) => set({ cpuAnimationStyle: style }),
   
   // Helper functions to get computed values
   getPlayerColors: () => {
-    const { playerColorTheme } = get();
-    return colorThemes[playerColorTheme];
+    const state = get();
+    return colorThemes[state.playerColorTheme];
   },
   getPlayerStyle: () => {
-    const { playerFigureStyle } = get();
-    return figureStyles[playerFigureStyle];
+    const state = get();
+    return figureStyles[state.playerFigureStyle];
   },
   getPlayerAccessory: () => {
-    const { playerAccessory, playerAccessoryColor } = get();
-    return accessories[playerAccessory].apply(playerAccessoryColor);
+    const state = get();
+    return {
+      ...accessories[state.playerAccessory],
+      color: state.playerAccessoryColor
+    };
   },
   
   getCPUColors: () => {
-    const { cpuColorTheme } = get();
-    return colorThemes[cpuColorTheme];
+    const state = get();
+    return colorThemes[state.cpuColorTheme];
   },
   getCPUStyle: () => {
-    const { cpuFigureStyle } = get();
-    return figureStyles[cpuFigureStyle];
+    const state = get();
+    return figureStyles[state.cpuFigureStyle];
   },
   getCPUAccessory: () => {
-    const { cpuAccessory, cpuAccessoryColor } = get();
-    return accessories[cpuAccessory].apply(cpuAccessoryColor);
+    const state = get();
+    return {
+      ...accessories[state.cpuAccessory],
+      color: state.cpuAccessoryColor
+    };
   },
   
-  // Reset customizations
+  // Reset to default customizations
   resetCustomizations: () => set(DEFAULT_CUSTOMIZATION)
 }));

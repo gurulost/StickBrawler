@@ -12,7 +12,8 @@ import {
   applyGravity, 
   stayInArena, 
   PLAYER_SPEED,
-  JUMP_FORCE
+  JUMP_FORCE,
+  ATTACK_RANGE
 } from "./Physics";
 import { useControls } from "../lib/stores/useControls";
 import { useKeyboardControls } from "@react-three/drei";

@@ -9,16 +9,25 @@ import Menu from "./game/Menu";
 import UI from "./game/UI";
 import { useFighting } from "./lib/stores/useFighting";
 
-// Define control keys for the game
+// Define control keys for the game - Super Smash Bros style controls
 const keyboardMap = [
+  // Movement
   { name: Controls.forward, keys: ["KeyW", "ArrowUp"] },
   { name: Controls.backward, keys: ["KeyS", "ArrowDown"] },
   { name: Controls.leftward, keys: ["KeyA", "ArrowLeft"] },
   { name: Controls.rightward, keys: ["KeyD", "ArrowRight"] },
+  
+  // Basic attacks
   { name: Controls.punch, keys: ["KeyJ"] },
   { name: Controls.kick, keys: ["KeyK"] },
   { name: Controls.block, keys: ["KeyL"] },
   { name: Controls.special, keys: ["Space"] },
+  
+  // Advanced moves (Super Smash Bros style)
+  { name: Controls.dodge, keys: ["ShiftLeft", "ShiftRight"] },
+  { name: Controls.airAttack, keys: ["KeyI"] },  // Air attack (while jumping)
+  { name: Controls.grab, keys: ["KeyG"] },       // Grab opponent 
+  { name: Controls.taunt, keys: ["KeyT"] },      // Taunt move
 ];
 
 // Log the key mapping configuration to help with debugging

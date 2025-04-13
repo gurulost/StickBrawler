@@ -9,6 +9,10 @@ export enum Controls {
   kick = 'kick',
   block = 'block',
   special = 'special',
+  dodge = 'dodge',     // New dodge mechanic
+  airAttack = 'airAttack', // New aerial attack
+  taunt = 'taunt',     // Fun taunt move
+  grab = 'grab',       // Grab opponent (like Smash Bros)
 }
 
 type ControlsState = {

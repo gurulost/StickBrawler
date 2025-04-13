@@ -10,7 +10,14 @@ export interface CharacterState {
   isJumping: boolean;
   isAttacking: boolean;
   isBlocking: boolean;
+  isDodging: boolean;     // New dodge mechanic
+  isGrabbing: boolean;    // New grab mechanic
+  isTaunting: boolean;    // Taunt animation
+  isAirAttacking: boolean; // Aerial attack
+  airJumpsLeft: number;   // Double/triple jump capability (Smash Bros style)
   attackCooldown: number;
+  dodgeCooldown: number;  // Cooldown for dodge
+  grabCooldown: number;   // Cooldown for grab
   velocity: [number, number, number];
 }
 
@@ -36,6 +43,12 @@ interface FightingState {
   setPlayerJumping: (isJumping: boolean) => void;
   setPlayerAttacking: (isAttacking: boolean) => void;
   setPlayerBlocking: (isBlocking: boolean) => void;
+  setPlayerDodging: (isDodging: boolean) => void;        // New dodge action
+  setPlayerGrabbing: (isGrabbing: boolean) => void;      // New grab action
+  setPlayerTaunting: (isTaunting: boolean) => void;      // New taunt action
+  setPlayerAirAttacking: (isAirAttacking: boolean) => void; // New air attack
+  resetPlayerAirJumps: () => void;                       // Reset air jumps when landing
+  usePlayerAirJump: () => boolean;                       // Use an air jump, returns success
   damagePlayer: (amount: number) => void;
   updatePlayerCooldowns: (delta: number) => void;
   
@@ -46,6 +59,12 @@ interface FightingState {
   setCPUJumping: (isJumping: boolean) => void;
   setCPUAttacking: (isAttacking: boolean) => void;
   setCPUBlocking: (isBlocking: boolean) => void;
+  setCPUDodging: (isDodging: boolean) => void;           // New dodge action
+  setCPUGrabbing: (isGrabbing: boolean) => void;         // New grab action
+  setCPUTaunting: (isTaunting: boolean) => void;         // New taunt action
+  setCPUAirAttacking: (isAirAttacking: boolean) => void; // New air attack
+  resetCPUAirJumps: () => void;                          // Reset air jumps when landing
+  useCPUAirJump: () => boolean;                          // Use an air jump, returns success
   damageCPU: (amount: number) => void;
   updateCPUCooldowns: (delta: number) => void;
   
@@ -65,7 +84,14 @@ const createDefaultCharacterState = (position: [number, number, number], directi
   isJumping: false,
   isAttacking: false,
   isBlocking: false,
+  isDodging: false,
+  isGrabbing: false,
+  isTaunting: false,
+  isAirAttacking: false,
+  airJumpsLeft: 2, // Allow 2 additional jumps (triple jump total - Smash Bros style)
   attackCooldown: 0,
+  dodgeCooldown: 0,
+  grabCooldown: 0,
   velocity: [0, 0, 0],
 });
 
@@ -275,31 +301,243 @@ export const useFighting = create<FightingState>((set) => ({
     };
   }),
   
-  // Update player cooldowns
-  updatePlayerCooldowns: (delta) => set((state) => {
-    if (state.player.attackCooldown > 0) {
-      console.log("Reducing player cooldown from", state.player.attackCooldown);
+  // New Player Action Methods
+  setPlayerDodging: (isDodging) => set((state) => {
+    // Start dodge cooldown when beginning to dodge
+    let newCooldown = state.player.dodgeCooldown;
+    if (isDodging && !state.player.isDodging) {
+      newCooldown = 20; // Dodge has longer cooldown than attacks
+      console.log("Player DODGE - starting cooldown:", newCooldown);
+    }
+    
+    return {
+      player: {
+        ...state.player,
+        isDodging,
+        dodgeCooldown: newCooldown
+      }
+    };
+  }),
+
+  setPlayerGrabbing: (isGrabbing) => set((state) => {
+    // Start grab cooldown when beginning to grab
+    let newCooldown = state.player.grabCooldown;
+    if (isGrabbing && !state.player.isGrabbing) {
+      newCooldown = 30; // Grab has longer cooldown
+      console.log("Player GRAB - starting cooldown:", newCooldown);
+    }
+    
+    return {
+      player: {
+        ...state.player,
+        isGrabbing,
+        grabCooldown: newCooldown
+      }
+    };
+  }),
+
+  setPlayerTaunting: (isTaunting) => set((state) => ({
+    player: {
+      ...state.player,
+      isTaunting
+    }
+  })),
+
+  setPlayerAirAttacking: (isAirAttacking) => set((state) => {
+    if (isAirAttacking && !state.player.isJumping) {
+      // Can't air attack if not in the air
+      return {}; // No change
+    }
+    
+    // Air attacks have a separate state from ground attacks
+    let newCooldown = state.player.attackCooldown;
+    if (isAirAttacking && !state.player.isAirAttacking) {
+      newCooldown = 15; // Air attacks have longer cooldown
+      console.log("Player AIR ATTACK - starting cooldown:", newCooldown);
+    }
+    
+    return {
+      player: {
+        ...state.player,
+        isAirAttacking,
+        attackCooldown: newCooldown
+      }
+    };
+  }),
+
+  resetPlayerAirJumps: () => set((state) => ({
+    player: {
+      ...state.player,
+      airJumpsLeft: 2 // Reset to 2 air jumps
+    }
+  })),
+
+  usePlayerAirJump: () => {
+    let jumpSuccess = false;
+    
+    set((state) => {
+      if (state.player.airJumpsLeft <= 0) {
+        // No air jumps left
+        console.log("Player has no air jumps left!");
+        return state; // No changes to state
+      }
+      
+      console.log("Player using air jump! Jumps remaining:", state.player.airJumpsLeft - 1);
+      jumpSuccess = true;
+      
       return {
         player: {
           ...state.player,
-          attackCooldown: Math.max(0, state.player.attackCooldown - 1)
+          airJumpsLeft: state.player.airJumpsLeft - 1
         }
       };
+    });
+    
+    return jumpSuccess; // Return success flag
+  },
+
+  // New CPU Action Methods
+  setCPUDodging: (isDodging) => set((state) => {
+    // Start dodge cooldown when beginning to dodge
+    let newCooldown = state.cpu.dodgeCooldown;
+    if (isDodging && !state.cpu.isDodging) {
+      newCooldown = 20; // Dodge has longer cooldown than attacks
     }
-    return {}; // No changes if cooldown is already 0
+    
+    return {
+      cpu: {
+        ...state.cpu,
+        isDodging,
+        dodgeCooldown: newCooldown
+      }
+    };
+  }),
+
+  setCPUGrabbing: (isGrabbing) => set((state) => {
+    // Start grab cooldown when beginning to grab
+    let newCooldown = state.cpu.grabCooldown;
+    if (isGrabbing && !state.cpu.isGrabbing) {
+      newCooldown = 30; // Grab has longer cooldown
+    }
+    
+    return {
+      cpu: {
+        ...state.cpu,
+        isGrabbing,
+        grabCooldown: newCooldown
+      }
+    };
+  }),
+
+  setCPUTaunting: (isTaunting) => set((state) => ({
+    cpu: {
+      ...state.cpu,
+      isTaunting
+    }
+  })),
+
+  setCPUAirAttacking: (isAirAttacking) => set((state) => {
+    if (isAirAttacking && !state.cpu.isJumping) {
+      // Can't air attack if not in the air
+      return {}; // No change
+    }
+    
+    // Air attacks have a separate state from ground attacks
+    let newCooldown = state.cpu.attackCooldown;
+    if (isAirAttacking && !state.cpu.isAirAttacking) {
+      newCooldown = 15; // Air attacks have longer cooldown
+    }
+    
+    return {
+      cpu: {
+        ...state.cpu,
+        isAirAttacking,
+        attackCooldown: newCooldown
+      }
+    };
+  }),
+
+  resetCPUAirJumps: () => set((state) => ({
+    cpu: {
+      ...state.cpu,
+      airJumpsLeft: 2 // Reset to 2 air jumps
+    }
+  })),
+
+  useCPUAirJump: () => {
+    let jumpSuccess = false;
+    
+    set((state) => {
+      if (state.cpu.airJumpsLeft <= 0) {
+        // No air jumps left
+        return state; // No changes to state
+      }
+      
+      jumpSuccess = true;
+      return {
+        cpu: {
+          ...state.cpu,
+          airJumpsLeft: state.cpu.airJumpsLeft - 1
+        }
+      };
+    });
+    
+    return jumpSuccess; // Return success flag
+  },
+
+  // Update player cooldowns
+  updatePlayerCooldowns: (delta) => set((state) => {
+    // Update all cooldowns
+    const newAttackCooldown = state.player.attackCooldown > 0 
+      ? Math.max(0, state.player.attackCooldown - 1) 
+      : 0;
+      
+    const newDodgeCooldown = state.player.dodgeCooldown > 0
+      ? Math.max(0, state.player.dodgeCooldown - 1)
+      : 0;
+      
+    const newGrabCooldown = state.player.grabCooldown > 0
+      ? Math.max(0, state.player.grabCooldown - 1)
+      : 0;
+    
+    // Debug output for cooldowns
+    if (state.player.attackCooldown > 0) {
+      console.log("Reducing player attack cooldown from", state.player.attackCooldown);
+    }
+    
+    return {
+      player: {
+        ...state.player,
+        attackCooldown: newAttackCooldown,
+        dodgeCooldown: newDodgeCooldown,
+        grabCooldown: newGrabCooldown
+      }
+    };
   }),
   
   // Update CPU cooldowns
   updateCPUCooldowns: (delta) => set((state) => {
-    if (state.cpu.attackCooldown > 0) {
-      return {
-        cpu: {
-          ...state.cpu,
-          attackCooldown: Math.max(0, state.cpu.attackCooldown - 1)
-        }
-      };
-    }
-    return {}; // No changes if cooldown is already 0
+    // Update all cooldowns
+    const newAttackCooldown = state.cpu.attackCooldown > 0 
+      ? Math.max(0, state.cpu.attackCooldown - 1) 
+      : 0;
+      
+    const newDodgeCooldown = state.cpu.dodgeCooldown > 0
+      ? Math.max(0, state.cpu.dodgeCooldown - 1)
+      : 0;
+      
+    const newGrabCooldown = state.cpu.grabCooldown > 0
+      ? Math.max(0, state.cpu.grabCooldown - 1)
+      : 0;
+    
+    return {
+      cpu: {
+        ...state.cpu,
+        attackCooldown: newAttackCooldown,
+        dodgeCooldown: newDodgeCooldown,
+        grabCooldown: newGrabCooldown
+      }
+    };
   }),
   
   // Game time

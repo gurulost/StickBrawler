@@ -158,7 +158,7 @@ export function getPlatformHeight(x: number, z: number): number {
  * Applies gravity to a vertical position and velocity,
  * with platform collision detection
  */
-export function applyGravity(y: number, velocityY: number, x: number = 0, z: number = 0): [number, number] {
+export function applyGravity(y: number, velocityY: number, x: number = 0, z: number = 0, dropThrough: boolean = false): [number, number] {
   // Apply gravity to the velocity
   const newVelocityY = velocityY - GRAVITY;
   
@@ -168,8 +168,13 @@ export function applyGravity(y: number, velocityY: number, x: number = 0, z: num
   // Find the height of the platform at the current x,z position
   const platformHeight = getPlatformHeight(x, z);
   
-  // Check if on a platform or the ground
-  if (newY <= platformHeight && y > platformHeight - 0.5) {
+  // If the player is pressing down (dropThrough = true), let them drop through platforms
+  if (dropThrough && y === platformHeight && platformHeight > FLOOR_Y) {
+    // If we're on a platform and want to drop through, add a small push down
+    return [y - 0.1, newVelocityY - 0.01]; // Push through the platform
+  }
+  // Check if on a platform or the ground 
+  else if (newY <= platformHeight && y > platformHeight - 0.5) {
     // We're landing on a platform from above
     return [platformHeight, 0]; // Reset velocity when on platform
   }

@@ -3,7 +3,8 @@ import { useRef, useState, useEffect } from "react";
 import { useKeyboardControls } from "@react-three/drei";
 import { CharacterState } from "../lib/stores/useFighting";
 import { Controls } from "../lib/stores/useControls";
-import { Group, Mesh } from "three";
+import { Group, Mesh, DoubleSide } from "three";
+import * as THREE from "three";
 import { 
   applyGravity, 
   stayInArena, 
@@ -235,6 +236,83 @@ const StickFigure = ({
           roughness={characterStyle.roughness}
         />
       </mesh>
+      
+      {/* Render accessory if any */}
+      {characterAccessory.geometry && (
+        <group position={[0, 1.8 + characterStyle.headSize * 0.5, 0]}>
+          {characterAccessory.geometry.type === 'cone' && (
+            <mesh 
+              position={characterAccessory.geometry.position} 
+              castShadow
+            >
+              <coneGeometry args={characterAccessory.geometry.args} />
+              <meshStandardMaterial 
+                color={characterAccessory.color} 
+                metalness={characterStyle.metalness}
+                roughness={characterStyle.roughness}
+              />
+            </mesh>
+          )}
+          {characterAccessory.geometry.type === 'torusGeometry' && (
+            <mesh 
+              position={characterAccessory.geometry.position} 
+              rotation={characterAccessory.geometry.rotation}
+              castShadow
+            >
+              <torusGeometry args={characterAccessory.geometry.args} />
+              <meshStandardMaterial 
+                color={characterAccessory.color} 
+                metalness={characterStyle.metalness}
+                roughness={characterStyle.roughness}
+              />
+            </mesh>
+          )}
+          {characterAccessory.geometry.type === 'planeGeometry' && (
+            <mesh 
+              position={characterAccessory.geometry.position} 
+              rotation={characterAccessory.geometry.rotation}
+              castShadow
+            >
+              <planeGeometry args={characterAccessory.geometry.args} />
+              <meshStandardMaterial 
+                color={characterAccessory.color} 
+                metalness={characterStyle.metalness}
+                roughness={characterStyle.roughness}
+                side={THREE.DoubleSide}
+              />
+            </mesh>
+          )}
+          {characterAccessory.geometry.type === 'boxGeometry' && (
+            <mesh 
+              position={characterAccessory.geometry.position} 
+              rotation={characterAccessory.geometry.rotation}
+              castShadow
+            >
+              <boxGeometry args={characterAccessory.geometry.args} />
+              <meshStandardMaterial 
+                color={characterAccessory.color} 
+                metalness={characterStyle.metalness}
+                roughness={characterStyle.roughness}
+              />
+            </mesh>
+          )}
+          {characterAccessory.geometry.type === 'circleGeometry' && (
+            <mesh 
+              position={characterAccessory.geometry.position} 
+              rotation={characterAccessory.geometry.rotation}
+              castShadow
+            >
+              <circleGeometry args={characterAccessory.geometry.args} />
+              <meshStandardMaterial 
+                color={characterAccessory.color} 
+                metalness={characterStyle.metalness}
+                roughness={characterStyle.roughness}
+                side={THREE.DoubleSide}
+              />
+            </mesh>
+          )}
+        </group>
+      )}
 
       {/* Body - enhanced size and improved materials for better visuals */}
       <mesh position={[0, 1.0, 0]} castShadow scale={[characterStyle.bodyScale, characterStyle.bodyScale, characterStyle.bodyScale]}>

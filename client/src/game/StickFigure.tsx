@@ -13,6 +13,7 @@ import {
   applyDrag 
 } from "./Physics";
 import { useAudio } from "../lib/stores/useAudio";
+import { useCustomization } from "../lib/stores/useCustomization";
 
 interface StickFigureProps {
   isPlayer: boolean;
@@ -41,6 +42,21 @@ const StickFigure = ({
   const [attackType, setAttackType] = useState<'punch' | 'kick' | 'special' | 'air_attack' | 'grab' | 'dodge' | 'taunt' | null>(null);
   const [animationPhase, setAnimationPhase] = useState(0);
   const { playHit } = useAudio();
+  
+  // Get customization settings
+  const {
+    getPlayerColors,
+    getPlayerStyle,
+    getPlayerAccessory,
+    getCPUColors,
+    getCPUStyle,
+    getCPUAccessory
+  } = useCustomization();
+  
+  // Get the appropriate customization for this character
+  const characterColors = isPlayer ? getPlayerColors() : getCPUColors();
+  const characterStyle = isPlayer ? getPlayerStyle() : getCPUStyle();
+  const characterAccessory = isPlayer ? getPlayerAccessory() : getCPUAccessory();
   
   // Get keyboard controls - only used for player character with new control scheme
   const jump = useKeyboardControls<Controls>(state => state.jump);
@@ -210,23 +226,23 @@ const StickFigure = ({
     >
       {/* Head - enhanced size for the bigger arena */}
       <mesh position={[0, 1.8, 0]} castShadow>
-        <sphereGeometry args={[0.3, 24, 24]} />
+        <sphereGeometry args={[characterStyle.headSize, 24, 24]} />
         <meshStandardMaterial 
-          color={isPlayer ? "#3498db" : "#e74c3c"} 
-          emissive={isAttacking ? "#ffff00" : "#000000"}
+          color={characterColors.primary} 
+          emissive={isAttacking ? characterColors.emissive : "#000000"}
           emissiveIntensity={isAttacking ? 0.5 : 0}
-          metalness={0.2}
-          roughness={0.6}
+          metalness={characterStyle.metalness}
+          roughness={characterStyle.roughness}
         />
       </mesh>
 
       {/* Body - enhanced size and improved materials for better visuals */}
-      <mesh position={[0, 1.0, 0]} castShadow>
+      <mesh position={[0, 1.0, 0]} castShadow scale={[characterStyle.bodyScale, characterStyle.bodyScale, characterStyle.bodyScale]}>
         <cylinderGeometry args={[0.08, 0.08, 1.0, 12]} />
         <meshStandardMaterial 
-          color={isPlayer ? "#3498db" : "#e74c3c"} 
-          metalness={0.1}
-          roughness={0.7}
+          color={characterColors.primary}
+          metalness={characterStyle.metalness}
+          roughness={characterStyle.roughness}
         />
       </mesh>
 
@@ -272,11 +288,11 @@ const StickFigure = ({
           attackType === 'air_attack' ? -0.15 - animationPhase * 0.15 : // Downward position
           0
         ]} castShadow>
-          <cylinderGeometry args={[0.07, 0.07, 0.7, 12]} />
+          <cylinderGeometry args={[characterStyle.limbThickness, characterStyle.limbThickness, 0.7, 12]} />
           <meshStandardMaterial 
-            color={isPlayer ? "#2980b9" : "#c0392b"} 
-            metalness={0.1}
-            roughness={0.7}
+            color={characterColors.secondary} 
+            metalness={characterStyle.metalness}
+            roughness={characterStyle.roughness}
           />
         </mesh>
       </group>

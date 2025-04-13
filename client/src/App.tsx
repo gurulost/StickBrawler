@@ -21,6 +21,9 @@ const keyboardMap = [
   { name: Controls.special, keys: ["Space"] },
 ];
 
+// Log the key mapping configuration to help with debugging
+console.log("Keyboard controls configuration:", keyboardMap);
+
 // Main App component
 function App() {
   const { gamePhase } = useFighting();

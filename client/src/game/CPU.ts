@@ -1,5 +1,16 @@
 import { CharacterState } from "../lib/stores/useFighting";
-import { applyGravity, stayInArena, applyDrag, JUMP_FORCE, CPU_SPEED, checkAttackHit } from "./Physics";
+import { 
+  applyGravity, 
+  stayInArena, 
+  applyDrag, 
+  JUMP_FORCE, 
+  CPU_SPEED, 
+  checkAttackHit,
+  ATTACK_RANGE,
+  PUNCH_DAMAGE,
+  KICK_DAMAGE,
+  SPECIAL_DAMAGE 
+} from "./Physics";
 
 // CPU difficulty levels
 export enum CPUDifficulty {
@@ -36,22 +47,26 @@ export class CPUController {
     switch (difficulty) {
       case CPUDifficulty.EASY:
         this.targetDistance = 2.0; // Stays further away
-        this.attackChance = 0.02;  // Attacks less frequently
-        this.blockChance = 0.01;   // Blocks less frequently
-        this.jumpChance = 0.01;    // Jumps less frequently
+        this.attackChance = 0.03;  // Attacks less frequently
+        this.blockChance = 0.02;   // Blocks less frequently
+        this.jumpChance = 0.02;    // Jumps less frequently
         break;
       case CPUDifficulty.HARD:
         this.targetDistance = 1.0; // Gets closer to player
-        this.attackChance = 0.05;  // Attacks more frequently
-        this.blockChance = 0.04;   // Blocks more frequently
-        this.jumpChance = 0.03;    // Jumps more frequently
+        this.attackChance = 0.12;  // Attacks more frequently
+        this.blockChance = 0.09;   // Blocks more frequently
+        this.jumpChance = 0.07;    // Jumps more frequently
         break;
       default: // MEDIUM
         this.targetDistance = 1.5;
-        this.attackChance = 0.03;
-        this.blockChance = 0.02;
-        this.jumpChance = 0.02;
+        this.attackChance = 0.08;  // Increased from 0.03
+        this.blockChance = 0.06;   // Increased from 0.02
+        this.jumpChance = 0.04;    // Increased from 0.02
     }
+
+    // Log the CPU configuration for debugging
+    console.log(`CPU controller initialized with difficulty: ${CPUDifficulty[difficulty]}`);
+    console.log(`Attack chance: ${this.attackChance}, Block chance: ${this.blockChance}, Jump chance: ${this.jumpChance}`);
   }
   
   update(
@@ -118,10 +133,29 @@ export class CPUController {
         if (attackCooldown <= 0 && !isAttacking && !isBlocking) {
           onAttackingChange(true);
           
+          // Randomly choose attack type (basic implementation - for display purposes)
+          // In a full implementation, we'd handle different attack types and animations
+          const attackType = Math.random();
+          let attackDuration = 400; // default punch duration
+          
+          if (attackType < 0.6) {
+            // Basic punch - 60% chance
+            console.log("CPU performs a PUNCH");
+            attackDuration = 400;
+          } else if (attackType < 0.9) {
+            // Kick - 30% chance
+            console.log("CPU performs a KICK");
+            attackDuration = 500;
+          } else {
+            // Special - 10% chance
+            console.log("CPU performs a SPECIAL ATTACK");
+            attackDuration = 600;
+          }
+          
           // Reset attack after delay
           setTimeout(() => {
             onAttackingChange(false);
-          }, 400);
+          }, attackDuration);
         }
         break;
         
@@ -195,30 +229,72 @@ export class CPUController {
     // Random action selection based on distance and chances
     const rand = Math.random();
     
-    if (distanceToPlayer > this.targetDistance * 1.5) {
-      // Too far from player, chase
+    // Log for debugging
+    if (Math.random() < 0.05) { // Only log occasionally to avoid console spam
+      console.log(`CPU deciding action. Distance: ${distanceToPlayer.toFixed(2)}, Target: ${this.targetDistance}`);
+    }
+    
+    // Within attack range - most likely attack or block
+    if (distanceToPlayer <= ATTACK_RANGE * 1.1 && distanceToPlayer >= ATTACK_RANGE * 0.7) {
+      if (rand < this.attackChance * 2) { // Doubled chance to attack when in range
+        this.currentAction = CPUAction.ATTACK;
+        this.actionTimer = 10;
+        console.log('CPU decided to ATTACK because in perfect range');
+      } else if (rand < this.attackChance * 2 + this.blockChance) {
+        this.currentAction = CPUAction.BLOCK;
+        this.actionTimer = 15 + Math.floor(Math.random() * 15);
+        console.log('CPU decided to BLOCK');
+      } else if (rand < this.attackChance * 2 + this.blockChance + this.jumpChance) {
+        this.currentAction = CPUAction.JUMP;
+        this.actionTimer = 5;
+        console.log('CPU decided to JUMP');
+      } else {
+        // Even in attack range, sometimes just wait
+        this.currentAction = CPUAction.IDLE;
+        this.actionTimer = 5 + Math.floor(Math.random() * 10);
+        console.log('CPU decided to IDLE');
+      }
+    } 
+    // Too far from player, chase
+    else if (distanceToPlayer > this.targetDistance * 1.2) {
       this.currentAction = CPUAction.CHASE;
       this.actionTimer = 30 + Math.floor(Math.random() * 30);
-    } else if (distanceToPlayer < this.targetDistance * 0.5) {
-      // Too close to player, retreat
+      console.log('CPU decided to CHASE');
+    } 
+    // Too close to player, back up a bit
+    else if (distanceToPlayer < this.targetDistance * 0.5) {
       this.currentAction = CPUAction.RETREAT;
-      this.actionTimer = 20 + Math.floor(Math.random() * 20);
-    } else if (rand < this.attackChance) {
-      // Attack
-      this.currentAction = CPUAction.ATTACK;
-      this.actionTimer = 10;
-    } else if (rand < this.attackChance + this.blockChance) {
-      // Block
-      this.currentAction = CPUAction.BLOCK;
       this.actionTimer = 15 + Math.floor(Math.random() * 15);
-    } else if (rand < this.attackChance + this.blockChance + this.jumpChance) {
-      // Jump
-      this.currentAction = CPUAction.JUMP;
-      this.actionTimer = 5;
-    } else {
-      // Idle
-      this.currentAction = CPUAction.IDLE;
-      this.actionTimer = 10 + Math.floor(Math.random() * 10);
+      console.log('CPU decided to RETREAT');
+    } 
+    // Within good range but not perfect - mix of all actions
+    else {
+      if (rand < this.attackChance) {
+        this.currentAction = CPUAction.ATTACK;
+        this.actionTimer = 10;
+      } else if (rand < this.attackChance + this.blockChance) {
+        this.currentAction = CPUAction.BLOCK;
+        this.actionTimer = 15 + Math.floor(Math.random() * 15);
+      } else if (rand < this.attackChance + this.blockChance + this.jumpChance) {
+        this.currentAction = CPUAction.JUMP;
+        this.actionTimer = 5;
+      } else if (rand < this.attackChance + this.blockChance + this.jumpChance + 0.4) {
+        // Higher chance to chase to get into proper attack range
+        this.currentAction = CPUAction.CHASE;
+        this.actionTimer = 20 + Math.floor(Math.random() * 20);
+      } else {
+        this.currentAction = CPUAction.IDLE;
+        this.actionTimer = 10 + Math.floor(Math.random() * 10);
+      }
+    }
+    
+    // Special case: if player is attacking and we're not already blocking
+    if (playerIsAttacking && this.currentAction !== CPUAction.BLOCK && 
+        this.currentAction !== CPUAction.JUMP && 
+        Math.random() < this.blockChance * 2) {
+      this.currentAction = CPUAction.BLOCK;
+      this.actionTimer = 20;
+      console.log('CPU decided to BLOCK because player is attacking');
     }
   }
 }

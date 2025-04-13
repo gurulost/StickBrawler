@@ -48,9 +48,30 @@ const StickFigure = ({
   const [x, y, z] = position;
   const [vx, vy, vz] = velocity;
 
+  // For debugging key presses
+  useEffect(() => {
+    if (isPlayer) {
+      // Only log state changes to avoid spamming
+      if (forward) console.log("Forward pressed");
+      if (leftward) console.log("Left pressed");
+      if (rightward) console.log("Right pressed");
+      if (punch) console.log("Punch pressed");
+      if (kick) console.log("Kick pressed");
+      if (block) console.log("Block pressed");
+      if (special) console.log("Special pressed");
+    }
+  }, [isPlayer, forward, backward, leftward, rightward, punch, kick, block, special]);
+
   // Handle player movement and actions
   useFrame((state, delta) => {
     if (!isPlayer) return; // CPU character is controlled elsewhere
+    
+    // Log control states at regular intervals for debugging
+    if (state.clock.elapsedTime % 5 < 0.01) {
+      console.log("Control states:", {
+        forward, backward, leftward, rightward, punch, kick, block, special
+      });
+    }
     
     let newVX = vx;
     let newDirection = direction;
@@ -95,6 +116,7 @@ const StickFigure = ({
     
     // Handle attacks (punch, kick, special)
     if (punch && !isAttacking && !isBlocking && attackCooldown <= 0) {
+      console.log("Executing punch attack!");
       onAttackingChange(true);
       setLastPunch(state.clock.elapsedTime);
       playHit();
@@ -106,6 +128,7 @@ const StickFigure = ({
     }
     
     if (kick && !isAttacking && !isBlocking && attackCooldown <= 0) {
+      console.log("Executing kick attack!");
       onAttackingChange(true);
       setLastKick(state.clock.elapsedTime);
       playHit();
@@ -114,6 +137,17 @@ const StickFigure = ({
       setTimeout(() => {
         onAttackingChange(false);
       }, 500);
+    }
+    
+    if (special && !isAttacking && !isBlocking && attackCooldown <= 0) {
+      console.log("Executing special attack!");
+      onAttackingChange(true);
+      playHit();
+      
+      // Reset attack after a short delay
+      setTimeout(() => {
+        onAttackingChange(false);
+      }, 600);
     }
     
     // Handle blocking

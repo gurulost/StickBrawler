@@ -50,49 +50,74 @@ const StickFigure = ({
   const [x, y, z] = position;
   const [vx, vy, vz] = velocity;
 
-  // For debugging key presses only
+  // For debugging key presses only - removing dependency array to avoid blocking controls
   useEffect(() => {
-    if (isPlayer) {
-      // Only log state changes to avoid spamming
-      if (forward) console.log("Forward key detected in StickFigure");
-      if (leftward) console.log("Left key detected in StickFigure");
-      if (rightward) console.log("Right key detected in StickFigure");
-      if (punch) console.log("Punch key detected in StickFigure");
-      if (kick) console.log("Kick key detected in StickFigure");
-      if (block) console.log("Block key detected in StickFigure");
-      if (special) console.log("Special key detected in StickFigure");
-    }
-  }, [isPlayer, forward, backward, leftward, rightward, punch, kick, block, special]);
+    // Just debugging and logging - don't need to track key state changes
+    const keyDebugInterval = setInterval(() => {
+      if (isPlayer) {
+        // Just occasional logging to avoid spamming
+        if (Math.random() < 0.05) {
+          if (forward) console.log("Forward key detected in StickFigure");
+          if (leftward) console.log("Left key detected in StickFigure");
+          if (rightward) console.log("Right key detected in StickFigure");
+          if (punch) console.log("Punch key detected in StickFigure");
+          if (kick) console.log("Kick key detected in StickFigure");
+          if (block) console.log("Block key detected in StickFigure");
+          if (special) console.log("Special key detected in StickFigure");
+        }
+      }
+    }, 500);
+    
+    return () => clearInterval(keyDebugInterval);
+  }, []);
 
-  // Handle animation phases for more natural martial arts moves
+  // Handle animation phases for more natural martial arts moves - using a simpler approach to avoid control blocking
   useEffect(() => {
-    if (isAttacking) {
-      // Determine which attack type is being performed
+    // Set up a consistent animation interval that won't block controls
+    const animationInterval = setInterval(() => {
+      if (isAttacking) {
+        // Determine which attack type is being performed
+        if (isPlayer) {
+          // Check current key states - don't make this a dependency
+          if (punch) setAttackType('punch');
+          else if (kick) setAttackType('kick');
+          else if (special) setAttackType('special');
+          else setAttackType('punch'); // Default if no key detected
+        } else {
+          // For CPU, randomly choose attack type if not already set
+          if (!attackType) {
+            const attackRandom = Math.random();
+            if (attackRandom < 0.5) setAttackType('punch');
+            else if (attackRandom < 0.8) setAttackType('kick');
+            else setAttackType('special');
+          }
+        }
+        
+        // Update animation phase
+        setAnimationPhase(phase => (phase + 1) % 4); // 4 phases for attack animations
+      } else {
+        // Reset attack type when not attacking
+        if (attackType !== null) setAttackType(null);
+        if (animationPhase !== 0) setAnimationPhase(0);
+      }
+    }, 100);
+    
+    return () => clearInterval(animationInterval);
+  }, [isAttacking, isPlayer, attackType, animationPhase]);
+  
+  // Process attack type changes independently
+  useFrame(() => {
+    // Game frame-specific logic that doesn't block controls
+    if (isAttacking && !attackType) {
+      // Set a default attack type if none was detected
       if (isPlayer) {
         if (punch) setAttackType('punch');
         else if (kick) setAttackType('kick');
         else if (special) setAttackType('special');
-      } else {
-        // For CPU, randomly choose attack type
-        const attackRandom = Math.random();
-        if (attackRandom < 0.5) setAttackType('punch');
-        else if (attackRandom < 0.8) setAttackType('kick');
-        else setAttackType('special');
+        else setAttackType('punch'); // Default fallback
       }
-      
-      // Animate attack phases
-      setAnimationPhase(0);
-      const interval = setInterval(() => {
-        setAnimationPhase(phase => (phase + 1) % 4); // 4 phases for attack animations
-      }, 100);
-      
-      return () => clearInterval(interval);
-    } else {
-      // Reset attack type when not attacking
-      setAttackType(null);
-      setAnimationPhase(0);
     }
-  }, [isAttacking, punch, kick, special, isPlayer]);
+  });
 
   // Handle CPU character physics (player is now handled in GameManager)
   useFrame((state, delta) => {

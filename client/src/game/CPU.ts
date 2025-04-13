@@ -10,7 +10,9 @@ import {
   ATTACK_RANGE,
   PUNCH_DAMAGE,
   KICK_DAMAGE,
-  SPECIAL_DAMAGE 
+  SPECIAL_DAMAGE,
+  getPlatformHeight,
+  isOnPlatform
 } from "./Physics";
 
 // CPU difficulty levels

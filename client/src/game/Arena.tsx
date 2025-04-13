@@ -1,5 +1,5 @@
 import { useTexture } from "@react-three/drei";
-import { ARENA_WIDTH, FLOOR_Y } from "./Physics";
+import { ARENA_WIDTH, FLOOR_Y, PLATFORMS, ARENA_DEPTH } from "./Physics";
 import * as THREE from "three";
 
 const Arena = () => {
@@ -15,13 +15,74 @@ const Arena = () => {
   const wallHeight = ARENA_WIDTH / 3;
   const decorationCount = Math.floor(ARENA_WIDTH / 3);
   
+  // Platform texture for some visual variety
+  const platformTexture = useTexture("/textures/wood.jpg");
+  platformTexture.wrapS = platformTexture.wrapT = THREE.RepeatWrapping;
+  platformTexture.repeat.set(2, 2);
+  
   return (
     <group>
       {/* Ground plane - much larger for expanded arena */}
       <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, FLOOR_Y, 0]} receiveShadow>
-        <planeGeometry args={[ARENA_WIDTH, ARENA_WIDTH]} />
+        <planeGeometry args={[ARENA_WIDTH, ARENA_DEPTH]} />
         <meshStandardMaterial map={grassTexture} />
       </mesh>
+      
+      {/* Platforms for multi-level combat */}
+      {PLATFORMS.map((platform, index) => {
+        // Calculate dimensions and center position
+        const width = platform.x2 - platform.x1;
+        const depth = platform.z2 - platform.z1;
+        const centerX = (platform.x1 + platform.x2) / 2;
+        const centerZ = (platform.z1 + platform.z2) / 2;
+        
+        return (
+          <group key={`platform-${index}`}>
+            {/* Platform surface */}
+            <mesh 
+              position={[centerX, platform.y, centerZ]} 
+              castShadow 
+              receiveShadow
+            >
+              <boxGeometry args={[width, 0.3, depth]} />
+              <meshStandardMaterial map={platformTexture} color="#A97C50" />
+            </mesh>
+            
+            {/* Support columns for platforms */}
+            <mesh 
+              position={[platform.x1 + 0.5, platform.y/2, platform.z1 + 0.5]} 
+              castShadow
+            >
+              <boxGeometry args={[0.5, platform.y, 0.5]} />
+              <meshStandardMaterial color="#8B4513" />
+            </mesh>
+            
+            <mesh 
+              position={[platform.x2 - 0.5, platform.y/2, platform.z1 + 0.5]} 
+              castShadow
+            >
+              <boxGeometry args={[0.5, platform.y, 0.5]} />
+              <meshStandardMaterial color="#8B4513" />
+            </mesh>
+            
+            <mesh 
+              position={[platform.x1 + 0.5, platform.y/2, platform.z2 - 0.5]} 
+              castShadow
+            >
+              <boxGeometry args={[0.5, platform.y, 0.5]} />
+              <meshStandardMaterial color="#8B4513" />
+            </mesh>
+            
+            <mesh 
+              position={[platform.x2 - 0.5, platform.y/2, platform.z2 - 0.5]} 
+              castShadow
+            >
+              <boxGeometry args={[0.5, platform.y, 0.5]} />
+              <meshStandardMaterial color="#8B4513" />
+            </mesh>
+          </group>
+        );
+      })}
       
       {/* Enhanced background sky - larger and higher quality */}
       <mesh position={[0, ARENA_WIDTH/2, -ARENA_WIDTH/2]}>

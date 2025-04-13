@@ -3,9 +3,10 @@ import { create } from 'zustand';
 export enum Controls {
   // Movement controls
   jump = 'jump',        // Now W key
-  backward = 'backward', // S key
-  leftward = 'leftward', // A key
-  rightward = 'rightward', // D key
+  forward = 'forward',  // Up arrow key
+  backward = 'backward', // S key and Down arrow
+  leftward = 'leftward', // A key and Left arrow
+  rightward = 'rightward', // D key and Right arrow
   
   // Combat controls (separated from movement)
   attack1 = 'attack1', // J key - quick attack

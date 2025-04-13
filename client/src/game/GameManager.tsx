@@ -148,7 +148,7 @@ const GameManager = () => {
     
     // Get current keyboard state with the new control scheme
     const { 
-      jump, backward, leftward, rightward, 
+      jump, forward, backward, leftward, rightward, 
       attack1, attack2, shield, special,
       dodge, airAttack, grab, taunt
     } = getKeyboardState();
@@ -156,7 +156,7 @@ const GameManager = () => {
     // Log keyboard state periodically for debugging
     if (Math.random() < 0.01) {
       console.log("Current keyboard state:", { 
-        jump, backward, leftward, rightward, 
+        jump, forward, backward, leftward, rightward, 
         attack1, attack2, shield, special,
         dodge, airAttack, grab, taunt
       });
@@ -194,7 +194,11 @@ const GameManager = () => {
       }
       
       // Forward/Backward movement (Z-axis) - NEW 3D MOVEMENT
-      if (backward) {
+      if (forward) {
+        console.log("Moving player FORWARD"); // In 3D space, "forward" is toward camera (negative Z)
+        // Air control is more limited in the air
+        newVZ = player.isJumping ? Math.max(-PLAYER_SPEED * 0.7, playerVZ - 0.01) : -PLAYER_SPEED;
+      } else if (backward) {
         console.log("Moving player BACKWARD"); // In 3D space, "backward" is away from camera (positive Z)
         // Air control is more limited in the air
         newVZ = player.isJumping ? Math.min(PLAYER_SPEED * 0.7, playerVZ + 0.01) : PLAYER_SPEED;

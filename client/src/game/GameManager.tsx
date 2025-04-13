@@ -195,7 +195,7 @@ const GameManager = () => {
       
       // Forward/Backward movement (Z-axis) - NEW 3D MOVEMENT
       if (backward) {
-        console.log("Moving player FORWARD"); // In 3D space, "forward" is toward the camera (positive Z)
+        console.log("Moving player BACKWARD"); // In 3D space, "backward" is away from camera (positive Z)
         // Air control is more limited in the air
         newVZ = player.isJumping ? Math.min(PLAYER_SPEED * 0.7, playerVZ + 0.01) : PLAYER_SPEED;
       } else {

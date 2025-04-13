@@ -11,11 +11,11 @@ import { useFighting } from "./lib/stores/useFighting";
 
 // Define control keys for the game - Updated control scheme
 const keyboardMap = [
-  // Movement controls (WASD core movement)
-  { name: Controls.jump, keys: ["KeyW"] },             // W for jump (up)
-  { name: Controls.backward, keys: ["KeyS"] },         // S for backward
-  { name: Controls.leftward, keys: ["KeyA"] },         // A for left
-  { name: Controls.rightward, keys: ["KeyD"] },        // D for right
+  // Movement controls (WASD core movement + Arrow keys)
+  { name: Controls.jump, keys: ["KeyW", "ArrowUp"] },             // W or Up Arrow for jump
+  { name: Controls.backward, keys: ["KeyS", "ArrowDown"] },       // S or Down Arrow for backward
+  { name: Controls.leftward, keys: ["KeyA", "ArrowLeft"] },       // A or Left Arrow for left
+  { name: Controls.rightward, keys: ["KeyD", "ArrowRight"] },     // D or Right Arrow for right
   
   // Combat controls (separated and logical)
   { name: Controls.attack1, keys: ["KeyJ"] },          // J for quick attack

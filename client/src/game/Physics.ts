@@ -34,7 +34,7 @@ export interface Platform {
 }
 
 // Define platforms in the arena (coordinates are in world space)
-// Now smaller and more strategically placed
+// Now smaller and more strategically placed throughout the 3D space
 export const PLATFORMS: Platform[] = [
   // Main floor platform is implicit at y=0
   
@@ -42,62 +42,62 @@ export const PLATFORMS: Platform[] = [
   {
     x1: -2,
     x2: 2,
-    z1: -2,
-    z2: 2,
+    z1: -3, // Moved back a bit
+    z2: 0,
     y: 4
   },
   
-  // Small platform to the left side (reduced size)
+  // Small platform to the left side (positioned deeper in Z)
   {
     x1: -9,
     x2: -6,
-    z1: -1,
-    z2: 1,
+    z1: -4, // Far back platform
+    z2: -2,
     y: 2
   },
   
-  // Small platform to the right side (reduced size)
+  // Small platform to the right side (positioned forward in Z)
   {
     x1: 6,
     x2: 9,
-    z1: -1,
-    z2: 1,
+    z1: 2, // Forward platform
+    z2: 4,
     y: 2
   },
   
-  // Tiny stepping platform between left and center
+  // Tiny stepping platform between left and center (at a different Z position)
   {
     x1: -5,
     x2: -3,
-    z1: -1,
-    z2: 1,
+    z1: 1, // Positioned forward
+    z2: 3,
     y: 3
   },
   
-  // Tiny stepping platform between right and center
+  // Tiny stepping platform between right and center (at a different Z position)
   {
     x1: 3,
     x2: 5,
-    z1: -1,
-    z2: 1,
+    z1: -3, // Positioned back
+    z2: -1,
     y: 3
   },
   
-  // Small higher platform on far left
+  // Small higher platform on far left (forward)
   {
     x1: -10,
     x2: -8,
-    z1: 3,
-    z2: 5,
+    z1: 4, // Far forward
+    z2: 6,
     y: 5
   },
   
-  // Small higher platform on far right
+  // Small higher platform on far right (back)
   {
     x1: 8,
     x2: 10,
-    z1: 3,
-    z2: 5,
+    z1: -6, // Far back
+    z2: -4,
     y: 5
   }
 ];

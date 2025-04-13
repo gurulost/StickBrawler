@@ -22,10 +22,10 @@ const Arena = () => {
   
   return (
     <group>
-      {/* Ground plane - much larger for expanded arena */}
+      {/* Ground plane - much larger for expanded arena with lighter color */}
       <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, FLOOR_Y, 0]} receiveShadow>
         <planeGeometry args={[ARENA_WIDTH, ARENA_DEPTH]} />
-        <meshStandardMaterial map={grassTexture} />
+        <meshStandardMaterial map={grassTexture} color="#A8E4A0" /> {/* Lighter green color */}
       </mesh>
       
       {/* Platforms for multi-level combat */}

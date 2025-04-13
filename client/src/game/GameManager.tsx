@@ -89,14 +89,14 @@ const GameManager = () => {
       
       if (hit) {
         // Check which attack is being used
-        const { punch, kick, special } = getKeyboardState();
+        const { attack1, attack2, special } = getKeyboardState();
         
         let damage = PUNCH_DAMAGE;
-        let attackName = "PUNCH";
+        let attackName = "QUICK ATTACK";
         
-        if (kick) {
+        if (attack2) {
           damage = KICK_DAMAGE;
-          attackName = "KICK";
+          attackName = "STRONG ATTACK";
         }
         if (special) {
           damage = SPECIAL_DAMAGE;
@@ -261,7 +261,8 @@ const GameManager = () => {
         playHit();
         
         // Set cooldown to limit attack frequency
-        setPlayerAttackCooldown(15); // Increased cooldown to limit attack spam
+        console.log("Setting new player attack cooldown:", 15);
+        player.attackCooldown = 15; // Increased cooldown to limit attack spam
         
         // Reset attack after delay
         setTimeout(() => {
@@ -276,7 +277,8 @@ const GameManager = () => {
         playHit();
         
         // Set cooldown to limit attack frequency
-        setPlayerAttackCooldown(20); // Longer cooldown for stronger attack
+        console.log("Setting new player attack cooldown:", 20);
+        player.attackCooldown = 20; // Longer cooldown for stronger attack
         
         // Reset attack after delay
         setTimeout(() => {
@@ -291,7 +293,8 @@ const GameManager = () => {
         playHit();
         
         // Set cooldown to limit attack frequency
-        setPlayerAttackCooldown(30); // Long cooldown for special attack
+        console.log("Setting new player attack cooldown:", 30);
+        player.attackCooldown = 30; // Long cooldown for special attack
         
         // Reset attack after delay
         setTimeout(() => {
@@ -305,7 +308,8 @@ const GameManager = () => {
         setPlayerGrabbing(true);
         
         // Set grab cooldown
-        setPlayerGrabCooldown(25);
+        console.log("Setting grab cooldown:", 25);
+        player.grabCooldown = 25;
         
         // Reset grab after delay
         setTimeout(() => {
@@ -347,7 +351,8 @@ const GameManager = () => {
         playHit();
         
         // Set cooldown to limit attack frequency
-        setPlayerAttackCooldown(18);
+        console.log("Setting air attack cooldown:", 18);
+        player.attackCooldown = 18;
         
         // Reset air attack after delay
         setTimeout(() => {
@@ -361,7 +366,8 @@ const GameManager = () => {
         playHit();
         
         // Set cooldown to limit attack frequency
-        setPlayerAttackCooldown(25);
+        console.log("Setting air special cooldown:", 25);
+        player.attackCooldown = 25;
         
         // Reset air attack after delay
         setTimeout(() => {

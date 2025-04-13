@@ -2,6 +2,7 @@ import { CharacterState } from "../lib/stores/useFighting";
 import { 
   applyGravity, 
   stayInArena, 
+  stayInArenaZ,
   applyDrag, 
   JUMP_FORCE, 
   CPU_SPEED, 
@@ -136,8 +137,8 @@ export class CPUController {
     // Get player position
     const [playerX, playerY, playerZ] = playerState.position;
     
-    // Calculate distance to player
-    const distanceToPlayer = Math.abs(x - playerX);
+    // Calculate distance to player in 3D space (using x and z coordinates)
+    const distanceToPlayer = Math.sqrt(Math.pow(x - playerX, 2) + Math.pow(z - playerZ, 2));
     
     // Decide on a new action if current action is complete
     if (this.actionTimer <= 0 && !isAttacking) {
@@ -146,11 +147,13 @@ export class CPUController {
     
     // Execute the current action
     let newVX = vx;
+    let newVZ = vz; // Add Z-axis velocity for 3D movement
     let newDirection = direction;
     
     switch (this.currentAction) {
       case CPUAction.CHASE:
-        // Move toward player
+        // Move toward player in 3D space (both X and Z axes)
+        // X-axis movement
         if (x < playerX) {
           newVX = CPU_SPEED;
           newDirection = 1;
@@ -158,16 +161,31 @@ export class CPUController {
           newVX = -CPU_SPEED;
           newDirection = -1;
         }
+        
+        // Z-axis movement (new 3D movement)
+        if (z < playerZ) {
+          newVZ = CPU_SPEED * 0.8; // Slightly slower on Z-axis for more natural movement
+        } else if (z > playerZ) {
+          newVZ = -CPU_SPEED * 0.8;
+        }
         break;
         
       case CPUAction.RETREAT:
-        // Move away from player
+        // Move away from player in 3D space
+        // X-axis movement
         if (x < playerX) {
           newVX = -CPU_SPEED;
           newDirection = -1;
         } else {
           newVX = CPU_SPEED;
           newDirection = 1;
+        }
+        
+        // Z-axis movement (new 3D movement)
+        if (z < playerZ) {
+          newVZ = -CPU_SPEED * 0.8; // Move away on Z-axis too
+        } else if (z > playerZ) {
+          newVZ = CPU_SPEED * 0.8;
         }
         break;
         
@@ -330,8 +348,9 @@ export class CPUController {
         break;
         
       default: // IDLE
-        // Apply drag
+        // Apply drag to both X and Z axes for 3D movement
         newVX = applyDrag(newVX);
+        newVZ = applyDrag(newVZ); // Also slow down Z movement when idle
         
         // Reset blocking
         if (isBlocking) {
@@ -350,9 +369,12 @@ export class CPUController {
     // Calculate the new X position, staying within arena bounds
     const newX = stayInArena(x + newVX);
     
-    // Update positions and velocities
-    onPositionChange(newX, newY, z);
-    onVelocityChange(newVX, newVY, vz);
+    // Calculate the new Z position with 3D boundary checks
+    const newZ = stayInArenaZ(z + newVZ);
+    
+    // Update positions and velocities with 3D movement support
+    onPositionChange(newX, newY, newZ);
+    onVelocityChange(newVX, newVY, newVZ);
     
     // Update jumping state
     if (isJumping && newY <= 0.01) {

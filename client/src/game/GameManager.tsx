@@ -4,7 +4,16 @@ import { useFighting } from "../lib/stores/useFighting";
 import StickFigure from "./StickFigure";
 import Arena from "./Arena";
 import { CPUController, CPUDifficulty } from "./CPU";
-import { checkAttackHit, PUNCH_DAMAGE, KICK_DAMAGE, SPECIAL_DAMAGE } from "./Physics";
+import { 
+  checkAttackHit, 
+  PUNCH_DAMAGE, 
+  KICK_DAMAGE, 
+  SPECIAL_DAMAGE, 
+  applyGravity, 
+  stayInArena, 
+  PLAYER_SPEED,
+  JUMP_FORCE
+} from "./Physics";
 import { useControls } from "../lib/stores/useControls";
 import { useKeyboardControls } from "@react-three/drei";
 import { Controls } from "../lib/stores/useControls";
@@ -83,10 +92,110 @@ const GameManager = () => {
     }
   }, [player.isAttacking, cpu.isAttacking, player.position, cpu.position, player.direction, cpu.direction, damagePlayer, damageCPU, playHit, getKeyboardState]);
   
-  // Main game update loop
+  // Handle player keyboard controls directly
   useFrame(() => {
     if (gamePhase !== 'fighting') return;
     
+    // Get current keyboard state
+    const { 
+      forward, backward, leftward, rightward, 
+      punch, kick, block, special 
+    } = getKeyboardState();
+    
+    // Log keyboard state periodically for debugging
+    if (Math.random() < 0.01) {
+      console.log("Current keyboard state:", { 
+        forward, backward, leftward, rightward, 
+        punch, kick, block, special
+      });
+    }
+    
+    // Handle player movement directly here
+    const [playerX, playerY, playerZ] = player.position;
+    const [playerVX, playerVY, playerVZ] = player.velocity;
+    
+    // Movement
+    let newVX = playerVX;
+    let newDirection = player.direction;
+    
+    if (leftward) {
+      console.log("Moving player LEFT");
+      newVX = -PLAYER_SPEED;
+      newDirection = -1;
+    } else if (rightward) {
+      console.log("Moving player RIGHT");
+      newVX = PLAYER_SPEED;
+      newDirection = 1;
+    } else {
+      // Apply drag when not pressing movement keys
+      newVX = newVX * 0.95; // Apply drag - simplified version
+    }
+    
+    // Update player state
+    if (newDirection !== player.direction) {
+      setPlayerDirection(newDirection);
+    }
+    
+    // Handle jumping
+    if (forward && !player.isJumping && playerY <= 0.01) {
+      console.log("Player JUMPING");
+      updatePlayerVelocity(newVX, JUMP_FORCE, playerVZ);
+      setPlayerJumping(true);
+    } 
+    
+    // Apply gravity to player
+    const [newY, newVY] = applyGravity(playerY, playerVY);
+    
+    // Update jumping state
+    if (player.isJumping && newY <= 0.01) {
+      setPlayerJumping(false);
+    }
+    
+    // Handle attacks and blocking
+    if (punch && !player.isAttacking && !player.isBlocking && player.attackCooldown <= 0) {
+      console.log("Player PUNCH");
+      setPlayerAttacking(true);
+      playHit();
+      
+      // Reset attack after delay
+      setTimeout(() => {
+        setPlayerAttacking(false);
+      }, 400);
+    }
+    
+    if (kick && !player.isAttacking && !player.isBlocking && player.attackCooldown <= 0) {
+      console.log("Player KICK");
+      setPlayerAttacking(true);
+      playHit();
+      
+      // Reset attack after delay
+      setTimeout(() => {
+        setPlayerAttacking(false);
+      }, 500);
+    }
+    
+    if (special && !player.isAttacking && !player.isBlocking && player.attackCooldown <= 0) {
+      console.log("Player SPECIAL");
+      setPlayerAttacking(true);
+      playHit();
+      
+      // Reset attack after delay
+      setTimeout(() => {
+        setPlayerAttacking(false);
+      }, 600);
+    }
+    
+    // Handle blocking
+    setPlayerBlocking(block && !player.isAttacking);
+    
+    // Calculate the new X position, staying within arena bounds
+    const newX = stayInArena(playerX + newVX);
+    
+    // Update player position and velocity
+    movePlayer(newX, newY, playerZ);
+    updatePlayerVelocity(newVX, newVY, playerVZ);
+    
+    // Main game update loop
     // Calculate time delta in seconds
     const now = Date.now();
     const delta = (now - lastFrameTime.current) / 1000;

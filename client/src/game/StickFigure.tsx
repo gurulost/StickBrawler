@@ -48,110 +48,35 @@ const StickFigure = ({
   const [x, y, z] = position;
   const [vx, vy, vz] = velocity;
 
-  // For debugging key presses
+  // For debugging key presses only
   useEffect(() => {
     if (isPlayer) {
       // Only log state changes to avoid spamming
-      if (forward) console.log("Forward pressed");
-      if (leftward) console.log("Left pressed");
-      if (rightward) console.log("Right pressed");
-      if (punch) console.log("Punch pressed");
-      if (kick) console.log("Kick pressed");
-      if (block) console.log("Block pressed");
-      if (special) console.log("Special pressed");
+      if (forward) console.log("Forward key detected in StickFigure");
+      if (leftward) console.log("Left key detected in StickFigure");
+      if (rightward) console.log("Right key detected in StickFigure");
+      if (punch) console.log("Punch key detected in StickFigure");
+      if (kick) console.log("Kick key detected in StickFigure");
+      if (block) console.log("Block key detected in StickFigure");
+      if (special) console.log("Special key detected in StickFigure");
     }
   }, [isPlayer, forward, backward, leftward, rightward, punch, kick, block, special]);
 
-  // Handle player movement and actions
+  // Handle CPU character physics (player is now handled in GameManager)
   useFrame((state, delta) => {
-    if (!isPlayer) return; // CPU character is controlled elsewhere
+    // Skip this frame control for the player character - now handled in GameManager
+    if (isPlayer) return;
     
-    // Log control states at regular intervals for debugging
-    if (state.clock.elapsedTime % 5 < 0.01) {
-      console.log("Control states:", {
-        forward, backward, leftward, rightward, punch, kick, block, special
-      });
+    // Handle CPU character physics
+    // Apply gravity
+    const [newY, newVY] = applyGravity(y, vy);
+    
+    // Update jumping state
+    if (isJumping && newY <= 0.01) {
+      onJumpingChange(false);
     }
     
-    let newVX = vx;
-    let newDirection = direction;
-    
-    // Movement with arrow keys/WASD
-    if (leftward) {
-      newVX = -PLAYER_SPEED;
-      newDirection = -1;
-    } else if (rightward) {
-      newVX = PLAYER_SPEED;
-      newDirection = 1;
-    } else {
-      // Apply drag when not pressing movement keys
-      newVX = applyDrag(newVX);
-    }
-    
-    // Apply direction change if needed
-    if (newDirection !== direction) {
-      onDirectionChange(newDirection);
-    }
-    
-    // Jump when pressing up/W key and on the ground
-    if (forward && !isJumping && y <= 0.01) {
-      onVelocityChange(newVX, JUMP_FORCE, vz);
-      onJumpingChange(true);
-    } else {
-      // Apply gravity
-      const [newY, newVY] = applyGravity(y, vy);
-      
-      // Calculate the new X position, staying within arena bounds
-      const newX = stayInArena(x + newVX);
-      
-      // Update positions and velocities
-      onPositionChange(newX, newY, z);
-      onVelocityChange(newVX, newVY, vz);
-      
-      // Update jumping state
-      if (isJumping && newY <= 0.01) {
-        onJumpingChange(false);
-      }
-    }
-    
-    // Handle attacks (punch, kick, special)
-    if (punch && !isAttacking && !isBlocking && attackCooldown <= 0) {
-      console.log("Executing punch attack!");
-      onAttackingChange(true);
-      setLastPunch(state.clock.elapsedTime);
-      playHit();
-      
-      // Reset attack after a short delay
-      setTimeout(() => {
-        onAttackingChange(false);
-      }, 400);
-    }
-    
-    if (kick && !isAttacking && !isBlocking && attackCooldown <= 0) {
-      console.log("Executing kick attack!");
-      onAttackingChange(true);
-      setLastKick(state.clock.elapsedTime);
-      playHit();
-      
-      // Reset attack after a short delay
-      setTimeout(() => {
-        onAttackingChange(false);
-      }, 500);
-    }
-    
-    if (special && !isAttacking && !isBlocking && attackCooldown <= 0) {
-      console.log("Executing special attack!");
-      onAttackingChange(true);
-      playHit();
-      
-      // Reset attack after a short delay
-      setTimeout(() => {
-        onAttackingChange(false);
-      }, 600);
-    }
-    
-    // Handle blocking
-    onBlockingChange(block && !isAttacking);
+    // All other CPU logic is handled in the CPU controller
   });
 
   // Main stick figure elements

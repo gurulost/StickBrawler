@@ -19,14 +19,19 @@ export enum CPUDifficulty {
   HARD
 }
 
-// Action states for the CPU
+// Action states for the CPU with new Smash Bros style actions
 export enum CPUAction {
   IDLE,
   CHASE,
   RETREAT,
   ATTACK,
   BLOCK,
-  JUMP
+  JUMP,
+  AIR_ATTACK,    // New Smash Bros style air attack
+  AIR_JUMP,      // New Smash Bros style double/triple jump
+  DODGE,         // New Smash Bros style dodge
+  GRAB,          // New Smash Bros style grab and throw
+  TAUNT          // Just for fun
 }
 
 export class CPUController {
@@ -38,6 +43,13 @@ export class CPUController {
   private blockChance: number;
   private jumpChance: number;
   
+  // New Smash Bros style action chances
+  private airAttackChance: number;
+  private airJumpChance: number;
+  private dodgeChance: number;
+  private grabChance: number;
+  private tauntChance: number;
+  
   constructor(difficulty: CPUDifficulty = CPUDifficulty.MEDIUM) {
     this.difficulty = difficulty;
     this.currentAction = CPUAction.IDLE;
@@ -47,26 +59,53 @@ export class CPUController {
     switch (difficulty) {
       case CPUDifficulty.EASY:
         this.targetDistance = 2.0; // Stays further away
+        // Basic actions
         this.attackChance = 0.06;  // Doubled from 0.03
         this.blockChance = 0.04;   // Doubled from 0.02
         this.jumpChance = 0.03;    // Increased from 0.02
+        
+        // Smash Bros style actions (easy CPU rarely uses advanced techniques)
+        this.airAttackChance = 0.01;
+        this.airJumpChance = 0.01;
+        this.dodgeChance = 0.01;
+        this.grabChance = 0.01;
+        this.tauntChance = 0.005;  // Very rare taunt
         break;
+        
       case CPUDifficulty.HARD:
         this.targetDistance = 1.0; // Gets closer to player
+        // Basic actions
         this.attackChance = 0.25;  // Doubled from 0.12
         this.blockChance = 0.15;   // Increased from 0.09
         this.jumpChance = 0.10;    // Increased from 0.07
+        
+        // Smash Bros style actions (hard CPU uses advanced techniques frequently)
+        this.airAttackChance = 0.12;
+        this.airJumpChance = 0.10;
+        this.dodgeChance = 0.15;
+        this.grabChance = 0.15;
+        this.tauntChance = 0.02;  // Occasional taunting to frustrate player
         break;
+        
       default: // MEDIUM
         this.targetDistance = 1.5;
+        // Basic actions
         this.attackChance = 0.15;  // Significantly increased from 0.08
         this.blockChance = 0.08;   // Slightly increased from 0.06
         this.jumpChance = 0.05;    // Slightly increased from 0.04
+        
+        // Smash Bros style actions
+        this.airAttackChance = 0.06;
+        this.airJumpChance = 0.05;
+        this.dodgeChance = 0.08;
+        this.grabChance = 0.07;
+        this.tauntChance = 0.01;  // Occasional taunt
     }
 
     // Log the CPU configuration for debugging
     console.log(`CPU controller initialized with difficulty: ${CPUDifficulty[difficulty]}`);
-    console.log(`Attack chance: ${this.attackChance}, Block chance: ${this.blockChance}, Jump chance: ${this.jumpChance}`);
+    console.log(`Basic actions - Attack: ${this.attackChance.toFixed(2)}, Block: ${this.blockChance.toFixed(2)}, Jump: ${this.jumpChance.toFixed(2)}`);
+    console.log(`Smash Bros actions - Air Attack: ${this.airAttackChance.toFixed(2)}, Air Jump: ${this.airJumpChance.toFixed(2)}, Dodge: ${this.dodgeChance.toFixed(2)}, Grab: ${this.grabChance.toFixed(2)}`);
   }
   
   update(
@@ -77,7 +116,14 @@ export class CPUController {
     onDirectionChange: (direction: 1 | -1) => void,
     onJumpingChange: (isJumping: boolean) => void,
     onAttackingChange: (isAttacking: boolean) => void,
-    onBlockingChange: (isBlocking: boolean) => void
+    onBlockingChange: (isBlocking: boolean) => void,
+    // New Smash Bros style action handlers
+    onDodgingChange?: (isDodging: boolean) => void,
+    onGrabbingChange?: (isGrabbing: boolean) => void,
+    onTauntingChange?: (isTaunting: boolean) => void,
+    onAirAttackingChange?: (isAirAttacking: boolean) => void,
+    resetAirJumps?: () => void,
+    useAirJump?: () => boolean
   ) {
     // Decrease action timer
     this.actionTimer--;
@@ -189,6 +235,97 @@ export class CPUController {
           onVelocityChange(newVX, JUMP_FORCE, vz);
           onJumpingChange(true);
           this.currentAction = CPUAction.IDLE;
+          
+          // Reset air jumps when starting a new jump
+          if (resetAirJumps) {
+            resetAirJumps();
+          }
+        }
+        break;
+        
+      case CPUAction.AIR_JUMP:
+        // Air jump (double/triple jump - Smash Bros style)
+        if (isJumping && useAirJump && useAirJump()) {
+          // Successful air jump
+          console.log("CPU performs an AIR JUMP");
+          onVelocityChange(newVX, JUMP_FORCE * 0.8, vz); // Slightly weaker air jump
+          this.currentAction = CPUAction.AIR_ATTACK; // Follow up with air attack
+          this.actionTimer = 10;
+        } else {
+          this.currentAction = CPUAction.IDLE;
+        }
+        break;
+        
+      case CPUAction.AIR_ATTACK:
+        // Air attack (only when in the air)
+        if (isJumping && onAirAttackingChange && !cpuState.isAirAttacking && !cpuState.isAttacking) {
+          console.log("CPU performs an AIR ATTACK");
+          onAirAttackingChange(true);
+          
+          // Reset air attack after delay
+          setTimeout(() => {
+            if (onAirAttackingChange) {
+              onAirAttackingChange(false);
+            }
+          }, 500);
+        }
+        break;
+        
+      case CPUAction.DODGE:
+        // Dodge (Smash Bros style)
+        if (onDodgingChange && !cpuState.isDodging && cpuState.dodgeCooldown <= 0) {
+          console.log("CPU performs a DODGE");
+          onDodgingChange(true);
+          
+          // Add a burst of movement when dodging to evade attacks
+          if (Math.random() < 0.5) {
+            newVX = CPU_SPEED * 2 * (Math.random() < 0.5 ? 1 : -1);
+          }
+          
+          // End dodge after short delay
+          setTimeout(() => {
+            if (onDodgingChange) {
+              onDodgingChange(false);
+            }
+          }, 300);
+        }
+        break;
+        
+      case CPUAction.GRAB:
+        // Grab attack (Smash Bros style)
+        if (onGrabbingChange && !cpuState.isGrabbing && cpuState.grabCooldown <= 0) {
+          console.log("CPU performs a GRAB");
+          onGrabbingChange(true);
+          
+          // Face player for grab
+          newDirection = x < playerX ? 1 : -1;
+          
+          // End grab after delay and check if it connected
+          setTimeout(() => {
+            if (onGrabbingChange) {
+              onGrabbingChange(false);
+              
+              // Check if grab connected (needs additional parameters to handle the throw)
+              // This would be handled in the GameManager where the function is called
+            }
+          }, 400);
+        }
+        break;
+        
+      case CPUAction.TAUNT:
+        // Taunt (just for fun)
+        if (onTauntingChange && !cpuState.isTaunting) {
+          console.log("CPU performs a TAUNT");
+          onTauntingChange(true);
+          
+          // End taunt after delay
+          setTimeout(() => {
+            if (onTauntingChange) {
+              onTauntingChange(false);
+            }
+          }, 1200); // Taunts are longer
+          
+          this.currentAction = CPUAction.IDLE;
         }
         break;
         
@@ -296,13 +433,30 @@ export class CPUController {
       } else if (rand < this.attackChance + this.blockChance + this.jumpChance) {
         this.currentAction = CPUAction.JUMP;
         this.actionTimer = 5;
-      } else if (rand < this.attackChance + this.blockChance + this.jumpChance + 0.4) {
+      } else if (rand < this.attackChance + this.blockChance + this.jumpChance + this.dodgeChance) {
+        // Dodge (Smash Bros style)
+        this.currentAction = CPUAction.DODGE;
+        this.actionTimer = 5;
+        console.log('CPU decided to DODGE');
+      } else if (rand < this.attackChance + this.blockChance + this.jumpChance + this.dodgeChance + this.grabChance) {
+        // Grab (Smash Bros style)
+        this.currentAction = CPUAction.GRAB;
+        this.actionTimer = 5;
+        console.log('CPU decided to GRAB');
+      } else if (rand < this.attackChance + this.blockChance + this.jumpChance + this.dodgeChance + this.grabChance + 0.3) {
         // Higher chance to chase to get into proper attack range
         this.currentAction = CPUAction.CHASE;
         this.actionTimer = 20 + Math.floor(Math.random() * 20);
+        console.log('CPU decided to CHASE (normal)');
+      } else if (rand < this.attackChance + this.blockChance + this.jumpChance + this.dodgeChance + this.grabChance + 0.3 + this.tauntChance) {
+        // Occasionally taunt (just for fun)
+        this.currentAction = CPUAction.TAUNT;
+        this.actionTimer = 5;
+        console.log('CPU decided to TAUNT');
       } else {
         this.currentAction = CPUAction.IDLE;
         this.actionTimer = 10 + Math.floor(Math.random() * 10);
+        console.log('CPU decided to IDLE (normal)');
       }
     }
     

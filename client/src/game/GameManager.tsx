@@ -38,6 +38,20 @@ const GameManager = () => {
     setCPUAttacking,
     setPlayerBlocking,
     setCPUBlocking,
+    // New Super Smash Bros style actions
+    setPlayerDodging,
+    setPlayerGrabbing,
+    setPlayerTaunting,
+    setPlayerAirAttacking,
+    resetPlayerAirJumps,
+    usePlayerAirJump,
+    setCPUDodging,
+    setCPUGrabbing,
+    setCPUTaunting,
+    setCPUAirAttacking,
+    resetCPUAirJumps,
+    useCPUAirJump,
+    // Original actions
     damagePlayer,
     damageCPU,
     updateRoundTime,
@@ -380,7 +394,7 @@ const GameManager = () => {
       console.log("Distance between player and CPU:", distance.toFixed(2), "Attack range:", ATTACK_RANGE);
     }
     
-    // Update CPU behavior
+    // Update CPU behavior with all Smash Bros style actions
     cpuController.update(
       cpu,
       player,
@@ -389,7 +403,14 @@ const GameManager = () => {
       setCPUDirection,
       setCPUJumping,
       setCPUAttacking,
-      setCPUBlocking
+      setCPUBlocking,
+      // New Smash Bros style actions
+      setCPUDodging,
+      setCPUGrabbing,
+      setCPUTaunting,
+      setCPUAirAttacking,
+      resetCPUAirJumps,
+      useCPUAirJump
     );
   });
   

@@ -3,7 +3,6 @@ import { useEffect, useRef, useState } from "react";
 import { useFighting } from "../lib/stores/useFighting";
 import StickFigure from "./StickFigure";
 import Arena from "./Arena";
-import UI from "./UI";
 import { CPUController, CPUDifficulty } from "./CPU";
 import { checkAttackHit, PUNCH_DAMAGE, KICK_DAMAGE, SPECIAL_DAMAGE } from "./Physics";
 import { useControls } from "../lib/stores/useControls";
@@ -42,6 +41,9 @@ const GameManager = () => {
   // Refs for timing
   const lastFrameTime = useRef(Date.now());
   
+  // Get keyboard state
+  const [, getKeyboardState] = useKeyboardControls<Controls>();
+  
   // Combat system
   useEffect(() => {
     // Check for hits when player is attacking
@@ -54,9 +56,7 @@ const GameManager = () => {
       
       if (hit) {
         // Check which attack is being used
-        const punch = useKeyboardControls.getState<Controls>().punch;
-        const kick = useKeyboardControls.getState<Controls>().kick;
-        const special = useKeyboardControls.getState<Controls>().special;
+        const { punch, kick, special } = getKeyboardState();
         
         let damage = PUNCH_DAMAGE;
         if (kick) damage = KICK_DAMAGE;
@@ -81,7 +81,7 @@ const GameManager = () => {
         playHit();
       }
     }
-  }, [player.isAttacking, cpu.isAttacking, player.position, cpu.position, player.direction, cpu.direction, damagePlayer, damageCPU, playHit]);
+  }, [player.isAttacking, cpu.isAttacking, player.position, cpu.position, player.direction, cpu.direction, damagePlayer, damageCPU, playHit, getKeyboardState]);
   
   // Main game update loop
   useFrame(() => {
@@ -135,9 +135,6 @@ const GameManager = () => {
         onAttackingChange={setCPUAttacking}
         onBlockingChange={setCPUBlocking}
       />
-      
-      {/* UI layer */}
-      <UI />
     </>
   );
 };

@@ -6,6 +6,7 @@ import "@fontsource/inter";
 import { Controls } from "./lib/stores/useControls";
 import GameManager from "./game/GameManager";
 import Menu from "./game/Menu";
+import UI from "./game/UI";
 import { useFighting } from "./lib/stores/useFighting";
 
 // Define control keys for the game
@@ -74,6 +75,9 @@ function App() {
                   <GameManager />
                 </Suspense>
               </Canvas>
+
+              {/* UI is rendered outside of Canvas as an HTML overlay */}
+              <UI />
             </>
           )}
         </KeyboardControls>

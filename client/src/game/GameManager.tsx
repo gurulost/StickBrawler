@@ -38,7 +38,9 @@ const GameManager = () => {
     setCPUBlocking,
     damagePlayer,
     damageCPU,
-    updateRoundTime
+    updateRoundTime,
+    updatePlayerCooldowns,
+    updateCPUCooldowns
   } = useFighting();
   
   const { debugMode } = useControls();
@@ -203,6 +205,16 @@ const GameManager = () => {
     
     // Update game time
     updateRoundTime(delta);
+    
+    // Update attack cooldowns
+    updatePlayerCooldowns(delta);
+    updateCPUCooldowns(delta);
+    
+    // Log cooldown values for debugging
+    if (Math.random() < 0.01) {
+      console.log("Player attack cooldown:", player.attackCooldown);
+      console.log("CPU attack cooldown:", cpu.attackCooldown);
+    }
     
     // Update CPU behavior
     cpuController.update(

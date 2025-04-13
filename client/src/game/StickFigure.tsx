@@ -76,6 +76,13 @@ const StickFigure = ({
       onJumpingChange(false);
     }
     
+    // Calculate the new X position, staying within arena bounds
+    const newX = stayInArena(x + vx);
+    
+    // Update positions and velocities
+    onPositionChange(newX, newY, z);
+    onVelocityChange(vx, newVY, vz);
+    
     // All other CPU logic is handled in the CPU controller
   });
 

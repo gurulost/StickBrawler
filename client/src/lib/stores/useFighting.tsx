@@ -37,6 +37,7 @@ interface FightingState {
   setPlayerAttacking: (isAttacking: boolean) => void;
   setPlayerBlocking: (isBlocking: boolean) => void;
   damagePlayer: (amount: number) => void;
+  updatePlayerCooldowns: (delta: number) => void;
   
   // CPU actions
   moveCPU: (x: number, y: number, z: number) => void;
@@ -46,6 +47,7 @@ interface FightingState {
   setCPUAttacking: (isAttacking: boolean) => void;
   setCPUBlocking: (isBlocking: boolean) => void;
   damageCPU: (amount: number) => void;
+  updateCPUCooldowns: (delta: number) => void;
   
   // Game time
   updateRoundTime: (delta: number) => void;
@@ -249,6 +251,34 @@ export const useFighting = create<FightingState>((set) => ({
         health: newHealth
       }
     };
+  }),
+  
+  // Update player cooldowns
+  updatePlayerCooldowns: (delta) => set((state) => {
+    // Only update cooldowns if the player is not currently attacking
+    if (!state.player.isAttacking) {
+      return {
+        player: {
+          ...state.player,
+          attackCooldown: Math.max(0, state.player.attackCooldown - 1)
+        }
+      };
+    }
+    return {}; // No changes if attacking
+  }),
+  
+  // Update CPU cooldowns
+  updateCPUCooldowns: (delta) => set((state) => {
+    // Only update cooldowns if the CPU is not currently attacking
+    if (!state.cpu.isAttacking) {
+      return {
+        cpu: {
+          ...state.cpu,
+          attackCooldown: Math.max(0, state.cpu.attackCooldown - 1)
+        }
+      };
+    }
+    return {}; // No changes if attacking
   }),
   
   // Game time

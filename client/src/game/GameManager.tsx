@@ -241,12 +241,19 @@ const GameManager = () => {
       console.log("Jump key pressed, playerY:", playerY, "isJumping:", player.isJumping, "airJumpsLeft:", player.airJumpsLeft);
     }
     
-    // Apply gravity to player with platform collision detection
-    const [newY, gravityVY] = applyGravity(playerY, newVY, playerX, playerZ);
+    // Apply gravity to player with platform collision detection 
+    // Allow dropping through platforms when pressing down and player is on a platform above ground level
+    const platformHeight = getPlatformHeight(playerX, playerZ);
+    const dropThrough = backward && platformHeight > 0 && Math.abs(playerY - platformHeight) < 0.1;
+    
+    if (dropThrough) {
+      console.log("Player dropping through platform at height:", platformHeight);
+    }
+    
+    const [newY, gravityVY] = applyGravity(playerY, newVY, playerX, playerZ, dropThrough);
     newVY = gravityVY; // Update with gravity effect
     
     // Update jumping state when landing on a platform or ground
-    const platformHeight = getPlatformHeight(playerX, playerZ);
     if (player.isJumping && (Math.abs(newY - platformHeight) < 0.1 || newY <= 0.01)) {
       setPlayerJumping(false);
       // Reset air jumps when landing

@@ -139,7 +139,7 @@ const GameManager = () => {
     }
   }, [player.isAttacking, cpu.isAttacking, player.position, cpu.position, player.direction, cpu.direction, damagePlayer, damageCPU, playHit, getKeyboardState]);
   
-  // Handle player keyboard controls directly with Smash Bros style movement
+  // Handle player keyboard controls directly with 3D Smash Bros style movement
   useFrame(() => {
     if (gamePhase !== 'fighting') return;
     
@@ -170,9 +170,11 @@ const GameManager = () => {
     // Movement
     let newVX = playerVX;
     let newVY = playerVY;
+    let newVZ = playerVZ; // New Z-axis velocity for forward/backward movement
     let newDirection = player.direction;
     
     if (canAct || player.isJumping) { // Allow air control while jumping
+      // Left/Right movement (X-axis)
       if (leftward) {
         console.log("Moving player LEFT");
         // Air control is more limited (Smash Bros style)
@@ -184,8 +186,23 @@ const GameManager = () => {
         newVX = player.isJumping ? Math.min(PLAYER_SPEED * 0.7, playerVX + 0.01) : PLAYER_SPEED;
         newDirection = 1;
       } else {
-        // Apply drag when not pressing movement keys
+        // Apply drag when not pressing movement keys on X-axis
         newVX = newVX * (player.isJumping ? 0.98 : 0.95); // Less drag in air (Smash Bros style)
+      }
+      
+      // Forward/Backward movement (Z-axis) - NEW 3D MOVEMENT
+      if (backward) {
+        console.log("Moving player FORWARD"); // In 3D space, "forward" is toward the camera (positive Z)
+        // Air control is more limited in the air
+        newVZ = player.isJumping ? Math.min(PLAYER_SPEED * 0.7, playerVZ + 0.01) : PLAYER_SPEED;
+      } else if (forward && !(!player.isJumping && playerY <= 0.01)) {
+        // Only move backward when not trying to jump
+        console.log("Moving player BACKWARD"); // In 3D space, "backward" is away from the camera (negative Z)
+        // Air control is more limited in the air
+        newVZ = player.isJumping ? Math.max(-PLAYER_SPEED * 0.7, playerVZ - 0.01) : -PLAYER_SPEED;
+      } else {
+        // Apply drag when not pressing movement keys on Z-axis
+        newVZ = newVZ * (player.isJumping ? 0.98 : 0.95); // Less drag in air
       }
     }
     
@@ -196,7 +213,7 @@ const GameManager = () => {
     
     // --- JUMPING SYSTEM (SMASH BROS STYLE) ---
     
-    // First jump (normal jump from ground)
+    // First jump (normal jump from ground) - now using actual up direction instead of "forward"
     if (forward && !player.isJumping && playerY <= 0.01 && canAct) {
       console.log("Player JUMPING - JUMP_FORCE:", JUMP_FORCE);
       // Apply a strong upward velocity
@@ -365,9 +382,12 @@ const GameManager = () => {
     // Calculate the new X position, staying within arena bounds
     const newX = stayInArena(playerX + newVX);
     
-    // Update player position and velocity
-    movePlayer(newX, newY, playerZ);
-    updatePlayerVelocity(newVX, newVY, playerVZ);
+    // Calculate the new Z position, staying within arena bounds - NEW 3D MOVEMENT
+    const newZ = stayInArenaZ(playerZ + newVZ);
+    
+    // Update player position and velocity with 3D movement
+    movePlayer(newX, newY, newZ);
+    updatePlayerVelocity(newVX, newVY, newVZ);
     
     // Main game update loop
     // Calculate time delta in seconds

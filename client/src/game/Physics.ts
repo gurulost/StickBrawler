@@ -7,6 +7,8 @@ export const DRAG = 0.92; // Increased drag for smoother movement
 export const FLOOR_Y = 0;
 export const ARENA_WIDTH = 24; // Dramatically increased for much bigger play area
 export const ARENA_HALF_WIDTH = ARENA_WIDTH / 2;
+export const ARENA_DEPTH = 14; // Depth of the arena for z-axis movement
+export const ARENA_HALF_DEPTH = ARENA_DEPTH / 2;
 
 // Player bounding box dimensions
 export const PLAYER_WIDTH = 0.5;
@@ -41,7 +43,7 @@ export function applyGravity(y: number, velocityY: number): [number, number] {
 }
 
 /**
- * Checks if character is within arena boundaries and adjusts position if needed
+ * Checks if character is within arena boundaries on X-axis and adjusts position if needed
  */
 export function stayInArena(x: number): number {
   if (x < -ARENA_HALF_WIDTH) {
@@ -54,6 +56,19 @@ export function stayInArena(x: number): number {
 }
 
 /**
+ * Checks if character is within arena boundaries on Z-axis and adjusts position if needed
+ */
+export function stayInArenaZ(z: number): number {
+  if (z < -ARENA_HALF_DEPTH) {
+    return -ARENA_HALF_DEPTH;
+  }
+  if (z > ARENA_HALF_DEPTH) {
+    return ARENA_HALF_DEPTH;
+  }
+  return z;
+}
+
+/**
  * Apply drag to velocity to slow down over time
  */
 export function applyDrag(velocity: number): number {
@@ -61,7 +76,7 @@ export function applyDrag(velocity: number): number {
 }
 
 /**
- * Checks if two characters are colliding (simple AABB collision)
+ * Checks if two characters are colliding (simple AABB collision in 3D)
  */
 export function checkCollision(
   pos1: [number, number, number], 
@@ -77,32 +92,48 @@ export function checkCollision(
   // Check y-axis overlap
   const yOverlap = 
     Math.abs(y1 - y2) < PLAYER_HEIGHT;
+    
+  // Check z-axis overlap - Now considering z-axis for full 3D collision
+  const zOverlap = 
+    Math.abs(z1 - z2) < PLAYER_WIDTH;
   
-  // For 2D fighting game, we only care about x and y
-  return xOverlap && yOverlap;
+  // Return true only if all three axes overlap
+  return xOverlap && yOverlap && zOverlap;
 }
 
 /**
- * Checks if an attack hits based on positions and facing direction
+ * Checks if an attack hits based on positions and facing direction in 3D
  */
 export function checkAttackHit(
   attackerPos: [number, number, number],
   attackerDirection: 1 | -1,
   targetPos: [number, number, number]
 ): boolean {
-  const [attackerX, attackerY] = attackerPos;
-  const [targetX, targetY] = targetPos;
+  const [attackerX, attackerY, attackerZ] = attackerPos;
+  const [targetX, targetY, targetZ] = targetPos;
   
-  // Check that the attacker is facing the target
+  // Check that the attacker is facing the target (x-axis)
   const isFacingTarget = 
     (attackerDirection === 1 && attackerX < targetX) ||
     (attackerDirection === -1 && attackerX > targetX);
   
-  // Check if target is within attack range
-  const inRange = Math.abs(attackerX - targetX) < ATTACK_RANGE;
+  // Check if target is within attack range on x-axis
+  const inRangeX = Math.abs(attackerX - targetX) < ATTACK_RANGE;
   
   // Check if heights are roughly similar (characters can't be too far above/below)
   const similarHeight = Math.abs(attackerY - targetY) < PLAYER_HEIGHT * 0.5;
   
-  return isFacingTarget && inRange && similarHeight;
+  // Check if target is within attack range on z-axis
+  const inRangeZ = Math.abs(attackerZ - targetZ) < ATTACK_RANGE;
+  
+  // Calculate an actual 3D distance for more realistic attack range
+  const distance3D = Math.sqrt(
+    Math.pow(attackerX - targetX, 2) + 
+    Math.pow(attackerZ - targetZ, 2)
+  );
+  const inRange3D = distance3D < ATTACK_RANGE;
+  
+  // Return true if attacker is facing target, they're at similar height,
+  // and the 3D distance is within attack range
+  return isFacingTarget && similarHeight && inRange3D;
 }

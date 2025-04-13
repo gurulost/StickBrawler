@@ -14,10 +14,10 @@ export const ARENA_HALF_DEPTH = ARENA_DEPTH / 2;
 export const PLAYER_WIDTH = 0.5;
 export const PLAYER_HEIGHT = 1.8;
 
-// Attack parameters (drastically reduced damage per hit)
-export const PUNCH_DAMAGE = 3; // Reduced from 10
-export const KICK_DAMAGE = 5;  // Reduced from 15
-export const SPECIAL_DAMAGE = 8; // Reduced from 25
+// Attack parameters (further reduced damage per hit for better balance)
+export const PUNCH_DAMAGE = 2; // Reduced from 3
+export const KICK_DAMAGE = 3;  // Reduced from 5
+export const SPECIAL_DAMAGE = 5; // Reduced from 8
 export const ATTACK_RANGE = 1.5; // Kept the same for consistent hit detection
 
 // Combo system constants
@@ -34,51 +34,70 @@ export interface Platform {
 }
 
 // Define platforms in the arena (coordinates are in world space)
+// Now smaller and more strategically placed
 export const PLATFORMS: Platform[] = [
   // Main floor platform is implicit at y=0
   
-  // Medium height platform in the center
+  // Small floating platform in center, higher up for challenging jumps
   {
-    x1: -4,
-    x2: 4,
-    z1: -3,
-    z2: 3,
+    x1: -2,
+    x2: 2,
+    z1: -2,
+    z2: 2,
+    y: 4
+  },
+  
+  // Small platform to the left side (reduced size)
+  {
+    x1: -9,
+    x2: -6,
+    z1: -1,
+    z2: 1,
+    y: 2
+  },
+  
+  // Small platform to the right side (reduced size)
+  {
+    x1: 6,
+    x2: 9,
+    z1: -1,
+    z2: 1,
+    y: 2
+  },
+  
+  // Tiny stepping platform between left and center
+  {
+    x1: -5,
+    x2: -3,
+    z1: -1,
+    z2: 1,
     y: 3
   },
   
-  // Small platform to the left side
+  // Tiny stepping platform between right and center
+  {
+    x1: 3,
+    x2: 5,
+    z1: -1,
+    z2: 1,
+    y: 3
+  },
+  
+  // Small higher platform on far left
   {
     x1: -10,
-    x2: -6,
-    z1: -2,
-    z2: 2,
-    y: 2
-  },
-  
-  // Small platform to the right side
-  {
-    x1: 6,
-    x2: 10,
-    z1: -2,
-    z2: 2,
-    y: 2
-  },
-  
-  // Upper platform on one side
-  {
-    x1: 8,
-    x2: 11,
-    z1: 4,
-    z2: 6,
+    x2: -8,
+    z1: 3,
+    z2: 5,
     y: 5
   },
   
-  // Upper platform on other side
+  // Small higher platform on far right
   {
-    x1: -11,
-    x2: -8,
-    z1: 4,
-    z2: 6,
+    x1: 8,
+    x2: 10,
+    z1: 3,
+    z2: 5,
     y: 5
   }
 ];

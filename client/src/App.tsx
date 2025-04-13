@@ -9,25 +9,25 @@ import Menu from "./game/Menu";
 import UI from "./game/UI";
 import { useFighting } from "./lib/stores/useFighting";
 
-// Define control keys for the game - Super Smash Bros style controls
+// Define control keys for the game - Updated control scheme
 const keyboardMap = [
-  // Movement
-  { name: Controls.forward, keys: ["KeyW", "ArrowUp"] },
-  { name: Controls.backward, keys: ["KeyS", "ArrowDown"] },
-  { name: Controls.leftward, keys: ["KeyA", "ArrowLeft"] },
-  { name: Controls.rightward, keys: ["KeyD", "ArrowRight"] },
+  // Movement controls (WASD core movement)
+  { name: Controls.jump, keys: ["KeyW"] },             // W for jump (up)
+  { name: Controls.backward, keys: ["KeyS"] },         // S for backward
+  { name: Controls.leftward, keys: ["KeyA"] },         // A for left
+  { name: Controls.rightward, keys: ["KeyD"] },        // D for right
   
-  // Basic attacks
-  { name: Controls.punch, keys: ["KeyJ"] },
-  { name: Controls.kick, keys: ["KeyK"] },
-  { name: Controls.block, keys: ["KeyL"] },
-  { name: Controls.special, keys: ["Space"] },
+  // Combat controls (separated and logical)
+  { name: Controls.attack1, keys: ["KeyJ"] },          // J for quick attack
+  { name: Controls.attack2, keys: ["KeyK"] },          // K for strong attack
+  { name: Controls.shield, keys: ["KeyL"] },           // L for shield/block
+  { name: Controls.special, keys: ["Space"] },         // Space for special move
   
-  // Advanced moves (Super Smash Bros style)
-  { name: Controls.dodge, keys: ["ShiftLeft", "ShiftRight"] },
-  { name: Controls.airAttack, keys: ["KeyI"] },  // Air attack (while jumping)
-  { name: Controls.grab, keys: ["KeyG"] },       // Grab opponent 
-  { name: Controls.taunt, keys: ["KeyT"] },      // Taunt move
+  // Advanced techniques
+  { name: Controls.dodge, keys: ["ShiftLeft", "ShiftRight"] }, // Shift for dodge
+  { name: Controls.airAttack, keys: ["KeyE"] },        // E for air attack
+  { name: Controls.grab, keys: ["KeyG"] },             // G for grab
+  { name: Controls.taunt, keys: ["KeyT"] },            // T for taunt
 ];
 
 // Log the key mapping configuration to help with debugging

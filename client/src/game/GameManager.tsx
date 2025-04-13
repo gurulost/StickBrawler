@@ -146,18 +146,18 @@ const GameManager = () => {
   useFrame(() => {
     if (gamePhase !== 'fighting') return;
     
-    // Get current keyboard state including new Smash Bros style controls
+    // Get current keyboard state with the new control scheme
     const { 
-      forward, backward, leftward, rightward, 
-      punch, kick, block, special,
+      jump, backward, leftward, rightward, 
+      attack1, attack2, shield, special,
       dodge, airAttack, grab, taunt
     } = getKeyboardState();
     
     // Log keyboard state periodically for debugging
     if (Math.random() < 0.01) {
       console.log("Current keyboard state:", { 
-        forward, backward, leftward, rightward, 
-        punch, kick, block, special,
+        jump, backward, leftward, rightward, 
+        attack1, attack2, shield, special,
         dodge, airAttack, grab, taunt
       });
     }
@@ -198,11 +198,6 @@ const GameManager = () => {
         console.log("Moving player FORWARD"); // In 3D space, "forward" is toward the camera (positive Z)
         // Air control is more limited in the air
         newVZ = player.isJumping ? Math.min(PLAYER_SPEED * 0.7, playerVZ + 0.01) : PLAYER_SPEED;
-      } else if (forward && !(!player.isJumping && playerY <= 0.01)) {
-        // Only move backward when not trying to jump
-        console.log("Moving player BACKWARD"); // In 3D space, "backward" is away from the camera (negative Z)
-        // Air control is more limited in the air
-        newVZ = player.isJumping ? Math.max(-PLAYER_SPEED * 0.7, playerVZ - 0.01) : -PLAYER_SPEED;
       } else {
         // Apply drag when not pressing movement keys on Z-axis
         newVZ = newVZ * (player.isJumping ? 0.98 : 0.95); // Less drag in air
@@ -216,8 +211,8 @@ const GameManager = () => {
     
     // --- JUMPING SYSTEM (SMASH BROS STYLE) ---
     
-    // First jump (normal jump from ground) - now using actual up direction instead of "forward"
-    if (forward && !player.isJumping && playerY <= 0.01 && canAct) {
+    // First jump (normal jump from ground) - now using W key for jump
+    if (jump && !player.isJumping && playerY <= 0.01 && canAct) {
       console.log("Player JUMPING - JUMP_FORCE:", JUMP_FORCE);
       // Apply a strong upward velocity
       newVY = JUMP_FORCE;
@@ -226,7 +221,7 @@ const GameManager = () => {
       resetPlayerAirJumps();
     }
     // Air jump (double/triple jump in midair - Smash Bros style)
-    else if (forward && player.isJumping && player.airJumpsLeft > 0) {
+    else if (jump && player.isJumping && player.airJumpsLeft > 0) {
       // Only air jump on key press, not hold
       if (Math.random() < 0.2) { // Simulate a key press check (we're running every frame)
         console.log("Player AIR JUMP! Remaining:", player.airJumpsLeft - 1);
@@ -238,8 +233,8 @@ const GameManager = () => {
     }
     
     // Debug message for jump state
-    if (forward && Math.random() < 0.05) {
-      console.log("Forward key pressed, playerY:", playerY, "isJumping:", player.isJumping, "airJumpsLeft:", player.airJumpsLeft);
+    if (jump && Math.random() < 0.05) {
+      console.log("Jump key pressed, playerY:", playerY, "isJumping:", player.isJumping, "airJumpsLeft:", player.airJumpsLeft);
     }
     
     // Apply gravity to player with platform collision detection
@@ -259,11 +254,14 @@ const GameManager = () => {
     
     // Ground attacks (only when not jumping)
     if (!player.isJumping && canAct) {
-      // Normal punch
-      if (punch && player.attackCooldown <= 0) {
-        console.log("Player PUNCH");
+      // Quick attack (attack1)
+      if (attack1 && player.attackCooldown <= 0) {
+        console.log("Player QUICK ATTACK");
         setPlayerAttacking(true);
         playHit();
+        
+        // Set cooldown to limit attack frequency
+        setPlayerAttackCooldown(15); // Increased cooldown to limit attack spam
         
         // Reset attack after delay
         setTimeout(() => {
@@ -271,11 +269,14 @@ const GameManager = () => {
         }, 400);
       }
       
-      // Normal kick
-      else if (kick && player.attackCooldown <= 0) {
-        console.log("Player KICK");
+      // Strong attack (attack2)
+      else if (attack2 && player.attackCooldown <= 0) {
+        console.log("Player STRONG ATTACK");
         setPlayerAttacking(true);
         playHit();
+        
+        // Set cooldown to limit attack frequency
+        setPlayerAttackCooldown(20); // Longer cooldown for stronger attack
         
         // Reset attack after delay
         setTimeout(() => {
@@ -289,6 +290,9 @@ const GameManager = () => {
         setPlayerAttacking(true);
         playHit();
         
+        // Set cooldown to limit attack frequency
+        setPlayerAttackCooldown(30); // Long cooldown for special attack
+        
         // Reset attack after delay
         setTimeout(() => {
           setPlayerAttacking(false);
@@ -299,6 +303,9 @@ const GameManager = () => {
       else if (grab && player.grabCooldown <= 0) {
         console.log("Player GRAB");
         setPlayerGrabbing(true);
+        
+        // Set grab cooldown
+        setPlayerGrabCooldown(25);
         
         // Reset grab after delay
         setTimeout(() => {
@@ -334,10 +341,13 @@ const GameManager = () => {
     // Air attacks (only when jumping - Smash Bros style)
     else if (player.isJumping && !player.isAirAttacking && player.attackCooldown <= 0) {
       // Air attack
-      if (airAttack || punch || kick) {
+      if (airAttack || attack1 || attack2) {
         console.log("Player AIR ATTACK");
         setPlayerAirAttacking(true);
         playHit();
+        
+        // Set cooldown to limit attack frequency
+        setPlayerAttackCooldown(18);
         
         // Reset air attack after delay
         setTimeout(() => {
@@ -350,6 +360,9 @@ const GameManager = () => {
         setPlayerAirAttacking(true);
         playHit();
         
+        // Set cooldown to limit attack frequency
+        setPlayerAttackCooldown(25);
+        
         // Reset air attack after delay
         setTimeout(() => {
           setPlayerAirAttacking(false);
@@ -359,8 +372,8 @@ const GameManager = () => {
     
     // --- DEFENSIVE ACTIONS ---
     
-    // Handle blocking
-    if (block && canAct) {
+    // Handle blocking with shield key
+    if (shield && canAct) {
       setPlayerBlocking(true);
     } else if (player.isBlocking) {
       setPlayerBlocking(false);

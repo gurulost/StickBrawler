@@ -1,13 +1,13 @@
 // Constants for physics calculations
-export const GRAVITY = 0.012; // Reduced for smoother jumping
-export const JUMP_FORCE = 0.4; // Decreased for more controlled jumping with lower height
+export const GRAVITY = 0.008; // Further reduced for even slower/smoother jumping
+export const JUMP_FORCE = 0.3; // Decreased for more controlled jumping with lower height
 export const PLAYER_SPEED = 0.06; // Increased for better movement across larger arena
 export const CPU_SPEED = 0.05; // Increased to match player in larger arena
 export const DRAG = 0.92; // Increased drag for smoother movement
 export const FLOOR_Y = 0;
-export const ARENA_WIDTH = 24; // Dramatically increased for much bigger play area
+export const ARENA_WIDTH = 30; // Further increased for an even larger play area
 export const ARENA_HALF_WIDTH = ARENA_WIDTH / 2;
-export const ARENA_DEPTH = 14; // Depth of the arena for z-axis movement
+export const ARENA_DEPTH = 18; // Increased depth for z-axis movement
 export const ARENA_HALF_DEPTH = ARENA_DEPTH / 2;
 
 // Player bounding box dimensions
@@ -34,71 +34,80 @@ export interface Platform {
 }
 
 // Define platforms in the arena (coordinates are in world space)
-// Now smaller and more strategically placed throughout the 3D space
+// Spread more evenly throughout the larger 3D space
 export const PLATFORMS: Platform[] = [
   // Main floor platform is implicit at y=0
   
   // Small floating platform in center, higher up for challenging jumps
   {
-    x1: -2,
-    x2: 2,
-    z1: -3, // Moved back a bit
+    x1: -3,
+    x2: 3,
+    z1: -4, // Moved back a bit
     z2: 0,
     y: 4
   },
   
   // Small platform to the left side (positioned deeper in Z)
   {
-    x1: -9,
-    x2: -6,
-    z1: -4, // Far back platform
-    z2: -2,
+    x1: -12,
+    x2: -9,
+    z1: -6, // Far back platform
+    z2: -3,
     y: 2
   },
   
   // Small platform to the right side (positioned forward in Z)
   {
-    x1: 6,
-    x2: 9,
-    z1: 2, // Forward platform
-    z2: 4,
+    x1: 9,
+    x2: 12,
+    z1: 3, // Forward platform
+    z2: 6,
     y: 2
   },
   
   // Tiny stepping platform between left and center (at a different Z position)
   {
-    x1: -5,
-    x2: -3,
-    z1: 1, // Positioned forward
-    z2: 3,
+    x1: -7,
+    x2: -4,
+    z1: 2, // Positioned forward
+    z2: 5,
     y: 3
   },
   
   // Tiny stepping platform between right and center (at a different Z position)
   {
-    x1: 3,
-    x2: 5,
-    z1: -3, // Positioned back
-    z2: -1,
+    x1: 4,
+    x2: 7,
+    z1: -5, // Positioned back
+    z2: -2,
     y: 3
   },
   
   // Small higher platform on far left (forward)
   {
-    x1: -10,
-    x2: -8,
-    z1: 4, // Far forward
-    z2: 6,
+    x1: -14,
+    x2: -11,
+    z1: 5, // Far forward
+    z2: 8,
     y: 5
   },
   
   // Small higher platform on far right (back)
   {
-    x1: 8,
-    x2: 10,
-    z1: -6, // Far back
-    z2: -4,
+    x1: 11,
+    x2: 14,
+    z1: -8, // Far back
+    z2: -5,
     y: 5
+  },
+  
+  // New central high platform (for dramatic aerial battles)
+  {
+    x1: -2,
+    x2: 2,
+    z1: -2,
+    z2: 2,
+    y: 7
   }
 ];
 

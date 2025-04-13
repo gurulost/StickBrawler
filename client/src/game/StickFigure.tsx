@@ -327,15 +327,26 @@ const StickFigure = ({
           isJumping ? -Math.PI / 3 : 
           attackType === 'kick' ? -Math.PI / 2 - animationPhase * 0.3 : // High kick animation
           attackType === 'special' ? -Math.PI / 6 - animationPhase * 0.1 : // Spinning kick preparation
+          attackType === 'air_attack' ? -Math.PI / 3 - animationPhase * 0.2 : // Air attack downward kick
+          attackType === 'grab' ? -Math.PI / 10 - animationPhase * 0.05 : // Grab stance (stable)
+          attackType === 'dodge' ? -Math.PI / 4 - animationPhase * 0.2 : // Quick dodge movement
+          attackType === 'taunt' ? -Math.PI / 6 + Math.sin(Date.now() * 0.05) * 0.2 : // Playful taunt
           isAttacking ? -Math.PI / 8 : 
           0, 
           // Left leg Y rotation (side to side)
-          attackType === 'special' ? animationPhase * Math.PI / 6 : 0,
+          attackType === 'special' ? animationPhase * Math.PI / 6 : 
+          attackType === 'dodge' ? -animationPhase * Math.PI / 8 : // Dodge sidestep
+          attackType === 'taunt' ? Math.sin(Date.now() * 0.05) * Math.PI / 4 : // Taunt dance
+          0,
           // Left leg Z rotation (twisting)
           isJumping ? Math.PI / 6 : 
           attackType === 'kick' ? Math.PI / 5 + animationPhase * 0.2 : // Kick extension
           attackType === 'punch' ? Math.PI / 10 + Math.sin(Date.now() * 0.03) * 0.1 : // Stable stance 
           attackType === 'special' ? Math.PI / 4 + animationPhase * 0.2 : // Spinning position
+          attackType === 'air_attack' ? Math.PI / 3 + animationPhase * 0.15 : // Air attack leg extension
+          attackType === 'grab' ? Math.PI / 6 + animationPhase * 0.1 : // Grab stance
+          attackType === 'dodge' ? Math.PI / 3 - animationPhase * 0.2 : // Dodge twist
+          attackType === 'taunt' ? Math.PI / 6 + Math.sin(Date.now() * 0.05) * 0.4 : // Taunt swagger
           isAttacking ? Math.PI / 10 : 
           Math.sin(Date.now() * 0.003) * 0.04 // Subtle weight shifting
         ]}>
@@ -343,8 +354,11 @@ const StickFigure = ({
         <mesh position={[
           0.1, 
           -0.25, 
-          // Extend leg forward during kick
-          attackType === 'kick' ? 0.1 + animationPhase * 0.15 : 0
+          // Extend leg forward based on the move type
+          attackType === 'kick' ? 0.1 + animationPhase * 0.15 : 
+          attackType === 'air_attack' ? -0.1 - animationPhase * 0.15 : // Downward air attack
+          attackType === 'dodge' ? 0.1 - animationPhase * 0.2 : // Dodge movement
+          0
         ]}>
           <cylinderGeometry args={[0.05, 0.05, 0.5, 8]} />
           <meshStandardMaterial color={isPlayer ? "#2980b9" : "#c0392b"} />
@@ -358,20 +372,38 @@ const StickFigure = ({
           attackType === 'kick' ? Math.PI / 6 : // Support leg during kick
           attackType === 'punch' ? Math.PI / 10 : // Solid base for punch
           attackType === 'special' ? Math.PI / 4 - animationPhase * 0.1 : // Spinning support
+          attackType === 'air_attack' ? Math.PI / 3 - animationPhase * 0.1 : // Air attack support
+          attackType === 'grab' ? Math.PI / 8 + animationPhase * 0.05 : // Grab stance (pushing forward)
+          attackType === 'dodge' ? Math.PI / 4 + animationPhase * 0.2 : // Quick dodge support leg
+          attackType === 'taunt' ? Math.PI / 6 - Math.sin(Date.now() * 0.05) * 0.2 : // Taunt dance movement
           isAttacking ? Math.PI / 8 : 
           0, 
           // Right leg Y rotation (side to side)
-          attackType === 'special' ? -animationPhase * Math.PI / 6 : 0,
+          attackType === 'special' ? -animationPhase * Math.PI / 6 : 
+          attackType === 'dodge' ? animationPhase * Math.PI / 8 : // Dodge sidestep
+          attackType === 'taunt' ? -Math.sin(Date.now() * 0.05) * Math.PI / 4 : // Taunt dance
+          0,
           // Right leg Z rotation (twisting)
           isJumping ? -Math.PI / 6 : 
           attackType === 'kick' ? -Math.PI / 4 : // Support stance
           attackType === 'punch' ? -Math.PI / 8 - Math.sin(Date.now() * 0.03) * 0.08 : // Subtle shifting
           attackType === 'special' ? -Math.PI / 4 - animationPhase * 0.2 : // Spinning position
+          attackType === 'air_attack' ? -Math.PI / 3 - animationPhase * 0.1 : // Air attack leg support
+          attackType === 'grab' ? -Math.PI / 6 - animationPhase * 0.1 : // Grab stance
+          attackType === 'dodge' ? -Math.PI / 3 + animationPhase * 0.2 : // Dodge twist
+          attackType === 'taunt' ? -Math.PI / 6 - Math.sin(Date.now() * 0.05) * 0.4 : // Taunt swagger
           isAttacking ? -Math.PI / 10 : 
           -Math.sin(Date.now() * 0.003) * 0.04 // Subtle weight shifting opposite to other leg
         ]}>
         {/* Right Leg */}
-        <mesh position={[-0.1, -0.25, 0]}>
+        <mesh position={[
+          -0.1, 
+          -0.25, 
+          // Position adjustment based on attack type
+          attackType === 'air_attack' ? -0.05 - animationPhase * 0.05 : // Air attack support
+          attackType === 'dodge' ? -0.1 + animationPhase * 0.2 : // Dodge movement
+          0
+        ]}>
           <cylinderGeometry args={[0.05, 0.05, 0.5, 8]} />
           <meshStandardMaterial color={isPlayer ? "#2980b9" : "#c0392b"} />
         </mesh>
@@ -384,23 +416,37 @@ const StickFigure = ({
           attackType === 'punch' ? 0.1 + animationPhase * 0.05 : // Slight lean into punch
           attackType === 'kick' ? -0.2 - animationPhase * 0.05 : // Lean back for high kick
           attackType === 'special' ? Math.sin(Date.now() * 0.03) * 0.3 : // Dynamic spinning movement
+          attackType === 'air_attack' ? 0.3 + animationPhase * 0.1 : // Leaning forward for downward air attack
+          attackType === 'grab' ? 0.2 + animationPhase * 0.1 : // Leaning forward for grab
+          attackType === 'dodge' ? (Math.random() > 0.5 ? 0.2 : -0.2) * animationPhase : // Random dodge direction
+          attackType === 'taunt' ? Math.sin(Date.now() * 0.05) * 0.3 : // Playful taunt motion
           isAttacking ? Math.sin(Date.now() * 0.02) * 0.1 : 
           0,
           // Torso Y rotation (twisting)
           attackType === 'special' ? animationPhase * Math.PI / 2 : // Full spinning motion
           attackType === 'punch' ? animationPhase * 0.2 : // Slight twist for punch
           attackType === 'kick' ? -animationPhase * 0.15 : // Counter-rotation for kick balance
+          attackType === 'air_attack' ? animationPhase * Math.PI / 5 : // Air attack twist
+          attackType === 'grab' ? animationPhase * 0.25 : // Grab twist
+          attackType === 'dodge' ? (Math.random() > 0.5 ? 0.4 : -0.4) * animationPhase : // Random dodge direction
+          attackType === 'taunt' ? Math.sin(Date.now() * 0.05) * Math.PI / 3 : // Exaggerated taunt motion
           0,
           // Torso Z rotation (side bending)
           attackType === 'punch' ? Math.sin(Date.now() * 0.03) * 0.15 : // Dynamic punch motion
           attackType === 'kick' ? Math.sin(Date.now() * 0.03) * 0.2 : // Balance for kick
           attackType === 'special' ? Math.sin(Date.now() * 0.04) * 0.25 : // Spinning attack
+          attackType === 'air_attack' ? -0.1 - animationPhase * 0.1 : // Air attack lean
+          attackType === 'grab' ? Math.sin(Date.now() * 0.04) * 0.2 : // Dynamic grab movement
+          attackType === 'dodge' ? (Math.random() > 0.5 ? 0.3 : -0.3) * animationPhase : // Random dodge twist
+          attackType === 'taunt' ? Math.sin(Date.now() * 0.05) * 0.4 : // Exaggerated taunt swagger
           isAttacking ? Math.sin(Date.now() * 0.02) * 0.1 : 
           Math.sin(Date.now() * 0.003) * 0.03 // Subtle breathing/movement
         ]}>
       </group>
       
-      {/* Visual indicator for blocking */}
+      {/* Visual indicators for different actions */}
+      
+      {/* Blocking shield */}
       {isBlocking && (
         <mesh position={[0, 1, 0.2]}>
           <torusGeometry args={[0.3, 0.05, 16, 32]} />
@@ -410,6 +456,99 @@ const StickFigure = ({
             opacity={0.7}
           />
         </mesh>
+      )}
+      
+      {/* Dodge dash effect */}
+      {isDodging && (
+        <mesh position={[direction * -0.3, 0.8, 0]}>
+          <sphereGeometry args={[0.2, 8, 8]} />
+          <meshStandardMaterial 
+            color={"#1e90ff"} 
+            transparent={true}
+            opacity={0.5 - animationPhase * 0.1}
+            emissive={"#1e90ff"}
+            emissiveIntensity={0.5}
+          />
+        </mesh>
+      )}
+      
+      {/* Air attack effect */}
+      {isAirAttacking && isJumping && (
+        <group>
+          <mesh position={[0, -0.3, 0]}>
+            <coneGeometry args={[0.2, 0.4, 16]} />
+            <meshStandardMaterial 
+              color={"#ff4500"} 
+              transparent={true}
+              opacity={0.6}
+              emissive={"#ff4500"}
+              emissiveIntensity={0.3 + animationPhase * 0.1}
+            />
+          </mesh>
+        </group>
+      )}
+      
+      {/* Grab effect */}
+      {isGrabbing && (
+        <mesh position={[direction * 0.4, 0.9, 0.1]} rotation={[0, 0, direction * Math.PI / 4]}>
+          <torusGeometry args={[0.15, 0.03, 8, 16, Math.PI]} />
+          <meshStandardMaterial 
+            color={"#ffd700"} 
+            transparent={true}
+            opacity={0.7}
+            emissive={"#ffd700"}
+            emissiveIntensity={0.4}
+          />
+        </mesh>
+      )}
+      
+      {/* Taunt effect */}
+      {isTaunting && (
+        <mesh position={[0, 1.8, 0]}>
+          <sphereGeometry args={[0.1, 8, 8]} />
+          <meshStandardMaterial 
+            color={"#ff69b4"} 
+            transparent={true}
+            opacity={0.5 + Math.sin(Date.now() * 0.01) * 0.5}
+            emissive={"#ff69b4"}
+            emissiveIntensity={0.7}
+          />
+        </mesh>
+      )}
+      
+      {/* Combo counter indicator */}
+      {comboCount > 1 && (
+        <group position={[0, 2.0, 0]}>
+          {/* Combo background */}
+          <mesh position={[0, 0, -0.1]}>
+            <planeGeometry args={[0.6, 0.3]} />
+            <meshStandardMaterial 
+              color={"#000000"} 
+              transparent={true}
+              opacity={0.6}
+            />
+          </mesh>
+          
+          {/* Combo text visualization - we use colored geometric shapes to represent the combo count */}
+          {Array.from({ length: Math.min(5, comboCount) }).map((_, i) => (
+            <mesh key={i} position={[(i - 2) * 0.1, 0, 0]}>
+              <sphereGeometry args={[0.04, 8, 8]} />
+              <meshStandardMaterial 
+                color={
+                  comboCount >= 10 ? "#ff0000" :   // Red for combos ≥ 10
+                  comboCount >= 5 ? "#ff9900" :    // Orange for combos ≥ 5
+                  "#ffff00"                        // Yellow for smaller combos
+                } 
+                emissive={
+                  comboCount >= 10 ? "#ff0000" :
+                  comboCount >= 5 ? "#ff9900" :
+                  "#ffff00"
+                }
+                emissiveIntensity={0.5 + 0.5 * Math.sin(Date.now() * 0.01 * comboCount)}
+              />
+            </mesh>
+          ))}
+        </group>
       )}
     </group>
   );

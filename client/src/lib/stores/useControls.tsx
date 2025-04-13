@@ -8,9 +8,9 @@ export enum Controls {
   rightward = 'rightward', // D key
   
   // Combat controls (separated from movement)
-  attack1 = 'attack1', // A key - quick attack
-  attack2 = 'attack2', // D key - strong attack
-  shield = 'shield',   // S key - block/defend
+  attack1 = 'attack1', // J key - quick attack
+  attack2 = 'attack2', // K key - strong attack
+  shield = 'shield',   // L key - block/defend
   special = 'special', // Space - special move
   
   // Advanced techniques

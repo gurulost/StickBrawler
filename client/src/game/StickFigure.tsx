@@ -42,16 +42,16 @@ const StickFigure = ({
   const [animationPhase, setAnimationPhase] = useState(0);
   const { playHit } = useAudio();
   
-  // Get keyboard controls - only used for player character
-  const forward = useKeyboardControls<Controls>(state => state.forward);
+  // Get keyboard controls - only used for player character with new control scheme
+  const jump = useKeyboardControls<Controls>(state => state.jump);
   const backward = useKeyboardControls<Controls>(state => state.backward);
   const leftward = useKeyboardControls<Controls>(state => state.leftward);
   const rightward = useKeyboardControls<Controls>(state => state.rightward);
-  const punch = useKeyboardControls<Controls>(state => state.punch);
-  const kick = useKeyboardControls<Controls>(state => state.kick);
-  const block = useKeyboardControls<Controls>(state => state.block);
+  const attack1 = useKeyboardControls<Controls>(state => state.attack1);
+  const attack2 = useKeyboardControls<Controls>(state => state.attack2);
+  const shield = useKeyboardControls<Controls>(state => state.shield);
   const special = useKeyboardControls<Controls>(state => state.special);
-  // New Smash Bros style controls
+  // Advanced techniques
   const dodge = useKeyboardControls<Controls>(state => state.dodge);
   const airAttack = useKeyboardControls<Controls>(state => state.airAttack);
   const grab = useKeyboardControls<Controls>(state => state.grab);
@@ -84,14 +84,14 @@ const StickFigure = ({
         // Just occasional logging to avoid spamming
         if (Math.random() < 0.05) {
           // Log basic movement controls
-          if (forward) console.log("Forward key pressed, playerY:", y, "isJumping:", isJumping, "airJumpsLeft:", airJumpsLeft);
+          if (jump) console.log("Jump key pressed, playerY:", y, "isJumping:", isJumping, "airJumpsLeft:", airJumpsLeft);
           if (leftward) console.log("Left key detected in StickFigure");
           if (rightward) console.log("Right key detected in StickFigure");
           
-          // Log basic attack controls
-          if (punch) console.log("Punch key detected in StickFigure");
-          if (kick) console.log("Kick key detected in StickFigure");
-          if (block) console.log("Block key detected in StickFigure");
+          // Log attack controls with new scheme
+          if (attack1) console.log("Quick attack key detected in StickFigure");
+          if (attack2) console.log("Strong attack key detected in StickFigure");
+          if (shield) console.log("Shield key detected in StickFigure");
           if (special) console.log("Special key detected in StickFigure");
           
           // Log Smash Bros style controls
@@ -124,9 +124,9 @@ const StickFigure = ({
           else if (isDodging || dodge) setAttackType('dodge');
           else if (isGrabbing || grab) setAttackType('grab');
           else if (isTaunting || taunt) setAttackType('taunt');
-          // Then check the basic attacks
-          else if (punch) setAttackType('punch');
-          else if (kick) setAttackType('kick');
+          // Then check the basic attacks with new control scheme
+          else if (attack1) setAttackType('punch'); // Quick attack -> punch animation
+          else if (attack2) setAttackType('kick');  // Strong attack -> kick animation
           else if (special) setAttackType('special');
           else setAttackType('punch'); // Default if no key detected
         } else {
@@ -162,9 +162,9 @@ const StickFigure = ({
         else if (isDodging || dodge) setAttackType('dodge');
         else if (isGrabbing || grab) setAttackType('grab');
         else if (isTaunting || taunt) setAttackType('taunt');
-        // Then check the basic attacks
-        else if (punch) setAttackType('punch');
-        else if (kick) setAttackType('kick');
+        // Then check the basic attacks with new control scheme
+        else if (attack1) setAttackType('punch'); // Quick attack -> punch animation
+        else if (attack2) setAttackType('kick');  // Strong attack -> kick animation
         else if (special) setAttackType('special');
         else setAttackType('punch'); // Default fallback
       }

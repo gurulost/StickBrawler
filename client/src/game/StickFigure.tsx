@@ -128,45 +128,100 @@ const StickFigure = ({
     return () => clearInterval(keyDebugInterval);
   }, []);
 
-  // Handle animation phases for more natural martial arts moves - using a simpler approach to avoid control blocking
+  // Enhanced animation system for fluid, realistic martial arts movements
   useEffect(() => {
     // Set up a consistent animation interval that won't block controls
+    // Using smaller interval (60ms) for smoother animations
     const animationInterval = setInterval(() => {
+      // Attacking animations - dynamic based on attack type
       if (isAttacking) {
         // Determine which attack type is being performed
         if (isPlayer) {
-          // Check current key states - don't make this a dependency
-          // First check the Smash Bros style attacks that have priority
-          if (isAirAttacking || (airAttack && isJumping)) setAttackType('air_attack');
-          else if (isDodging || dodge) setAttackType('dodge');
-          else if (isGrabbing || grab) setAttackType('grab');
-          else if (isTaunting || taunt) setAttackType('taunt');
-          // Then check the basic attacks with new control scheme
-          else if (attack1) setAttackType('punch'); // Quick attack -> punch animation
-          else if (attack2) setAttackType('kick');  // Strong attack -> kick animation
-          else if (special) setAttackType('special');
-          else setAttackType('punch'); // Default if no key detected
+          // Check current key states with prioritization for better control feel
+          // Smash Bros style advanced techniques have highest priority
+          if (isAirAttacking || (airAttack && isJumping)) {
+            setAttackType('air_attack');
+          } 
+          else if (isDodging || dodge) {
+            setAttackType('dodge');
+          }
+          else if (isGrabbing || grab) {
+            setAttackType('grab');
+          }
+          else if (isTaunting || taunt) {
+            setAttackType('taunt');
+          }
+          // Basic attack controls follow in priority
+          else if (attack1) {
+            setAttackType('punch'); // Quick attack -> punch animation
+          }
+          else if (attack2) {
+            setAttackType('kick');  // Strong attack -> kick animation
+          }
+          else if (special) {
+            setAttackType('special');
+          }
+          else {
+            // Default - use punch as fallback for consistent animation
+            setAttackType('punch'); 
+          }
         } else {
           // For CPU, randomly choose attack type if not already set
+          // This makes CPU animations match their actual attacks
           if (!attackType) {
             const attackRandom = Math.random();
-            if (attackRandom < 0.5) setAttackType('punch');
-            else if (attackRandom < 0.8) setAttackType('kick');
-            else setAttackType('special');
+            // Distribute CPU attacks with varied probabilities for more realistic combat
+            if (attackRandom < 0.45) {
+              setAttackType('punch'); // Most common
+            }
+            else if (attackRandom < 0.75) {
+              setAttackType('kick');  // Medium probability
+            }
+            else if (attackRandom < 0.9) {
+              setAttackType('special'); // Rare but powerful
+            }
+            else if (attackRandom < 0.95) {
+              setAttackType('grab'); // Occasional grab attempt
+            }
+            else {
+              setAttackType('air_attack'); // Rare air attack
+            }
           }
         }
         
-        // Update animation phase
-        setAnimationPhase(phase => (phase + 1) % 4); // 4 phases for attack animations
-      } else {
-        // Reset attack type when not attacking
-        if (attackType !== null) setAttackType(null);
-        if (animationPhase !== 0) setAnimationPhase(0);
+        // Update animation phase with non-linear progression for more natural movement
+        // Use 6 phases instead of 4 for smoother transitions
+        setAnimationPhase(phase => {
+          // Wind-up, execution, follow-through pattern for martial arts moves
+          const nextPhase = (phase + 1) % 6;
+          
+          // Add some randomization to make CPU movements less predictable
+          if (!isPlayer && Math.random() < 0.1) {
+            // Occasionally skip a frame for CPU to create variation
+            return (phase + 2) % 6;
+          }
+          
+          return nextPhase;
+        });
+      } 
+      // Non-attacking animations (idle, walking, jumping)
+      else {
+        // Gradual reset for more natural transition out of attacks
+        if (attackType !== null) {
+          setAttackType(null);
+        }
+        
+        // Smoothly reset animation phase rather than jumping to 0
+        if (animationPhase > 0) {
+          setAnimationPhase(phase => Math.max(0, phase - 1));
+        }
       }
-    }, 100);
+    }, 60); // Faster interval for smoother animations
     
     return () => clearInterval(animationInterval);
-  }, [isAttacking, isPlayer, attackType, animationPhase]);
+  }, [isAttacking, isPlayer, attackType, animationPhase, 
+      isAirAttacking, isDodging, isGrabbing, isTaunting, 
+      airAttack, dodge, grab, taunt, attack1, attack2, special, isJumping]);
   
   // Process attack type changes independently
   useFrame(() => {

@@ -415,84 +415,167 @@ export class CPUController {
     
     // Within attack range - most likely attack or block
     if (distanceToPlayer <= ATTACK_RANGE * 1.1 && distanceToPlayer >= ATTACK_RANGE * 0.7) {
-      // Force CPU to attack much more frequently when in perfect range
-      // This is a 70% chance to attack when in perfect range
-      if (rand < 0.7) {
+      // Perfect strike range! CPU should mainly focus on fighting
+      // High chance to attack when in perfect range
+      if (rand < 0.65) {
         this.currentAction = CPUAction.ATTACK;
         this.actionTimer = 10;
         console.log('CPU decided to ATTACK because in perfect range');
-      } else if (rand < 0.7 + this.blockChance) {
+      } 
+      // Occasionally block to anticipate player attacks
+      else if (rand < 0.75) {
         this.currentAction = CPUAction.BLOCK;
         this.actionTimer = 15 + Math.floor(Math.random() * 15);
         console.log('CPU decided to BLOCK');
-      } else if (rand < 0.7 + this.blockChance + this.jumpChance) {
+      } 
+      // Mix in some grabs for variety
+      else if (rand < 0.85) {
+        this.currentAction = CPUAction.GRAB;
+        this.actionTimer = 5;
+        console.log('CPU decided to GRAB in perfect range');
+      }
+      // Sometimes jump to set up air attacks
+      else if (rand < 0.95) {
         this.currentAction = CPUAction.JUMP;
         this.actionTimer = 5;
-        console.log('CPU decided to JUMP');
-      } else {
-        // Even in attack range, sometimes just wait
-        this.currentAction = CPUAction.IDLE;
-        this.actionTimer = 5 + Math.floor(Math.random() * 10);
-        console.log('CPU decided to IDLE');
+        console.log('CPU decided to JUMP for air attack');
+      } 
+      // Rarely dodge to avoid predictability
+      else {
+        this.currentAction = CPUAction.DODGE;
+        this.actionTimer = 5;
+        console.log('CPU decided to DODGE unpredictably');
       }
     } 
-    // Too far from player, chase
+    // Too far from player, primarily focus on closing the distance
     else if (distanceToPlayer > this.targetDistance * 1.2) {
-      this.currentAction = CPUAction.CHASE;
-      this.actionTimer = 30 + Math.floor(Math.random() * 30);
-      console.log('CPU decided to CHASE');
+      // Most of the time chase directly
+      if (rand < 0.7) {
+        this.currentAction = CPUAction.CHASE;
+        this.actionTimer = 30 + Math.floor(Math.random() * 30);
+        console.log('CPU decided to CHASE');
+      }
+      // Sometimes jump to traverse platforms or take shortcuts
+      else if (rand < 0.9) {
+        this.currentAction = CPUAction.JUMP;
+        this.actionTimer = 5;
+        console.log('CPU decided to JUMP to close distance');
+      }
+      // Occasionally air jump for vertical navigation
+      else if (rand < 0.95) {
+        this.currentAction = CPUAction.AIR_JUMP;
+        this.actionTimer = 5;
+        console.log('CPU decided to AIR JUMP for vertical approach');
+      }
+      // Rarely taunt when far away
+      else {
+        this.currentAction = CPUAction.TAUNT;
+        this.actionTimer = 5;
+        console.log('CPU decided to TAUNT from a safe distance');
+      }
     } 
-    // Too close to player, back up a bit
+    // Too close to player, need some space
     else if (distanceToPlayer < this.targetDistance * 0.5) {
-      this.currentAction = CPUAction.RETREAT;
-      this.actionTimer = 15 + Math.floor(Math.random() * 15);
-      console.log('CPU decided to RETREAT');
+      // Usually back up
+      if (rand < 0.6) {
+        this.currentAction = CPUAction.RETREAT;
+        this.actionTimer = 15 + Math.floor(Math.random() * 15);
+        console.log('CPU decided to RETREAT');
+      }
+      // Sometimes attack anyway if very close
+      else if (rand < 0.8) {
+        this.currentAction = CPUAction.ATTACK;
+        this.actionTimer = 10;
+        console.log('CPU decided to ATTACK despite close range');
+      }
+      // Dodge away
+      else if (rand < 0.9) {
+        this.currentAction = CPUAction.DODGE;
+        this.actionTimer = 5;
+        console.log('CPU decided to DODGE away');
+      }
+      // Jump out
+      else {
+        this.currentAction = CPUAction.JUMP;
+        this.actionTimer = 5;
+        console.log('CPU decided to JUMP away');
+      }
     } 
-    // Within good range but not perfect - mix of all actions
+    // Within good range but not perfect - balanced strategy
     else {
+      // Strategic approach - attack when reasonable
       if (rand < this.attackChance) {
         this.currentAction = CPUAction.ATTACK;
         this.actionTimer = 10;
-      } else if (rand < this.attackChance + this.blockChance) {
+        console.log('CPU decided to ATTACK strategically');
+      } 
+      // Block to stay safe
+      else if (rand < this.attackChance + this.blockChance) {
         this.currentAction = CPUAction.BLOCK;
         this.actionTimer = 15 + Math.floor(Math.random() * 15);
-      } else if (rand < this.attackChance + this.blockChance + this.jumpChance) {
+        console.log('CPU decided to BLOCK strategically');
+      } 
+      // Jump for positional advantage
+      else if (rand < this.attackChance + this.blockChance + this.jumpChance) {
         this.currentAction = CPUAction.JUMP;
         this.actionTimer = 5;
-      } else if (rand < this.attackChance + this.blockChance + this.jumpChance + this.dodgeChance) {
-        // Dodge (Smash Bros style)
+        console.log('CPU decided to JUMP for position');
+      } 
+      // Dodge to avoid attacks
+      else if (rand < this.attackChance + this.blockChance + this.jumpChance + this.dodgeChance) {
         this.currentAction = CPUAction.DODGE;
         this.actionTimer = 5;
         console.log('CPU decided to DODGE');
-      } else if (rand < this.attackChance + this.blockChance + this.jumpChance + this.dodgeChance + this.grabChance) {
-        // Grab (Smash Bros style)
+      } 
+      // Grab when player might be blocking
+      else if (rand < this.attackChance + this.blockChance + this.jumpChance + this.dodgeChance + this.grabChance) {
         this.currentAction = CPUAction.GRAB;
         this.actionTimer = 5;
         console.log('CPU decided to GRAB');
-      } else if (rand < this.attackChance + this.blockChance + this.jumpChance + this.dodgeChance + this.grabChance + 0.3) {
-        // Higher chance to chase to get into proper attack range
+      } 
+      // Try air attack for surprise
+      else if (rand < this.attackChance + this.blockChance + this.jumpChance + this.dodgeChance + this.grabChance + this.airAttackChance) {
+        this.currentAction = CPUAction.AIR_ATTACK;
+        this.actionTimer = 5;
+        console.log('CPU decided to use AIR ATTACK');
+      }
+      // Chase to optimize position
+      else if (rand < this.attackChance + this.blockChance + this.jumpChance + this.dodgeChance + this.grabChance + this.airAttackChance + 0.2) {
         this.currentAction = CPUAction.CHASE;
         this.actionTimer = 20 + Math.floor(Math.random() * 20);
-        console.log('CPU decided to CHASE (normal)');
-      } else if (rand < this.attackChance + this.blockChance + this.jumpChance + this.dodgeChance + this.grabChance + 0.3 + this.tauntChance) {
-        // Occasionally taunt (just for fun)
+        console.log('CPU decided to CHASE (positioning)');
+      } 
+      // Taunt rarely
+      else if (rand < this.attackChance + this.blockChance + this.jumpChance + this.dodgeChance + this.grabChance + this.airAttackChance + 0.2 + this.tauntChance) {
         this.currentAction = CPUAction.TAUNT;
         this.actionTimer = 5;
         console.log('CPU decided to TAUNT');
-      } else {
+      } 
+      // Sometimes just pause to reset
+      else {
         this.currentAction = CPUAction.IDLE;
         this.actionTimer = 10 + Math.floor(Math.random() * 10);
-        console.log('CPU decided to IDLE (normal)');
+        console.log('CPU decided to IDLE (strategic pause)');
       }
     }
     
-    // Special case: if player is attacking and we're not already blocking
-    if (playerIsAttacking && this.currentAction !== CPUAction.BLOCK && 
-        this.currentAction !== CPUAction.JUMP && 
-        Math.random() < this.blockChance * 2) {
-      this.currentAction = CPUAction.BLOCK;
-      this.actionTimer = 20;
-      console.log('CPU decided to BLOCK because player is attacking');
+    // Special case: if player is attacking and we're close enough, high chance to block or dodge
+    if (playerIsAttacking && distanceToPlayer < ATTACK_RANGE * 1.5) {
+      if (this.currentAction !== CPUAction.BLOCK && 
+          this.currentAction !== CPUAction.JUMP && 
+          this.currentAction !== CPUAction.DODGE) {
+        
+        // Determine whether to block or dodge
+        if (Math.random() < 0.7) {
+          this.currentAction = CPUAction.BLOCK;
+          this.actionTimer = 20;
+          console.log('CPU decided to BLOCK because player is attacking');
+        } else {
+          this.currentAction = CPUAction.DODGE;
+          this.actionTimer = 15;
+          console.log('CPU decided to DODGE because player is attacking');
+        }
+      }
     }
   }
 }

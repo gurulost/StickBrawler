@@ -38,27 +38,78 @@ console.log("Keyboard controls configuration:", keyboardMap);
 function App() {
   const { gamePhase } = useFighting();
   const [showCanvas, setShowCanvas] = useState(false);
-  const { setBackgroundMusic, setHitSound, setSuccessSound } = useAudio();
+  const { 
+    setBackgroundMusic, 
+    setHitSound, 
+    setSuccessSound, 
+    setPunchSound,
+    setKickSound,
+    setSpecialSound,
+    setBlockSound,
+    setJumpSound,
+    setLandSound,
+    setDodgeSound,
+    setGrabSound,
+    setThrowSound,
+    setTauntSound,
+    playBackgroundMusic
+  } = useAudio();
 
   // Initialize audio elements
   useEffect(() => {
-    // Load sound effects
-    const backgroundMusic = new Audio("/sounds/background.mp3");
+    // Load sound effects with error handling
+    const loadAudio = (path: string, volume: number = 0.5) => {
+      try {
+        const audio = new Audio(path);
+        audio.volume = volume;
+        return audio;
+      } catch (error) {
+        console.error(`Failed to load audio: ${path}`, error);
+        // Return a silent audio as fallback
+        return new Audio();
+      }
+    };
+
+    // Background music
+    const backgroundMusic = loadAudio("/sounds/background.mp3", 0.4);
     backgroundMusic.loop = true;
-    backgroundMusic.volume = 0.4;
     setBackgroundMusic(backgroundMusic);
 
-    const hitSound = new Audio("/sounds/hit.mp3");
-    hitSound.volume = 0.5;
-    setHitSound(hitSound);
+    // Combat sounds
+    setHitSound(loadAudio("/sounds/hit.mp3", 0.5));
+    setSuccessSound(loadAudio("/sounds/success.mp3", 0.6));
+    setPunchSound(loadAudio("/sounds/punch.mp3", 0.5));
+    setKickSound(loadAudio("/sounds/kick.mp3", 0.55));
+    setSpecialSound(loadAudio("/sounds/special.mp3", 0.6));
+    
+    // Defensive sounds
+    setBlockSound(loadAudio("/sounds/block.mp3", 0.45));
+    setDodgeSound(loadAudio("/sounds/dodge.mp3", 0.4));
+    
+    // Movement sounds
+    setJumpSound(loadAudio("/sounds/jump.mp3", 0.4));
+    setLandSound(loadAudio("/sounds/land.mp3", 0.4));
+    
+    // Advanced technique sounds
+    setGrabSound(loadAudio("/sounds/grab.mp3", 0.5));
+    setThrowSound(loadAudio("/sounds/throw.mp3", 0.55));
+    setTauntSound(loadAudio("/sounds/taunt.mp3", 0.5));
 
-    const successSound = new Audio("/sounds/success.mp3");
-    successSound.volume = 0.6;
-    setSuccessSound(successSound);
+    // Start playing background music
+    setTimeout(() => {
+      playBackgroundMusic();
+      console.log("Background music started");
+    }, 1000);
 
     // Show the canvas once everything is loaded
     setShowCanvas(true);
-  }, [setBackgroundMusic, setHitSound, setSuccessSound]);
+  }, [
+    setBackgroundMusic, setHitSound, setSuccessSound, 
+    setPunchSound, setKickSound, setSpecialSound, 
+    setBlockSound, setJumpSound, setLandSound, 
+    setDodgeSound, setGrabSound, setThrowSound, 
+    setTauntSound, playBackgroundMusic
+  ]);
 
   return (
     <div style={{ width: '100vw', height: '100vh', position: 'relative', overflow: 'hidden' }}>

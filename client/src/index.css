@@ -31,6 +31,22 @@
     animation: bounce 1s infinite alternate;
   }
   
+  .animate-ping {
+    animation: ping 1s cubic-bezier(0, 0, 0.2, 1) infinite;
+  }
+  
+  .animate-jump {
+    animation: jump 1.5s ease-in-out infinite alternate;
+  }
+  
+  .animate-attack {
+    animation: attack 2s ease-in-out infinite;
+  }
+  
+  .animate-idle {
+    animation: idle 4s ease-in-out infinite;
+  }
+  
   .transform {
     transition: transform 0.2s ease-in-out;
   }
@@ -67,6 +83,78 @@
   }
 }
 
+@keyframes ping {
+  75%, 100% {
+    transform: scale(1.5);
+    opacity: 0;
+  }
+}
+
+@keyframes floatParticle {
+  0% {
+    transform: translateY(0) translateX(0);
+    opacity: 0;
+  }
+  10% {
+    opacity: 0.8;
+  }
+  90% {
+    opacity: 0.8;
+  }
+  100% {
+    transform: translateY(-100vh) translateX(20px);
+    opacity: 0;
+  }
+}
+
+@keyframes jump {
+  0% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-30px);
+  }
+  100% {
+    transform: translateY(0);
+  }
+}
+
+@keyframes attack {
+  0% {
+    transform: translateX(0) rotate(0deg);
+  }
+  15% {
+    transform: translateX(-5px) rotate(-5deg);
+  }
+  30% {
+    transform: translateX(15px) rotate(0deg);
+  }
+  45% {
+    transform: translateX(0) rotate(0deg);
+  }
+  100% {
+    transform: translateX(0) rotate(0deg);
+  }
+}
+
+@keyframes idle {
+  0% {
+    transform: translateY(0) rotate(0deg);
+  }
+  25% {
+    transform: translateY(-3px) rotate(1deg);
+  }
+  50% {
+    transform: translateY(0) rotate(0deg);
+  }
+  75% {
+    transform: translateY(-2px) rotate(-1deg);
+  }
+  100% {
+    transform: translateY(0) rotate(0deg);
+  }
+}
+
 #root {
   width: 100%;
   height: 100%;
@@ -100,10 +188,39 @@ input[type="range"]:focus {
   outline: none;
 }
 
+input[type="range"].accent-yellow-500::-webkit-slider-thumb {
+  background: #EAB308;
+  box-shadow: 0 0 5px rgba(234, 179, 8, 0.5);
+}
+
 button {
   transition: all 0.2s ease;
 }
 
-button:hover {
+button:hover:not(:disabled) {
   transform: scale(1.05);
+}
+
+button:active:not(:disabled) {
+  transform: scale(0.98);
+}
+
+/* Modern scrollbar styles */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: rgba(0, 0, 0, 0.2);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(100, 100, 100, 0.5);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(120, 120, 120, 0.7);
 }

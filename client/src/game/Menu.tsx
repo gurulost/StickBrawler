@@ -100,7 +100,7 @@ const StickFigure = ({
                style={{ transform: `rotate(${isDefending ? '0deg' : '45deg'})` }}></div>
         </div>
         
-        {/* Legs */}
+        {/* Legs - All in one container to avoid separate animated elements */}
         <div className="flex justify-center mt-2">
           <div className={`w-2 h-20 ${color === 'blue' ? 'bg-blue-500' : 'bg-red-500'} origin-top shadow-md transition-all duration-200`}
                style={{ transform: `rotate(${isJumping ? '-30deg' : '-15deg'})` }}></div>

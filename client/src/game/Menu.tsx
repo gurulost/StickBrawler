@@ -325,8 +325,9 @@ const Menu = () => {
         
         {/* Interactive fighting scene */}
         <div className="relative w-96 h-96 mx-auto mb-10">
-          {/* Interactive background elements */}
-          <div className="absolute inset-x-0 bottom-10 h-1 bg-gradient-to-r from-transparent via-gray-500 to-transparent rounded"></div>
+          {/* Interactive background elements - Ground/Platform */}
+          <div className="absolute inset-x-0 bottom-10 h-1 bg-gradient-to-r from-transparent via-gray-400 to-transparent opacity-80 rounded-full shadow-md"></div>
+          <div className="absolute inset-x-10 bottom-9 h-4 bg-gradient-to-b from-indigo-900/30 to-transparent blur-sm rounded-full"></div>
           
           {/* Fighting characters with dynamic animations */}
           <StickFigure 

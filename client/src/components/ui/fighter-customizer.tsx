@@ -10,6 +10,7 @@ import { Input } from './input';
 import { useCustomization, colorThemes, figureStyles, accessories, animationStyles, SavedCharacter } from '../../lib/stores/useCustomization';
 import StickFigure from '../../game/StickFigure';
 import { useFighting } from '../../lib/stores/useFighting';
+import { ParticleEffect, AuraEffect } from './particle-effects';
 import { Palette, User, Zap, Crown, Save, RotateCcw, Eye } from 'lucide-react';
 import * as THREE from 'three';
 
@@ -53,8 +54,11 @@ const CharacterPreview = ({
     velocity: [0, 0, 0] as [number, number, number]
   };
 
+  const colors = isPlayer ? getPlayerColors() : getCPUColors();
+  const style = isPlayer ? getPlayerStyle() : getCPUStyle();
+
   return (
-    <div className={`h-64 w-full bg-gradient-to-b from-gray-900 to-gray-800 rounded-lg overflow-hidden ${className}`}>
+    <div className={`h-64 w-full bg-gradient-to-b from-gray-900 to-gray-800 rounded-lg overflow-hidden ${className} relative`}>
       <Canvas
         camera={{ position: [0, 1, 3], fov: 50 }}
         style={{ width: '100%', height: '100%' }}
@@ -63,6 +67,22 @@ const CharacterPreview = ({
           <ambientLight intensity={0.4} />
           <directionalLight position={[10, 10, 5]} intensity={1} />
           <pointLight position={[-10, -10, -5]} intensity={0.5} />
+          
+          {/* Character particle effects based on theme */}
+          {colors.specialEffect && (
+            <ParticleEffect 
+              theme={colors.specialEffect} 
+              count={style.particleCount || 5}
+              intensity={style.glowIntensity || 0.5}
+            />
+          )}
+          
+          {/* Character aura effect */}
+          <AuraEffect 
+            color={colors.glow} 
+            intensity={style.glowIntensity || 0.5}
+            radius={1.2}
+          />
           
           <StickFigure
             isPlayer={isPlayer}
@@ -86,11 +106,21 @@ const CharacterPreview = ({
           <Environment preset="studio" />
         </Suspense>
       </Canvas>
+      
+      {/* Character theme name overlay */}
+      <div className="absolute top-2 left-2 bg-black bg-opacity-60 rounded px-2 py-1">
+        <span className="text-xs text-white font-medium">{colors.name}</span>
+      </div>
+      
+      {/* Style name overlay */}
+      <div className="absolute top-2 right-2 bg-black bg-opacity-60 rounded px-2 py-1">
+        <span className="text-xs text-white font-medium">{style.name}</span>
+      </div>
     </div>
   );
 };
 
-// Color palette selector
+// Enhanced color palette selector with theme names
 const ColorSelector = ({ 
   label, 
   value, 
@@ -105,21 +135,31 @@ const ColorSelector = ({
   return (
     <div className={`space-y-3 ${className}`}>
       <label className="text-sm font-medium text-gray-200">{label}</label>
-      <div className="grid grid-cols-4 gap-2">
+      <div className="grid grid-cols-2 gap-3">
         {Object.entries(colorThemes).map(([key, theme]) => (
           <button
             key={key}
             onClick={() => onChange(key)}
-            className={`w-12 h-12 rounded-lg border-2 transition-all hover:scale-105 ${
+            className={`p-3 rounded-lg border-2 transition-all hover:scale-105 ${
               value === key 
-                ? 'border-white ring-2 ring-blue-400' 
-                : 'border-gray-600 hover:border-gray-400'
+                ? 'border-white ring-2 ring-blue-400 bg-gray-700' 
+                : 'border-gray-600 hover:border-gray-400 bg-gray-800'
             }`}
-            style={{ 
-              background: `linear-gradient(135deg, ${theme.primary}, ${theme.secondary})` 
-            }}
-            title={key.charAt(0).toUpperCase() + key.slice(1)}
-          />
+          >
+            <div className="flex items-center gap-3">
+              <div 
+                className="w-8 h-8 rounded-full border border-gray-500"
+                style={{ 
+                  background: `linear-gradient(135deg, ${theme.primary}, ${theme.secondary})`,
+                  boxShadow: `0 0 8px ${theme.glow}40`
+                }}
+              />
+              <div className="text-left">
+                <div className="text-sm font-medium text-white">{theme.name}</div>
+                <div className="text-xs text-gray-400">{theme.specialEffect}</div>
+              </div>
+            </div>
+          </button>
         ))}
       </div>
     </div>
@@ -173,7 +213,7 @@ const StyleSelector = ({
   );
 };
 
-// Accessory selector
+// Enhanced accessory selector with visual effects
 const AccessorySelector = ({ 
   label, 
   value, 
@@ -192,7 +232,7 @@ const AccessorySelector = ({
   return (
     <div className={`space-y-3 ${className}`}>
       <label className="text-sm font-medium text-gray-200">{label}</label>
-      <div className="grid grid-cols-2 gap-2">
+      <div className="grid grid-cols-2 gap-2 max-h-48 overflow-y-auto">
         {Object.entries(accessories).map(([key, accessory]) => (
           <button
             key={key}
@@ -203,7 +243,24 @@ const AccessorySelector = ({
                 : 'border-gray-600 bg-gray-800 text-gray-300 hover:border-gray-500'
             }`}
           >
-            <div className="font-medium text-sm">{accessory.name}</div>
+            <div className="flex items-center gap-2">
+              <div className="font-medium text-sm">{accessory.name}</div>
+              {accessory.effect && (
+                <div className="flex gap-1">
+                  {accessory.emissive && (
+                    <div className="w-2 h-2 rounded-full bg-yellow-400 animate-pulse" title="Glowing Effect" />
+                  )}
+                  {accessory.animated && (
+                    <div className="w-2 h-2 rounded-full bg-blue-400 animate-spin" title="Animated Effect" />
+                  )}
+                </div>
+              )}
+            </div>
+            {accessory.effect && (
+              <div className="text-xs text-gray-400 mt-1 capitalize">
+                {accessory.effect.replace('_', ' ')} effect
+              </div>
+            )}
           </button>
         ))}
       </div>
@@ -211,15 +268,32 @@ const AccessorySelector = ({
       {value !== 'none' && (
         <div className="space-y-2">
           <label className="text-xs font-medium text-gray-300">Accessory Color</label>
-          <div className="flex gap-2">
-            {['#ffffff', '#ff0000', '#00ff00', '#0000ff', '#ffff00', '#ff00ff', '#000000', '#ffa500'].map((c) => (
+          <div className="grid grid-cols-4 gap-2">
+            {[
+              { color: '#ffffff', name: 'White' },
+              { color: '#ff4444', name: 'Fire Red' },
+              { color: '#44ff44', name: 'Nature Green' },
+              { color: '#4444ff', name: 'Ocean Blue' },
+              { color: '#ffff44', name: 'Solar Gold' },
+              { color: '#ff44ff', name: 'Magic Purple' },
+              { color: '#444444', name: 'Shadow Black' },
+              { color: '#ff8844', name: 'Ember Orange' },
+              { color: '#44ffff', name: 'Cyber Cyan' },
+              { color: '#ff88ff', name: 'Sakura Pink' },
+              { color: '#88ff88', name: 'Crystal Green' },
+              { color: '#8888ff', name: 'Mystic Blue' }
+            ].map((colorOption) => (
               <button
-                key={c}
-                onClick={() => onColorChange(c)}
-                className={`w-8 h-8 rounded border-2 ${
-                  color === c ? 'border-white' : 'border-gray-600'
+                key={colorOption.color}
+                onClick={() => onColorChange(colorOption.color)}
+                className={`w-8 h-8 rounded border-2 transition-all hover:scale-110 ${
+                  color === colorOption.color ? 'border-white ring-2 ring-blue-400' : 'border-gray-600'
                 }`}
-                style={{ backgroundColor: c }}
+                style={{ 
+                  backgroundColor: colorOption.color,
+                  boxShadow: color === colorOption.color ? `0 0 8px ${colorOption.color}60` : 'none'
+                }}
+                title={colorOption.name}
               />
             ))}
           </div>
@@ -229,55 +303,87 @@ const AccessorySelector = ({
   );
 };
 
-// Preset characters
+// Enhanced preset characters with new accessories
 const presetCharacters = [
   {
-    name: "Blue Warrior",
+    name: "Ocean Warrior",
     colorTheme: 'blue' as const,
     figureStyle: 'normal' as const,
-    accessory: 'sword' as const,
-    accessoryColor: '#c0c0c0',
+    accessory: 'crystal_shield' as const,
+    accessoryColor: '#87ceeb',
     animationStyle: 'normal'
   },
   {
-    name: "Red Berserker",
+    name: "Fire Champion",
     colorTheme: 'red' as const,
     figureStyle: 'bulky' as const,
-    accessory: 'none' as const,
-    accessoryColor: '#ffffff',
+    accessory: 'flame_sword' as const,
+    accessoryColor: '#ff4444',
     animationStyle: 'powerful'
   },
   {
-    name: "Green Ninja",
-    colorTheme: 'green' as const,
+    name: "Shadow Ninja",
+    colorTheme: 'black' as const,
     figureStyle: 'slim' as const,
-    accessory: 'none' as const,
-    accessoryColor: '#ffffff',
+    accessory: 'ninja_mask' as const,
+    accessoryColor: '#2c3e50',
     animationStyle: 'fast'
   },
   {
-    name: "Purple Mage",
+    name: "Mystic Sorcerer",
     colorTheme: 'purple' as const,
     figureStyle: 'cartoonish' as const,
-    accessory: 'hat' as const,
-    accessoryColor: '#4a148c',
+    accessory: 'wizard_hat' as const,
+    accessoryColor: '#8e44ad',
     animationStyle: 'acrobatic'
   },
   {
-    name: "Robot Fighter",
-    colorTheme: 'black' as const,
+    name: "Cyber Ninja",
+    colorTheme: 'cyber' as const,
     figureStyle: 'robot' as const,
-    accessory: 'glasses' as const,
-    accessoryColor: '#00ff00',
+    accessory: 'cyber_visor' as const,
+    accessoryColor: '#00ffff',
     animationStyle: 'robotic'
   },
   {
-    name: "Knight Champion",
+    name: "Light Paladin",
     colorTheme: 'white' as const,
     figureStyle: 'normal' as const,
-    accessory: 'shield' as const,
+    accessory: 'halo' as const,
+    accessoryColor: '#ffffff',
+    animationStyle: 'normal'
+  },
+  {
+    name: "Angel Guardian",
+    colorTheme: 'white' as const,
+    figureStyle: 'ethereal' as const,
+    accessory: 'wings' as const,
+    accessoryColor: '#f0f8ff',
+    animationStyle: 'acrobatic'
+  },
+  {
+    name: "Demon Lord",
+    colorTheme: 'red' as const,
+    figureStyle: 'bulky' as const,
+    accessory: 'demon_horns' as const,
+    accessoryColor: '#8b0000',
+    animationStyle: 'powerful'
+  },
+  {
+    name: "Royal Champion",
+    colorTheme: 'orange' as const,
+    figureStyle: 'normal' as const,
+    accessory: 'crown' as const,
     accessoryColor: '#ffd700',
     animationStyle: 'normal'
+  },
+  {
+    name: "Prism Warrior",
+    colorTheme: 'rainbow' as const,
+    figureStyle: 'crystal' as const,
+    accessory: 'energy_cape' as const,
+    accessoryColor: '#ff6b6b',
+    animationStyle: 'acrobatic'
   }
 ];
 

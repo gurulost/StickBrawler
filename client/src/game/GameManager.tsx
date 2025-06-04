@@ -83,7 +83,7 @@ const GameManager = () => {
   const [cpuUpdater] = useState(() => new CPUUpdater(CPUDifficulty.MEDIUM));
   
   // Refs for timing
-  const lastFrameTime = useRef(Date.now());
+  const lastFrameTime = useRef(Date.now()); // Initialized ref
   
   // Get keyboard state through custom hook
   const getKeyboardState = usePlayerControls();
@@ -159,15 +159,15 @@ const GameManager = () => {
         playHit();
       }
     }
-  }, [player.isAttacking, cpu.isAttacking, player.position, cpu.position, player.direction, cpu.direction, damagePlayer, damageCPU, playHit, getKeyboardState]);
+  }, [player.isAttacking, cpu.isAttacking, player.position, cpu.position, player.direction, cpu.direction, damagePlayer, damageCPU, playHit, getKeyboardState, debugMode]); // Added debugMode to dependencies
   
   // Handle player keyboard controls directly with 3D Smash Bros style movement
-  useFrame(() => {
+  useFrame((state, frameDelta) => { // Renamed useFrame's delta to frameDelta to avoid confusion
     if (gamePhase !== 'fighting') return;
 
-    // Calculate time delta in seconds at the start of the frame
+    // Calculate time delta in seconds at the start of the frame using the ref
     const now = Date.now();
-    const delta = (now - lastFrameTime.current) / 1000;
+    const delta = (now - lastFrameTime.current) / 1000; // This is the delta used for game logic
     lastFrameTime.current = now;
     
     // Get current keyboard state with the new control scheme
@@ -206,80 +206,62 @@ const GameManager = () => {
         if (debugMode) {
           console.log("Moving player LEFT");
         }
-        // Air control is more limited (Smash Bros style)
         newVX = player.isJumping ? Math.max(-PLAYER_SPEED * 0.7, playerVX - 0.01) : -PLAYER_SPEED;
         newDirection = -1;
       } else if (rightward) {
         if (debugMode) {
           console.log("Moving player RIGHT");
         }
-        // Air control is more limited (Smash Bros style)
         newVX = player.isJumping ? Math.min(PLAYER_SPEED * 0.7, playerVX + 0.01) : PLAYER_SPEED;
         newDirection = 1;
       } else {
-        // Apply drag when not pressing movement keys on X-axis
-        newVX = newVX * (player.isJumping ? 0.98 : 0.95); // Less drag in air (Smash Bros style)
+        newVX = newVX * (player.isJumping ? 0.98 : 0.95); 
       }
       
       // Forward/Backward movement (Z-axis) - NEW 3D MOVEMENT
       if (forward) {
         if (debugMode) {
-          console.log("Moving player FORWARD"); // In 3D space, "forward" is toward camera (negative Z)
+          console.log("Moving player FORWARD"); 
         }
-        // Air control is more limited in the air
         newVZ = player.isJumping ? Math.max(-PLAYER_SPEED * 0.7, playerVZ - 0.01) : -PLAYER_SPEED;
       } else if (backward) {
         if (debugMode) {
-          console.log("Moving player BACKWARD"); // In 3D space, "backward" is away from camera (positive Z)
+          console.log("Moving player BACKWARD"); 
         }
-        // Air control is more limited in the air
         newVZ = player.isJumping ? Math.min(PLAYER_SPEED * 0.7, playerVZ + 0.01) : PLAYER_SPEED;
       } else {
-        // Apply drag when not pressing movement keys on Z-axis
-        newVZ = newVZ * (player.isJumping ? 0.98 : 0.95); // Less drag in air
+        newVZ = newVZ * (player.isJumping ? 0.98 : 0.95); 
       }
     }
     
-    // Update player direction
     if (newDirection !== player.direction) {
       setPlayerDirection(newDirection);
     }
     
-    // --- JUMPING SYSTEM (SMASH BROS STYLE) ---
-    
-    // First jump (normal jump from ground) - now using W key for jump
     if (jump && !player.isJumping && playerY <= 0.01 && canAct) {
       if (debugMode) {
         console.log("Player JUMPING - JUMP_FORCE:", JUMP_FORCE);
       }
-      // Apply a strong upward velocity
       newVY = JUMP_FORCE;
       setPlayerJumping(true);
-      playJump(); // Play jump sound
-      // Reset air jumps when starting a new jump
+      playJump(); 
       resetPlayerAirJumps();
     }
-    // Air jump (double/triple jump in midair - Smash Bros style)
     else if (jump && player.isJumping && player.airJumpsLeft > 0) {
-      // Only air jump on key press, not hold
-      if (Math.random() < 0.2) { // Simulate a key press check (we're running every frame)
+      if (Math.random() < 0.2) { 
         if (debugMode) {
           console.log("Player AIR JUMP! Remaining:", player.airJumpsLeft - 1);
         }
-        // Slightly weaker jump for air jumps
         newVY = JUMP_FORCE * 0.8;
         usePlayerAirJump();
-        playJump(); // Play jump sound for air jumps too
+        playJump(); 
       }
     }
     
-    // Debug message for jump state
     if (jump && Math.random() < 0.05 && debugMode) {
       console.log("Jump key pressed, playerY:", playerY, "isJumping:", player.isJumping, "airJumpsLeft:", player.airJumpsLeft);
     }
     
-    // Apply gravity to player with platform collision detection 
-    // Allow dropping through platforms when pressing down and player is on a platform above ground level
     const platformHeight = getPlatformHeight(playerX, playerZ);
     const dropThrough = backward && platformHeight > 0 && Math.abs(playerY - platformHeight) < 0.1;
     
@@ -288,206 +270,150 @@ const GameManager = () => {
     }
     
     const [newY, gravityVY] = applyGravity(playerY, newVY, playerX, playerZ, dropThrough, delta);
-    newVY = gravityVY; // Update with gravity effect
+    newVY = gravityVY; 
     
-    // Update jumping state when landing on a platform or ground
     if (player.isJumping && (Math.abs(newY - platformHeight) < 0.1 || newY <= 0.01)) {
       setPlayerJumping(false);
-      // Reset air jumps when landing
       resetPlayerAirJumps();
-      // Play landing sound effect
       playLand();
       if (debugMode) {
         console.log("Player landed on platform at height:", platformHeight);
       }
     }
     
-    // --- ATTACK SYSTEM (SMASH BROS STYLE) ---
-    
-    // Ground attacks (only when not jumping)
     if (!player.isJumping && canAct) {
-      // Quick attack (attack1)
       if (attack1 && player.attackCooldown <= 0) {
         if (debugMode) {
           console.log("Player QUICK ATTACK");
         }
         setPlayerAttacking(true);
-        playPunch(); // Use specific punch sound effect
-        
-        // Reset attack after delay
+        playPunch(); 
         setTimeout(() => {
           setPlayerAttacking(false);
         }, 400);
       }
-      
-      // Strong attack (attack2)
       else if (attack2 && player.attackCooldown <= 0) {
         if (debugMode) {
           console.log("Player STRONG ATTACK");
         }
         setPlayerAttacking(true);
-        playKick(); // Use specific kick sound effect
-        
-        // Reset attack after delay
+        playKick(); 
         setTimeout(() => {
           setPlayerAttacking(false);
         }, 500);
       }
-      
-      // Special attack
       else if (special && player.attackCooldown <= 0) {
         if (debugMode) {
           console.log("Player SPECIAL");
         }
         setPlayerAttacking(true);
-        playSpecial(); // Use specific special attack sound effect
-        
-        // Reset attack after delay
+        playSpecial(); 
         setTimeout(() => {
           setPlayerAttacking(false);
         }, 600);
       }
-      
-      // Grab attack (new Smash Bros style)
       else if (grab && player.grabCooldown <= 0) {
         if (debugMode) {
           console.log("Player GRAB");
         }
         setPlayerGrabbing(true);
-        playGrab(); // Play grab sound
-        
-        // Reset grab after delay
+        playGrab(); 
         setTimeout(() => {
           setPlayerGrabbing(false);
-          
-          // Check if grab connected at the end
           const distanceToCPU = Math.abs(player.position[0] - cpu.position[0]);
-          if (distanceToCPU < ATTACK_RANGE * 0.6) { // Grab has shorter range than attacks
+          if (distanceToCPU < ATTACK_RANGE * 0.6) { 
             if (debugMode) {
               console.log("Player GRAB CONNECTED!");
             }
-            // Apply throw damage
             damageCPU(20);
-            playThrow(); // Play throw sound when successful
-            
-            // Throw CPU away from player
-            const throwDirection = player.direction * 0.4; // Throw in facing direction
-            const throwUpForce = 0.4; // Throw upward for juggle
+            playThrow(); 
+            const throwDirection = player.direction * 0.4; 
+            const throwUpForce = 0.4; 
             updateCPUVelocity(throwDirection, throwUpForce, 0);
             setCPUJumping(true);
           }
         }, 400);
       }
-      
-      // Taunt (just for fun, no gameplay effect)
       else if (taunt && !player.isTaunting) {
         if (debugMode) {
           console.log("Player TAUNT");
         }
         setPlayerTaunting(true);
-        playTaunt(); // Play taunt sound
-        
-        // End taunt after delay
+        playTaunt(); 
         setTimeout(() => {
           setPlayerTaunting(false);
-        }, 1200); // Taunts are longer
+        }, 1200); 
       }
     }
-    // Air attacks (only when jumping - Smash Bros style)
     else if (player.isJumping && !player.isAirAttacking && player.attackCooldown <= 0) {
-      // Air attack
       if (airAttack || attack1 || attack2) {
         if (debugMode) {
           console.log("Player AIR ATTACK");
         }
         setPlayerAirAttacking(true);
-        playPunch(); // Use punch sound for air attacks
-        
-        // Reset air attack after delay
+        playPunch(); 
         setTimeout(() => {
           setPlayerAirAttacking(false);
         }, 500);
       }
-      // Air special
       else if (special) {
         if (debugMode) {
           console.log("Player AIR SPECIAL");
         }
         setPlayerAirAttacking(true);
-        playSpecial(); // Use special sound for air specials
-        
-        // Reset air attack after delay
+        playSpecial(); 
         setTimeout(() => {
           setPlayerAirAttacking(false);
         }, 600);
       }
     }
     
-    // --- DEFENSIVE ACTIONS ---
-    
-    // Handle blocking with shield key
     if (shield && canAct) {
       if (!player.isBlocking) {
-        playBlock(); // Play block sound when starting to block
+        playBlock(); 
       }
       setPlayerBlocking(true);
     } else if (player.isBlocking) {
       setPlayerBlocking(false);
     }
     
-    // Handle dodging (new Smash Bros style)
     if (dodge && canAct && player.dodgeCooldown <= 0) {
       if (debugMode) {
         console.log("Player DODGE");
       }
       setPlayerDodging(true);
-      playDodge(); // Play dodge sound
-      
-      // Give a small burst of movement when dodging in a direction
+      playDodge(); 
       if (leftward) {
-        newVX = -PLAYER_SPEED * 2; // Dodge left quickly
+        newVX = -PLAYER_SPEED * 2; 
       } else if (rightward) {
-        newVX = PLAYER_SPEED * 2; // Dodge right quickly
+        newVX = PLAYER_SPEED * 2; 
       }
-      
-      // End dodge after short delay
       setTimeout(() => {
         setPlayerDodging(false);
-      }, 300); // Short invulnerability frames
+      }, 300); 
     }
     
-    // Calculate the new X position, staying within arena bounds
     const newX = stayInArena(playerX + newVX * delta);
-    
-    // Calculate the new Z position, staying within arena bounds - NEW 3D MOVEMENT
     const newZ = stayInArenaZ(playerZ + newVZ * delta);
     
-    // Update player position and velocity with 3D movement
     movePlayer(newX, newY, newZ);
     updatePlayerVelocity(newVX, newVY, newVZ);
     
     // Main game update loop
-
-    // Update game time
+    // updateRoundTime, updatePlayerCooldowns, and updateCPUCooldowns are called with the locally calculated 'delta'
     updateRoundTime(delta);
-    
-    // Update attack cooldowns
     updatePlayerCooldowns(delta);
     updateCPUCooldowns(delta);
     
-    // Log cooldown values for debugging
     if (Math.random() < 0.01 && debugMode) {
       console.log("Player attack cooldown:", player.attackCooldown);
       console.log("CPU attack cooldown:", cpu.attackCooldown);
-      
-      // Debug the distance between characters to help with attack range tuning
-      const [playerX] = player.position;
-      const [cpuX] = cpu.position;
-      const distance = Math.abs(playerX - cpuX);
-      console.log("Distance between player and CPU:", distance.toFixed(2), "Attack range:", ATTACK_RANGE);
+      const [px] = player.position; // Renamed to avoid conflict
+      const [cx] = cpu.position;    // Renamed to avoid conflict
+      const dist = Math.abs(px - cx); // Renamed to avoid conflict
+      console.log("Distance between player and CPU:", dist.toFixed(2), "Attack range:", ATTACK_RANGE);
     }
     
-    // Update CPU behavior with all Smash Bros style actions
     cpuUpdater.update(
       cpu,
       player,
@@ -497,14 +423,13 @@ const GameManager = () => {
       setCPUJumping,
       setCPUAttacking,
       setCPUBlocking,
-      // New Smash Bros style actions
       setCPUDodging,
       setCPUGrabbing,
       setCPUTaunting,
       setCPUAirAttacking,
       resetCPUAirJumps,
       useCPUAirJump,
-      delta
+      delta // Pass the locally calculated delta here
     );
   });
   

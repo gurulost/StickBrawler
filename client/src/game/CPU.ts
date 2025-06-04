@@ -110,6 +110,63 @@ export class CPUController {
     console.log(`Basic actions - Attack: ${this.attackChance.toFixed(2)}, Block: ${this.blockChance.toFixed(2)}, Jump: ${this.jumpChance.toFixed(2)}`);
     console.log(`Smash Bros actions - Air Attack: ${this.airAttackChance.toFixed(2)}, Air Jump: ${this.airJumpChance.toFixed(2)}, Dodge: ${this.dodgeChance.toFixed(2)}, Grab: ${this.grabChance.toFixed(2)}`);
   }
+
+  private moveTowards(x: number, z: number, playerX: number, playerZ: number) {
+    const vx = x < playerX ? CPU_SPEED : -CPU_SPEED;
+    const direction: 1 | -1 = x < playerX ? 1 : -1;
+    let vz = 0;
+    if (z < playerZ) {
+      vz = CPU_SPEED * 0.8;
+    } else if (z > playerZ) {
+      vz = -CPU_SPEED * 0.8;
+    }
+    return { vx, vz, direction };
+  }
+
+  private moveAway(x: number, z: number, playerX: number, playerZ: number) {
+    const vx = x < playerX ? -CPU_SPEED : CPU_SPEED;
+    const direction: 1 | -1 = x < playerX ? -1 : 1;
+    let vz = 0;
+    if (z < playerZ) {
+      vz = -CPU_SPEED * 0.8;
+    } else if (z > playerZ) {
+      vz = CPU_SPEED * 0.8;
+    }
+    return { vx, vz, direction };
+  }
+
+  private performAttack(
+    attackCooldown: number,
+    isAttacking: boolean,
+    isBlocking: boolean,
+    distance: number,
+    onAttack: (v: boolean) => void
+  ) {
+    if (attackCooldown <= 0 && !isAttacking && !isBlocking) {
+      onAttack(true);
+      const attackType = Math.random();
+      let dur = 400;
+      if (attackType < 0.5) {
+        console.log("CPU performs a PUNCH");
+        dur = 400;
+      } else if (attackType < 0.85) {
+        console.log("CPU performs a KICK");
+        dur = 500;
+      } else {
+        console.log("CPU performs a SPECIAL ATTACK");
+        dur = 600;
+      }
+      setTimeout(() => {
+        onAttack(false);
+        if (Math.random() < 0.3 && distance <= ATTACK_RANGE) {
+          setTimeout(() => {
+            onAttack(true);
+            setTimeout(() => onAttack(false), 400);
+          }, 200);
+        }
+      }, dur);
+    }
+  }
   
   update(
     cpuState: CharacterState,
@@ -153,92 +210,31 @@ export class CPUController {
     let newDirection = direction;
     
     switch (this.currentAction) {
-      case CPUAction.CHASE:
-        // Move toward player in 3D space (both X and Z axes)
-        // X-axis movement
-        if (x < playerX) {
-          newVX = CPU_SPEED;
-          newDirection = 1;
-        } else {
-          newVX = -CPU_SPEED;
-          newDirection = -1;
-        }
-        
-        // Z-axis movement (new 3D movement)
-        if (z < playerZ) {
-          newVZ = CPU_SPEED * 0.8; // Slightly slower on Z-axis for more natural movement
-        } else if (z > playerZ) {
-          newVZ = -CPU_SPEED * 0.8;
-        }
+      case CPUAction.CHASE: {
+        const m = this.moveTowards(x, z, playerX, playerZ);
+        newVX = m.vx;
+        newVZ = m.vz;
+        newDirection = m.direction;
         break;
-        
-      case CPUAction.RETREAT:
-        // Move away from player in 3D space
-        // X-axis movement
-        if (x < playerX) {
-          newVX = -CPU_SPEED;
-          newDirection = -1;
-        } else {
-          newVX = CPU_SPEED;
-          newDirection = 1;
-        }
-        
-        // Z-axis movement (new 3D movement)
-        if (z < playerZ) {
-          newVZ = -CPU_SPEED * 0.8; // Move away on Z-axis too
-        } else if (z > playerZ) {
-          newVZ = CPU_SPEED * 0.8;
-        }
+      }
+
+      case CPUAction.RETREAT: {
+        const m = this.moveAway(x, z, playerX, playerZ);
+        newVX = m.vx;
+        newVZ = m.vz;
+        newDirection = m.direction;
         break;
+      }
         
       case CPUAction.ATTACK:
-        // Face player
         newDirection = x < playerX ? 1 : -1;
-        
-        // Attack if not on cooldown
-        if (attackCooldown <= 0 && !isAttacking && !isBlocking) {
-          onAttackingChange(true);
-          
-          // Randomly choose attack type (basic implementation - for display purposes)
-          // In a full implementation, we'd handle different attack types and animations
-          const attackType = Math.random();
-          let attackDuration = 400; // default punch duration
-          
-          if (attackType < 0.5) {
-            // Basic punch - 50% chance
-            console.log("CPU performs a PUNCH");
-            attackDuration = 400;
-          } else if (attackType < 0.85) {
-            // Kick - 35% chance
-            console.log("CPU performs a KICK");
-            attackDuration = 500;
-          } else {
-            // Special - 15% chance
-            console.log("CPU performs a SPECIAL ATTACK");
-            attackDuration = 600;
-          }
-          
-          // Reset attack after delay
-          setTimeout(() => {
-            onAttackingChange(false);
-            
-            // Force CPU to attack again quickly as part of a combo
-            // 30% chance to perform a combo attack
-            if (Math.random() < 0.3 && distanceToPlayer <= ATTACK_RANGE) {
-              setTimeout(() => {
-                if (!cpuState.isAttacking && cpuState.attackCooldown <= 0) {
-                  console.log("CPU performs a COMBO FOLLOW-UP ATTACK!");
-                  onAttackingChange(true);
-                  
-                  // Reset attack after delay
-                  setTimeout(() => {
-                    onAttackingChange(false);
-                  }, 400); // Quick follow-up attack
-                }
-              }, 200); // Small pause between combo attacks
-            }
-          }, attackDuration);
-        }
+        this.performAttack(
+          attackCooldown,
+          isAttacking,
+          isBlocking,
+          distanceToPlayer,
+          onAttackingChange
+        );
         break;
         
       case CPUAction.BLOCK:

@@ -35,81 +35,46 @@ export interface Platform {
 
 // Define platforms in the arena (coordinates are in world space)
 // Spread more evenly throughout the larger 3D space
-export const PLATFORMS: Platform[] = [
-  // Main floor platform is implicit at y=0
-  
-  // Small floating platform in center, higher up for challenging jumps
-  {
-    x1: -3,
-    x2: 3,
-    z1: -4, // Moved back a bit
-    z2: 0,
-    y: 4
-  },
-  
-  // Small platform to the left side (positioned deeper in Z)
-  {
-    x1: -12,
-    x2: -9,
-    z1: -6, // Far back platform
-    z2: -3,
-    y: 2
-  },
-  
-  // Small platform to the right side (positioned forward in Z)
-  {
-    x1: 9,
-    x2: 12,
-    z1: 3, // Forward platform
-    z2: 6,
-    y: 2
-  },
-  
-  // Tiny stepping platform between left and center (at a different Z position)
-  {
-    x1: -7,
-    x2: -4,
-    z1: 2, // Positioned forward
-    z2: 5,
-    y: 3
-  },
-  
-  // Tiny stepping platform between right and center (at a different Z position)
-  {
-    x1: 4,
-    x2: 7,
-    z1: -5, // Positioned back
-    z2: -2,
-    y: 3
-  },
-  
-  // Small higher platform on far left (forward)
-  {
-    x1: -14,
-    x2: -11,
-    z1: 5, // Far forward
-    z2: 8,
-    y: 5
-  },
-  
-  // Small higher platform on far right (back)
-  {
-    x1: 11,
-    x2: 14,
-    z1: -8, // Far back
-    z2: -5,
-    y: 5
-  },
-  
-  // New central high platform (for dramatic aerial battles)
-  {
-    x1: -2,
-    x2: 2,
-    z1: -2,
-    z2: 2,
-    y: 7
+/**
+ * Generate the default set of combat platforms.
+ * Symmetry is used so that left/right and front/back placements can be
+ * described compactly.
+ */
+export function generateDefaultPlatforms(): Platform[] {
+  const platforms: Platform[] = [];
+
+  // Central floating platform
+  platforms.push({ x1: -3, x2: 3, z1: -4, z2: 0, y: 4 });
+
+  // Base platforms which will be mirrored to create symmetric pairs
+  const bases: Platform[] = [
+    { x1: -12, x2: -9, z1: -6, z2: -3, y: 2 },
+    { x1: -7, x2: -4, z1: 2, z2: 5, y: 3 },
+    { x1: -14, x2: -11, z1: 5, z2: 8, y: 5 },
+  ];
+
+  for (const b of bases) {
+    // Original placement
+    platforms.push({ ...b });
+
+    // Mirrored counterpart across both axes
+    platforms.push({
+      x1: -b.x2,
+      x2: -b.x1,
+      z1: -b.z2,
+      z2: -b.z1,
+      y: b.y,
+    });
   }
-];
+
+  // Central high platform
+  platforms.push({ x1: -2, x2: 2, z1: -2, z2: 2, y: 7 });
+
+  return platforms;
+}
+
+// Define platforms in the arena using the generator
+export const PLATFORMS: Platform[] = generateDefaultPlatforms();
 
 /**
  * Check if a point is on a platform
@@ -158,12 +123,19 @@ export function getPlatformHeight(x: number, z: number): number {
  * Applies gravity to a vertical position and velocity,
  * with platform collision detection
  */
-export function applyGravity(y: number, velocityY: number, x: number = 0, z: number = 0, dropThrough: boolean = false): [number, number] {
-  // Apply gravity to the velocity
-  const newVelocityY = velocityY - GRAVITY;
-  
-  // Calculate new position
-  const newY = y + newVelocityY;
+export function applyGravity(
+  y: number,
+  velocityY: number,
+  x: number = 0,
+  z: number = 0,
+  dropThrough: boolean = false,
+  delta: number = 1
+): [number, number] {
+  // Apply gravity to the velocity scaled by delta
+  const newVelocityY = velocityY - GRAVITY * delta;
+
+  // Calculate new position scaled by delta
+  const newY = y + newVelocityY * delta;
   
   // Find the height of the platform at the current x,z position
   const platformHeight = getPlatformHeight(x, z);
@@ -215,8 +187,10 @@ export function stayInArenaZ(z: number): number {
 /**
  * Apply drag to velocity to slow down over time
  */
-export function applyDrag(velocity: number): number {
-  return velocity * DRAG;
+export function applyDrag(velocity: number, delta: number = 1): number {
+  // Linearly scale drag effect by delta
+  const dragFactor = 1 - (1 - DRAG) * delta;
+  return velocity * dragFactor;
 }
 
 /**

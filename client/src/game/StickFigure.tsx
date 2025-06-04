@@ -1,9 +1,9 @@
 import { useFrame } from "@react-three/fiber";
-import { useRef, useEffect } from "react";
+import { useRef, useEffect, useState } from "react"; // Added useState back for lastPunch, lastKick
 import { useKeyboardControls } from "@react-three/drei";
 import { CharacterState } from "../lib/stores/useFighting";
 import { Controls } from "../lib/stores/useControls";
-import { Group, Mesh, DoubleSide } from "three";
+import { Group, Mesh, DoubleSide } from "three"; // Mesh, DoubleSide might not be directly used here but kept if Stickfigure/* needs it
 import * as THREE from "three";
 import { 
   applyGravity, 
@@ -39,15 +39,17 @@ const StickFigure = ({
   onBlockingChange
 }: StickFigureProps) => {
   const groupRef = useRef<Group>(null);
-  const [lastPunch, setLastPunch] = useState(0);
-  const [lastKick, setLastKick] = useState(0);
+  const [lastPunch, setLastPunch] = useState(0); // Kept useState for these as they weren't part of the conflict's focus
+  const [lastKick, setLastKick] = useState(0); // Kept useState for these
+
+  // Resolved Conflict 1: Kept from 'main' branch
   // animationPhase and attackType use refs to avoid triggering React state updates
   const attackType = useRef<'punch' | 'kick' | 'special' | 'air_attack' | 'grab' | 'dodge' | 'taunt' | null>(null);
   const animationPhase = useRef(0);
-  const phaseTimer = useRef(0);
+  const phaseTimer = useRef(0); // Added by 'main'
+
   const { playHit } = useAudio();
   
-  // Get customization settings
   const {
     getPlayerColors,
     getPlayerStyle,
@@ -57,12 +59,10 @@ const StickFigure = ({
     getCPUAccessory
   } = useCustomization();
   
-  // Get the appropriate customization for this character
   const characterColors = isPlayer ? getPlayerColors() : getCPUColors();
   const characterStyle = isPlayer ? getPlayerStyle() : getCPUStyle();
   const characterAccessory = isPlayer ? getPlayerAccessory() : getCPUAccessory();
   
-  // Get keyboard controls - only used for player character with new control scheme
   const jump = useKeyboardControls<Controls>(state => state.jump);
   const backward = useKeyboardControls<Controls>(state => state.backward);
   const leftward = useKeyboardControls<Controls>(state => state.leftward);
@@ -71,13 +71,11 @@ const StickFigure = ({
   const attack2 = useKeyboardControls<Controls>(state => state.attack2);
   const shield = useKeyboardControls<Controls>(state => state.shield);
   const special = useKeyboardControls<Controls>(state => state.special);
-  // Advanced techniques
   const dodge = useKeyboardControls<Controls>(state => state.dodge);
   const airAttack = useKeyboardControls<Controls>(state => state.airAttack);
   const grab = useKeyboardControls<Controls>(state => state.grab);
   const taunt = useKeyboardControls<Controls>(state => state.taunt);
   
-  // Destructure character state for more complete access
   const { 
     position, 
     direction, 
@@ -94,33 +92,23 @@ const StickFigure = ({
     comboCount
   } = characterState;
   const [x, y, z] = position;
-  const [vx, vy, vz] = velocity;
+  // const [vx, vy, vz] = velocity; // vx, vy, vz are read but not directly used in this component's render logic after destructuring.
 
-  // For debugging key presses only - removing dependency array to avoid blocking controls
   useEffect(() => {
-    // Just debugging and logging - don't need to track key state changes
     const keyDebugInterval = setInterval(() => {
       if (isPlayer) {
-        // Just occasional logging to avoid spamming
         if (Math.random() < 0.05) {
-          // Log basic movement controls
           if (jump) console.log("Jump key pressed, playerY:", y, "isJumping:", isJumping, "airJumpsLeft:", airJumpsLeft);
           if (leftward) console.log("Left key detected in StickFigure");
           if (rightward) console.log("Right key detected in StickFigure");
-          
-          // Log attack controls with new scheme
           if (attack1) console.log("Quick attack key detected in StickFigure");
           if (attack2) console.log("Strong attack key detected in StickFigure");
           if (shield) console.log("Shield key detected in StickFigure");
           if (special) console.log("Special key detected in StickFigure");
-          
-          // Log Smash Bros style controls
           if (dodge) console.log("Dodge key detected in StickFigure");
           if (airAttack) console.log("Air attack key detected in StickFigure");
           if (grab) console.log("Grab key detected in StickFigure");
           if (taunt) console.log("Taunt key detected in StickFigure");
-          
-          // Log jumping state
           if (isJumping && y > 0.1) {
             console.log("Player in air at height:", y.toFixed(2), "Air jumps left:", airJumpsLeft);
           }
@@ -129,9 +117,11 @@ const StickFigure = ({
     }, 500);
     
     return () => clearInterval(keyDebugInterval);
-  }, []);
+  }, [isPlayer, jump, y, isJumping, airJumpsLeft, leftward, rightward, attack1, attack2, shield, special, dodge, airAttack, grab, taunt]); // Added dependencies
 
-  // Enhanced animation system for fluid, realistic martial arts movements
+  // Resolved Conflict 2: Kept the new useFrame from 'main' and the modified subsequent one
+
+  // Enhanced animation system for fluid, realistic martial arts movements (from main branch)
   useFrame((_, delta) => {
     phaseTimer.current += delta;
     if (phaseTimer.current < 0.06) return;
@@ -163,7 +153,7 @@ const StickFigure = ({
         else {
           attackType.current = 'punch';
         }
-      } else if (!attackType.current) {
+      } else if (!attackType.current) { // CPU attack type logic
         const attackRandom = Math.random();
         if (attackRandom < 0.45) {
           attackType.current = 'punch';
@@ -183,7 +173,7 @@ const StickFigure = ({
       }
 
       animationPhase.current = (animationPhase.current + 1) % 6;
-      if (!isPlayer && Math.random() < 0.1) {
+      if (!isPlayer && Math.random() < 0.1) { // Slightly different animation update for CPU from main
         animationPhase.current = (animationPhase.current + 1) % 6;
       }
     } else {
@@ -197,9 +187,9 @@ const StickFigure = ({
     }
   });
   
-  // Process attack type changes independently
+  // Process attack type changes independently (this is the simplified second useFrame from main)
   useFrame(() => {
-    if (isAttacking && !attackType.current) {
+    if (isAttacking && !attackType.current) { // Condition from main
       if (isPlayer) {
         if (isAirAttacking || (airAttack && isJumping)) attackType.current = 'air_attack';
         else if (isDodging || dodge) attackType.current = 'dodge';
@@ -208,12 +198,11 @@ const StickFigure = ({
         else if (attack1) attackType.current = 'punch';
         else if (attack2) attackType.current = 'kick';
         else if (special) attackType.current = 'special';
-        else attackType.current = 'punch';
+        else attackType.current = 'punch'; // Default player attack type from main
       }
     }
   });
 
-  // Main stick figure elements
   return (
     <group 
       ref={groupRef} 
@@ -228,7 +217,6 @@ const StickFigure = ({
       
       {/* Visual indicators for different actions */}
       
-      {/* Blocking shield - enhanced for larger arena */}
       {isBlocking && (
         <mesh position={[0, 1.2, 0.2]}>
           <torusGeometry args={[0.4, 0.08, 24, 48]} />
@@ -242,7 +230,6 @@ const StickFigure = ({
         </mesh>
       )}
       
-      {/* Dodge dash effect - enhanced for larger arena */}
       {isDodging && (
         <group>
           <mesh position={[direction * -0.4, 0.8, 0]}>
@@ -256,7 +243,6 @@ const StickFigure = ({
             />
           </mesh>
           
-          {/* Additional motion trail for dodge */}
           <mesh position={[direction * -0.7, 0.8, 0]}>
             <sphereGeometry args={[0.2, 8, 8]} />
             <meshStandardMaterial 
@@ -270,10 +256,8 @@ const StickFigure = ({
         </group>
       )}
       
-      {/* Air attack effect - enhanced for larger arena */}
       {isAirAttacking && isJumping && (
         <group>
-          {/* Main air attack effect */}
           <mesh position={[0, -0.4, 0]}>
             <coneGeometry args={[0.3, 0.6, 24]} />
             <meshStandardMaterial 
@@ -285,7 +269,6 @@ const StickFigure = ({
             />
           </mesh>
           
-          {/* Additional flame particles for air attack */}
           {Array.from({ length: 5 }).map((_, i) => (
             <mesh 
               key={i} 
@@ -308,7 +291,6 @@ const StickFigure = ({
         </group>
       )}
       
-      {/* Grab effect - enhanced for larger arena */}
       {isGrabbing && (
         <group>
           <mesh position={[direction * 0.5, 1.0, 0.2]} rotation={[0, 0, direction * Math.PI / 4]}>
@@ -322,7 +304,6 @@ const StickFigure = ({
             />
           </mesh>
           
-          {/* Additional visual cue for grab direction */}
           <mesh 
             position={[direction * 0.7, 1.0, 0.1]} 
             rotation={[0, 0, direction * Math.PI / 2]}
@@ -339,7 +320,6 @@ const StickFigure = ({
         </group>
       )}
       
-      {/* Taunt effect - enhanced for larger arena */}
       {isTaunting && (
         <group>
           <mesh position={[0, 2.2, 0]}>
@@ -353,7 +333,6 @@ const StickFigure = ({
             />
           </mesh>
           
-          {/* Multiple particles for taunt effect */}
           {Array.from({ length: 4 }).map((_, i) => (
             <mesh 
               key={i} 
@@ -376,10 +355,8 @@ const StickFigure = ({
         </group>
       )}
       
-      {/* Enhanced combo counter indicator for bigger arena */}
       {comboCount > 1 && (
         <group position={[0, 2.5, 0]}>
-          {/* Larger combo background with glow effect */}
           <mesh position={[0, 0, -0.15]}>
             <planeGeometry args={[0.8, 0.4]} />
             <meshStandardMaterial 
@@ -396,7 +373,6 @@ const StickFigure = ({
             />
           </mesh>
           
-          {/* Animated border for the combo counter */}
           <mesh position={[0, 0, -0.12]} rotation={[0, 0, Date.now() * 0.001]}>
             <ringGeometry args={[0.35, 0.4, 32]} />
             <meshStandardMaterial 
@@ -418,17 +394,16 @@ const StickFigure = ({
             />
           </mesh>
           
-          {/* Combo text visualization - enhanced colored indicator dots */}
           {Array.from({ length: Math.min(5, comboCount) }).map((_, i) => (
             <group key={i}>
               <mesh position={[(i - 2) * 0.15, 0, 0]}>
                 <sphereGeometry args={[0.06, 12, 12]} />
                 <meshStandardMaterial 
                   color={
-                    comboCount >= 20 ? "#ff0000" :   // Red for combos ≥ 20
-                    comboCount >= 10 ? "#ff9900" :    // Orange for combos ≥ 10
-                    comboCount >= 5 ? "#ffff00" :     // Yellow for combos ≥ 5
-                    "#ffffff"                         // White for smaller combos
+                    comboCount >= 20 ? "#ff0000" :   
+                    comboCount >= 10 ? "#ff9900" :    
+                    comboCount >= 5 ? "#ffff00" :     
+                    "#ffffff"                         
                   } 
                   emissive={
                     comboCount >= 20 ? "#ff0000" :
@@ -440,7 +415,6 @@ const StickFigure = ({
                 />
               </mesh>
               
-              {/* Additional particle effect for high combos */}
               {comboCount >= 10 && (
                 <mesh 
                   position={[

@@ -244,35 +244,6 @@ const StickFigure = ({
     }
   });
 
-  // Handle CPU character physics (player is now handled in GameManager)
-  useFrame((state, delta) => {
-    // Update animation phase for natural movement
-    if (isAttacking) {
-      // Animation is handled in useEffect
-    }
-    
-    // Skip CPU physics control for the player character - now handled in GameManager
-    if (isPlayer) return;
-    
-    // Handle CPU character physics
-    // Apply gravity
-    const [newY, newVY] = applyGravity(y, vy);
-    
-    // Update jumping state
-    if (isJumping && newY <= 0.01) {
-      onJumpingChange(false);
-    }
-    
-    // Calculate the new X position, staying within arena bounds
-    const newX = stayInArena(x + vx);
-    
-    // Update positions and velocities
-    onPositionChange(newX, newY, z);
-    onVelocityChange(vx, newVY, vz);
-    
-    // All other CPU logic is handled in the CPU controller
-  });
-
   // Main stick figure elements
   return (
     <group 

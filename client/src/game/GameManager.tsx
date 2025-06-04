@@ -1,5 +1,5 @@
 import { useFrame } from "@react-three/fiber";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { useFighting } from "../lib/stores/useFighting";
 import StickFigure from "./StickFigure";
 import Arena from "./Arena";
@@ -82,8 +82,6 @@ const GameManager = () => {
   // Initialize CPU updater
   const [cpuUpdater] = useState(() => new CPUUpdater(CPUDifficulty.MEDIUM));
   
-  // Refs for timing
-  const lastFrameTime = useRef(Date.now());
   
   // Get keyboard state through custom hook
   const getKeyboardState = usePlayerControls();
@@ -154,7 +152,7 @@ const GameManager = () => {
   }, [player.isAttacking, cpu.isAttacking, player.position, cpu.position, player.direction, cpu.direction, damagePlayer, damageCPU, playHit, getKeyboardState]);
   
   // Handle player keyboard controls directly with 3D Smash Bros style movement
-  useFrame(() => {
+  useFrame((state, delta) => {
     if (gamePhase !== 'fighting') return;
     
     // Get current keyboard state with the new control scheme
@@ -422,10 +420,7 @@ const GameManager = () => {
     updatePlayerVelocity(newVX, newVY, newVZ);
     
     // Main game update loop
-    // Calculate time delta in seconds
-    const now = Date.now();
-    const delta = (now - lastFrameTime.current) / 1000;
-    lastFrameTime.current = now;
+    // 'delta' is provided by useFrame and represents the time since the last frame
     
     // Update game time
     updateRoundTime(delta);

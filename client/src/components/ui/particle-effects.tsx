@@ -208,47 +208,27 @@ export const EnergyTrail = ({
   color?: string;
   segments?: number;
 }) => {
-  const lineRef = useRef<THREE.Line>(null);
-  
-  const points = useMemo(() => {
-    const pts = [];
-    for (let i = 0; i <= segments; i++) {
-      const t = i / segments;
-      const x = start[0] + (end[0] - start[0]) * t;
-      const y = start[1] + (end[1] - start[1]) * t;
-      const z = start[2] + (end[2] - start[2]) * t;
-      pts.push(new THREE.Vector3(x, y, z));
-    }
-    return pts;
-  }, [start, end, segments]);
+  const meshRef = useRef<THREE.Mesh>(null);
   
   useFrame((state) => {
-    if (!lineRef.current) return;
+    if (!meshRef.current) return;
     
     const time = state.clock.elapsedTime;
-    const material = lineRef.current.material as THREE.LineBasicMaterial;
+    const material = meshRef.current.material as THREE.MeshBasicMaterial;
     
     // Animated opacity
     material.opacity = Math.sin(time * 3) * 0.3 + 0.7;
   });
   
   return (
-    <line ref={lineRef}>
-      <bufferGeometry>
-        <bufferAttribute
-          attach="attributes-position"
-          array={new Float32Array(points.flatMap(p => [p.x, p.y, p.z]))}
-          count={points.length}
-          itemSize={3}
-        />
-      </bufferGeometry>
-      <lineBasicMaterial
+    <mesh ref={meshRef} position={[start[0], start[1], start[2]]}>
+      <cylinderGeometry args={[0.02, 0.02, 2, 8]} />
+      <meshBasicMaterial
         color={color}
         transparent
         opacity={0.8}
-        linewidth={3}
       />
-    </line>
+    </mesh>
   );
 };
 
@@ -297,8 +277,6 @@ export const FloatingRunes = ({
             color="#aa88ff"
             transparent
             opacity={0.6}
-            emissive="#4444aa"
-            emissiveIntensity={0.5}
           />
         </mesh>
       ))}

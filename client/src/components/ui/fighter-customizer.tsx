@@ -25,10 +25,8 @@ const CharacterPreview = ({
   const {
     getPlayerColors,
     getPlayerStyle,
-    getPlayerAccessory,
     getCPUColors,
-    getCPUStyle,
-    getCPUAccessory
+    getCPUStyle
   } = useCustomization();
 
   // Create a dummy character state for preview
@@ -69,20 +67,22 @@ const CharacterPreview = ({
           <pointLight position={[-10, -10, -5]} intensity={0.5} />
           
           {/* Character particle effects based on theme */}
-          {colors.specialEffect && (
+          {colors?.specialEffect && (
             <ParticleEffect 
               theme={colors.specialEffect} 
-              count={style.particleCount || 5}
-              intensity={style.glowIntensity || 0.5}
+              count={style?.particleCount || 5}
+              intensity={style?.glowIntensity || 0.5}
             />
           )}
           
           {/* Character aura effect */}
-          <AuraEffect 
-            color={colors.glow} 
-            intensity={style.glowIntensity || 0.5}
-            radius={1.2}
-          />
+          {colors?.glow && (
+            <AuraEffect 
+              color={colors.glow} 
+              intensity={style?.glowIntensity || 0.5}
+              radius={1.2}
+            />
+          )}
           
           <StickFigure
             isPlayer={isPlayer}
@@ -108,14 +108,18 @@ const CharacterPreview = ({
       </Canvas>
       
       {/* Character theme name overlay */}
-      <div className="absolute top-2 left-2 bg-black bg-opacity-60 rounded px-2 py-1">
-        <span className="text-xs text-white font-medium">{colors.name}</span>
-      </div>
+      {colors?.name && (
+        <div className="absolute top-2 left-2 bg-black bg-opacity-60 rounded px-2 py-1">
+          <span className="text-xs text-white font-medium">{colors.name}</span>
+        </div>
+      )}
       
       {/* Style name overlay */}
-      <div className="absolute top-2 right-2 bg-black bg-opacity-60 rounded px-2 py-1">
-        <span className="text-xs text-white font-medium">{style.name}</span>
-      </div>
+      {style?.name && (
+        <div className="absolute top-2 right-2 bg-black bg-opacity-60 rounded px-2 py-1">
+          <span className="text-xs text-white font-medium">{style.name}</span>
+        </div>
+      )}
     </div>
   );
 };
@@ -155,8 +159,8 @@ const ColorSelector = ({
                 }}
               />
               <div className="text-left">
-                <div className="text-sm font-medium text-white">{theme.name}</div>
-                <div className="text-xs text-gray-400">{theme.specialEffect}</div>
+                <div className="text-sm font-medium text-white">{theme?.name || key}</div>
+                <div className="text-xs text-gray-400">{theme?.specialEffect || 'Default'}</div>
               </div>
             </div>
           </button>

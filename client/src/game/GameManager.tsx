@@ -3,7 +3,8 @@ import { useEffect, useRef, useState } from "react";
 import { useFighting } from "../lib/stores/useFighting";
 import StickFigure from "./StickFigure";
 import Arena from "./Arena";
-import { CPUController, CPUDifficulty } from "./CPU";
+import { CPUDifficulty } from "./CPU";
+import { CPUUpdater } from "./CPUUpdater";
 import { 
   checkAttackHit, 
   PUNCH_DAMAGE, 
@@ -20,8 +21,7 @@ import {
   isOnPlatform
 } from "./Physics";
 import { useControls } from "../lib/stores/useControls";
-import { useKeyboardControls } from "@react-three/drei";
-import { Controls } from "../lib/stores/useControls";
+import { usePlayerControls } from "../hooks/use-player-controls";
 import { useAudio } from "../lib/stores/useAudio";
 
 const GameManager = () => {
@@ -79,17 +79,14 @@ const GameManager = () => {
     playSuccess
   } = useAudio();
 
-  // Initialize CPU controller
-  const [cpuController] = useState(() => new CPUController(CPUDifficulty.MEDIUM));
+  // Initialize CPU updater
+  const [cpuUpdater] = useState(() => new CPUUpdater(CPUDifficulty.MEDIUM));
   
   // Refs for timing
   const lastFrameTime = useRef(Date.now());
   
-  // Get keyboard state
-  const [, getKeyboardState] = useKeyboardControls<Controls>();
-  
-  // Extract the forward key state directly from the keyboard controls
-  const forwardKey = useKeyboardControls(state => state.forward);
+  // Get keyboard state through custom hook
+  const getKeyboardState = usePlayerControls();
   
   // Combat system
   useEffect(() => {
@@ -450,7 +447,7 @@ const GameManager = () => {
     }
     
     // Update CPU behavior with all Smash Bros style actions
-    cpuController.update(
+    cpuUpdater.update(
       cpu,
       player,
       moveCPU,

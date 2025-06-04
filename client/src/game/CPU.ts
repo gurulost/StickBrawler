@@ -183,7 +183,8 @@ export class CPUController {
     onTauntingChange?: (isTaunting: boolean) => void,
     onAirAttackingChange?: (isAirAttacking: boolean) => void,
     resetAirJumps?: () => void,
-    useAirJump?: () => boolean
+    useAirJump?: () => boolean,
+    delta: number = 1
   ) {
     // Decrease action timer
     this.actionTimer--;
@@ -347,8 +348,8 @@ export class CPUController {
         
       default: // IDLE
         // Apply drag to both X and Z axes for 3D movement
-        newVX = applyDrag(newVX);
-        newVZ = applyDrag(newVZ); // Also slow down Z movement when idle
+        newVX = applyDrag(newVX, delta);
+        newVZ = applyDrag(newVZ, delta); // Also slow down Z movement when idle
         
         // Reset blocking
         if (isBlocking) {
@@ -362,13 +363,13 @@ export class CPUController {
     }
     
     // Apply gravity with platform collision detection
-    const [newY, newVY] = applyGravity(y, vy, x, z);
+    const [newY, newVY] = applyGravity(y, vy, x, z, false, delta);
     
     // Calculate the new X position, staying within arena bounds
-    const newX = stayInArena(x + newVX);
+    const newX = stayInArena(x + newVX * delta);
     
     // Calculate the new Z position with 3D boundary checks
-    const newZ = stayInArenaZ(z + newVZ);
+    const newZ = stayInArenaZ(z + newVZ * delta);
     
     // Update positions and velocities with 3D movement support
     onPositionChange(newX, newY, newZ);

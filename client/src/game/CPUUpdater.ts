@@ -22,7 +22,8 @@ export class CPUUpdater {
     setCPUTaunting?: (taunting: boolean) => void,
     setCPUAirAttacking?: (airAttacking: boolean) => void,
     resetCPUAirJumps?: () => void,
-    useCPUAirJump?: () => boolean
+    useCPUAirJump?: () => boolean,
+    delta: number = 1
   ) {
     this.controller.update(
       cpu,
@@ -38,7 +39,8 @@ export class CPUUpdater {
       setCPUTaunting,
       setCPUAirAttacking,
       resetCPUAirJumps,
-      useCPUAirJump
+      useCPUAirJump,
+      delta
     );
   }
 }

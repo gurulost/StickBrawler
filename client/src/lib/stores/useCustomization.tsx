@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { persist } from 'zustand/middleware';
 
 // Define color themes for characters
 export const colorThemes = {
@@ -203,8 +204,24 @@ export interface CustomizationOptions {
   cpuAnimationStyle: string;
 }
 
+// Saved character profile interface
+export interface SavedCharacter {
+  id: string;
+  name: string;
+  colorTheme: ColorTheme;
+  figureStyle: FigureStyle;
+  accessory: Accessory;
+  accessoryColor: string;
+  animationStyle: string;
+  createdAt: string;
+  thumbnail?: string;
+}
+
 // Zustand store interface with customization options and actions
 interface CustomizationState extends CustomizationOptions {
+  // Saved characters
+  savedCharacters: SavedCharacter[];
+  
   // Actions to update customization options
   setPlayerColorTheme: (theme: ColorTheme) => void;
   setPlayerFigureStyle: (style: FigureStyle) => void;
@@ -215,6 +232,11 @@ interface CustomizationState extends CustomizationOptions {
   setCPUFigureStyle: (style: FigureStyle) => void;
   setCPUAccessory: (accessory: Accessory, color?: string) => void;
   setCPUAnimationStyle: (style: string) => void;
+  
+  // Character saving and loading
+  saveCharacter: (name: string, isPlayer: boolean) => void;
+  loadCharacter: (character: SavedCharacter, isPlayer: boolean) => void;
+  deleteCharacter: (id: string) => void;
   
   // Helper functions to get computed values
   getPlayerColors: () => typeof colorThemes[ColorTheme];
@@ -244,62 +266,128 @@ const DEFAULT_CUSTOMIZATION: CustomizationOptions = {
   cpuAnimationStyle: 'normal'
 };
 
-// Create the Zustand store
-export const useCustomization = create<CustomizationState>((set, get) => ({
-  // Initial state
-  ...DEFAULT_CUSTOMIZATION,
-  
-  // Actions for player customization
-  setPlayerColorTheme: (theme) => set({ playerColorTheme: theme }),
-  setPlayerFigureStyle: (style) => set({ playerFigureStyle: style }),
-  setPlayerAccessory: (accessory, color = '#ffffff') => set({ 
-    playerAccessory: accessory,
-    playerAccessoryColor: color 
-  }),
-  setPlayerAnimationStyle: (style) => set({ playerAnimationStyle: style }),
-  
-  // Actions for CPU customization
-  setCPUColorTheme: (theme) => set({ cpuColorTheme: theme }),
-  setCPUFigureStyle: (style) => set({ cpuFigureStyle: style }),
-  setCPUAccessory: (accessory, color = '#ffffff') => set({ 
-    cpuAccessory: accessory,
-    cpuAccessoryColor: color 
-  }),
-  setCPUAnimationStyle: (style) => set({ cpuAnimationStyle: style }),
-  
-  // Helper functions to get computed values
-  getPlayerColors: () => {
-    const state = get();
-    return colorThemes[state.playerColorTheme];
-  },
-  getPlayerStyle: () => {
-    const state = get();
-    return figureStyles[state.playerFigureStyle];
-  },
-  getPlayerAccessory: () => {
-    const state = get();
-    return {
-      ...accessories[state.playerAccessory],
-      color: state.playerAccessoryColor
-    };
-  },
-  
-  getCPUColors: () => {
-    const state = get();
-    return colorThemes[state.cpuColorTheme];
-  },
-  getCPUStyle: () => {
-    const state = get();
-    return figureStyles[state.cpuFigureStyle];
-  },
-  getCPUAccessory: () => {
-    const state = get();
-    return {
-      ...accessories[state.cpuAccessory],
-      color: state.cpuAccessoryColor
-    };
-  },
-  
-  // Reset to default customizations
-  resetCustomizations: () => set(DEFAULT_CUSTOMIZATION)
-}));
+// Create the Zustand store with persistence
+export const useCustomization = create<CustomizationState>()(
+  persist(
+    (set, get) => ({
+      // Initial state
+      ...DEFAULT_CUSTOMIZATION,
+      savedCharacters: [],
+      
+      // Actions for player customization
+      setPlayerColorTheme: (theme) => set({ playerColorTheme: theme }),
+      setPlayerFigureStyle: (style) => set({ playerFigureStyle: style }),
+      setPlayerAccessory: (accessory, color = '#ffffff') => set({ 
+        playerAccessory: accessory,
+        playerAccessoryColor: color 
+      }),
+      setPlayerAnimationStyle: (style) => set({ playerAnimationStyle: style }),
+      
+      // Actions for CPU customization
+      setCPUColorTheme: (theme) => set({ cpuColorTheme: theme }),
+      setCPUFigureStyle: (style) => set({ cpuFigureStyle: style }),
+      setCPUAccessory: (accessory, color = '#ffffff') => set({ 
+        cpuAccessory: accessory,
+        cpuAccessoryColor: color 
+      }),
+      setCPUAnimationStyle: (style) => set({ cpuAnimationStyle: style }),
+      
+      // Character saving and loading
+      saveCharacter: (name, isPlayer) => {
+        const state = get();
+        const newCharacter: SavedCharacter = {
+          id: `character_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+          name,
+          colorTheme: isPlayer ? state.playerColorTheme : state.cpuColorTheme,
+          figureStyle: isPlayer ? state.playerFigureStyle : state.cpuFigureStyle,
+          accessory: isPlayer ? state.playerAccessory : state.cpuAccessory,
+          accessoryColor: isPlayer ? state.playerAccessoryColor : state.cpuAccessoryColor,
+          animationStyle: isPlayer ? state.playerAnimationStyle : state.cpuAnimationStyle,
+          createdAt: new Date().toISOString()
+        };
+        
+        set(state => ({
+          savedCharacters: [...state.savedCharacters, newCharacter]
+        }));
+      },
+      
+      loadCharacter: (character, isPlayer) => {
+        if (isPlayer) {
+          set({
+            playerColorTheme: character.colorTheme,
+            playerFigureStyle: character.figureStyle,
+            playerAccessory: character.accessory,
+            playerAccessoryColor: character.accessoryColor,
+            playerAnimationStyle: character.animationStyle
+          });
+        } else {
+          set({
+            cpuColorTheme: character.colorTheme,
+            cpuFigureStyle: character.figureStyle,
+            cpuAccessory: character.accessory,
+            cpuAccessoryColor: character.accessoryColor,
+            cpuAnimationStyle: character.animationStyle
+          });
+        }
+      },
+      
+      deleteCharacter: (id) => {
+        set(state => ({
+          savedCharacters: state.savedCharacters.filter(char => char.id !== id)
+        }));
+      },
+      
+      // Helper functions to get computed values
+      getPlayerColors: () => {
+        const state = get();
+        return colorThemes[state.playerColorTheme];
+      },
+      getPlayerStyle: () => {
+        const state = get();
+        return figureStyles[state.playerFigureStyle];
+      },
+      getPlayerAccessory: () => {
+        const state = get();
+        return {
+          ...accessories[state.playerAccessory],
+          color: state.playerAccessoryColor
+        };
+      },
+      
+      getCPUColors: () => {
+        const state = get();
+        return colorThemes[state.cpuColorTheme];
+      },
+      getCPUStyle: () => {
+        const state = get();
+        return figureStyles[state.cpuFigureStyle];
+      },
+      getCPUAccessory: () => {
+        const state = get();
+        return {
+          ...accessories[state.cpuAccessory],
+          color: state.cpuAccessoryColor
+        };
+      },
+      
+      // Reset to default customizations
+      resetCustomizations: () => set({
+        ...DEFAULT_CUSTOMIZATION,
+        savedCharacters: get().savedCharacters // Keep saved characters
+      })
+    }),
+    {
+      name: 'fighter-customization-storage',
+      partialize: (state) => ({
+        ...state,
+        // Don't persist the helper functions
+        getPlayerColors: undefined,
+        getPlayerStyle: undefined,
+        getPlayerAccessory: undefined,
+        getCPUColors: undefined,
+        getCPUStyle: undefined,
+        getCPUAccessory: undefined
+      })
+    }
+  )
+);

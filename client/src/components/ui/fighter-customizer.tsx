@@ -6,7 +6,8 @@ import { Card, CardContent, CardHeader, CardTitle } from './card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from './tabs';
 import { Badge } from './badge';
 import { Separator } from './separator';
-import { useCustomization, colorThemes, figureStyles, accessories, animationStyles } from '../../lib/stores/useCustomization';
+import { Input } from './input';
+import { useCustomization, colorThemes, figureStyles, accessories, animationStyles, SavedCharacter } from '../../lib/stores/useCustomization';
 import StickFigure from '../../game/StickFigure';
 import { useFighting } from '../../lib/stores/useFighting';
 import { Palette, User, Zap, Crown, Save, RotateCcw, Eye } from 'lucide-react';
@@ -282,33 +283,28 @@ const presetCharacters = [
 
 export function FighterCustomizer() {
   const [activeTab, setActiveTab] = useState('player');
-  const [savedCharacters, setSavedCharacters] = useState<any[]>([]);
+  const [showSaveDialog, setShowSaveDialog] = useState(false);
+  const [characterName, setCharacterName] = useState('');
   
   const {
     playerColorTheme, playerFigureStyle, playerAccessory, playerAccessoryColor, playerAnimationStyle,
     cpuColorTheme, cpuFigureStyle, cpuAccessory, cpuAccessoryColor, cpuAnimationStyle,
+    savedCharacters,
     setPlayerColorTheme, setPlayerFigureStyle, setPlayerAccessory, setPlayerAnimationStyle,
     setCPUColorTheme, setCPUFigureStyle, setCPUAccessory, setCPUAnimationStyle,
+    saveCharacter, loadCharacter, deleteCharacter,
     resetCustomizations
   } = useCustomization();
 
   const { startGame } = useFighting();
 
-  // Save current character configuration
-  const saveCharacter = () => {
-    const characterConfig = {
-      id: Date.now(),
-      name: `Fighter ${savedCharacters.length + 1}`,
-      type: activeTab,
-      colorTheme: activeTab === 'player' ? playerColorTheme : cpuColorTheme,
-      figureStyle: activeTab === 'player' ? playerFigureStyle : cpuFigureStyle,
-      accessory: activeTab === 'player' ? playerAccessory : cpuAccessory,
-      accessoryColor: activeTab === 'player' ? playerAccessoryColor : cpuAccessoryColor,
-      animationStyle: activeTab === 'player' ? playerAnimationStyle : cpuAnimationStyle,
-      createdAt: new Date().toISOString()
-    };
-    
-    setSavedCharacters(prev => [...prev, characterConfig]);
+  // Save current character configuration with custom name
+  const handleSaveCharacter = () => {
+    if (characterName.trim()) {
+      saveCharacter(characterName.trim(), activeTab === 'player');
+      setCharacterName('');
+      setShowSaveDialog(false);
+    }
   };
 
   // Load a preset character
@@ -392,12 +388,43 @@ export function FighterCustomizer() {
 
                 <div className="space-y-3">
                   <Button 
-                    onClick={saveCharacter} 
+                    onClick={() => setShowSaveDialog(true)} 
                     className="w-full bg-green-600 hover:bg-green-700"
                   >
                     <Save className="w-4 h-4 mr-2" />
                     Save Character
                   </Button>
+                  
+                  {/* Save Dialog */}
+                  {showSaveDialog && (
+                    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+                      <div className="bg-gray-800 p-6 rounded-lg border border-gray-600 w-80">
+                        <h3 className="text-lg font-semibold text-white mb-4">Save Character</h3>
+                        <Input
+                          value={characterName}
+                          onChange={(e) => setCharacterName(e.target.value)}
+                          placeholder="Enter character name..."
+                          className="mb-4 bg-gray-700 border-gray-600 text-white"
+                        />
+                        <div className="flex gap-2">
+                          <Button 
+                            onClick={handleSaveCharacter}
+                            disabled={!characterName.trim()}
+                            className="flex-1 bg-green-600 hover:bg-green-700"
+                          >
+                            Save
+                          </Button>
+                          <Button 
+                            onClick={() => setShowSaveDialog(false)}
+                            variant="outline"
+                            className="flex-1 border-gray-600 text-gray-300"
+                          >
+                            Cancel
+                          </Button>
+                        </div>
+                      </div>
+                    </div>
+                  )}
                   
                   <Button 
                     onClick={resetCustomizations} 
@@ -493,6 +520,52 @@ export function FighterCustomizer() {
                 </div>
 
                 <Separator className="my-6 bg-gray-600" />
+
+                {/* Saved Characters Gallery */}
+                {savedCharacters.length > 0 && (
+                  <div className="space-y-4 mb-6">
+                    <h3 className="text-lg font-semibold text-white flex items-center gap-2">
+                      <User className="w-5 h-5" />
+                      Your Saved Characters
+                    </h3>
+                    <div className="grid grid-cols-2 md:grid-cols-3 gap-3 max-h-40 overflow-y-auto">
+                      {savedCharacters.map((character) => (
+                        <div
+                          key={character.id}
+                          className="p-3 rounded-lg border border-gray-600 bg-gray-800 hover:bg-gray-700 transition-all"
+                        >
+                          <div className="font-medium text-white text-sm mb-2">{character.name}</div>
+                          <div className="text-xs text-gray-400 mb-2">
+                            {character.figureStyle} • {character.colorTheme}
+                          </div>
+                          <div 
+                            className="w-full h-2 rounded mb-3"
+                            style={{ 
+                              background: `linear-gradient(90deg, ${colorThemes[character.colorTheme].primary}, ${colorThemes[character.colorTheme].secondary})` 
+                            }}
+                          />
+                          <div className="flex gap-1">
+                            <Button
+                              size="sm"
+                              onClick={() => loadCharacter(character, activeTab === 'player')}
+                              className="flex-1 text-xs bg-blue-600 hover:bg-blue-700"
+                            >
+                              Load
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => deleteCharacter(character.id)}
+                              className="text-xs border-red-600 text-red-400 hover:bg-red-900/30"
+                            >
+                              ✕
+                            </Button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
 
                 {/* Preset Characters */}
                 <div className="space-y-4">

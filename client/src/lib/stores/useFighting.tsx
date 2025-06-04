@@ -635,26 +635,29 @@ export const useFighting = create<FightingState>((set) => ({
   
   // Update CPU cooldowns
   updateCPUCooldowns: (delta) => set((state) => {
-    // Update all cooldowns
+    // Convert delta from seconds to milliseconds
+    const deltaMs = delta * 1000;
+    
+    // Update all cooldowns using time-based calculation
     const newAttackCooldown = state.cpu.attackCooldown > 0 
-      ? Math.max(0, state.cpu.attackCooldown - 1) 
+      ? Math.max(0, state.cpu.attackCooldown - deltaMs) 
       : 0;
       
     const newDodgeCooldown = state.cpu.dodgeCooldown > 0
-      ? Math.max(0, state.cpu.dodgeCooldown - 1)
+      ? Math.max(0, state.cpu.dodgeCooldown - deltaMs)
       : 0;
       
     const newGrabCooldown = state.cpu.grabCooldown > 0
-      ? Math.max(0, state.cpu.grabCooldown - 1)
+      ? Math.max(0, state.cpu.grabCooldown - deltaMs)
       : 0;
       
     const newMoveCooldown = state.cpu.moveCooldown > 0
-      ? Math.max(0, state.cpu.moveCooldown - 1)
+      ? Math.max(0, state.cpu.moveCooldown - deltaMs)
       : 0;
     
     // Update combo timer and reset combo if timeout
     let newComboTimer = state.cpu.comboTimer > 0
-      ? state.cpu.comboTimer - 1
+      ? Math.max(0, state.cpu.comboTimer - deltaMs)
       : 0;
     
     let newComboCount = state.cpu.comboCount;

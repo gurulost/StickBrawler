@@ -288,10 +288,6 @@ const GameManager = () => {
         setPlayerAttacking(true);
         playPunch(); // Use specific punch sound effect
         
-        // Set cooldown to limit attack frequency
-        console.log("Setting new player attack cooldown:", 15);
-        player.attackCooldown = 15; // Increased cooldown to limit attack spam
-        
         // Reset attack after delay
         setTimeout(() => {
           setPlayerAttacking(false);
@@ -303,10 +299,6 @@ const GameManager = () => {
         console.log("Player STRONG ATTACK");
         setPlayerAttacking(true);
         playKick(); // Use specific kick sound effect
-        
-        // Set cooldown to limit attack frequency
-        console.log("Setting new player attack cooldown:", 20);
-        player.attackCooldown = 20; // Longer cooldown for stronger attack
         
         // Reset attack after delay
         setTimeout(() => {
@@ -320,10 +312,6 @@ const GameManager = () => {
         setPlayerAttacking(true);
         playSpecial(); // Use specific special attack sound effect
         
-        // Set cooldown to limit attack frequency
-        console.log("Setting new player attack cooldown:", 30);
-        player.attackCooldown = 30; // Long cooldown for special attack
-        
         // Reset attack after delay
         setTimeout(() => {
           setPlayerAttacking(false);
@@ -335,10 +323,6 @@ const GameManager = () => {
         console.log("Player GRAB");
         setPlayerGrabbing(true);
         playGrab(); // Play grab sound
-        
-        // Set grab cooldown
-        console.log("Setting grab cooldown:", 25);
-        player.grabCooldown = 25;
         
         // Reset grab after delay
         setTimeout(() => {
@@ -381,10 +365,6 @@ const GameManager = () => {
         setPlayerAirAttacking(true);
         playPunch(); // Use punch sound for air attacks
         
-        // Set cooldown to limit attack frequency
-        console.log("Setting air attack cooldown:", 18);
-        player.attackCooldown = 18;
-        
         // Reset air attack after delay
         setTimeout(() => {
           setPlayerAirAttacking(false);
@@ -395,10 +375,6 @@ const GameManager = () => {
         console.log("Player AIR SPECIAL");
         setPlayerAirAttacking(true);
         playSpecial(); // Use special sound for air specials
-        
-        // Set cooldown to limit attack frequency
-        console.log("Setting air special cooldown:", 25);
-        player.attackCooldown = 25;
         
         // Reset air attack after delay
         setTimeout(() => {

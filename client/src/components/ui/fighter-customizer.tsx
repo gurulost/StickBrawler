@@ -412,25 +412,33 @@ export function FighterCustomizer() {
 
   // Save current character configuration with custom name
   const handleSaveCharacter = () => {
-    if (characterName.trim()) {
-      saveCharacter(characterName.trim(), activeTab === 'player');
-      setCharacterName('');
-      setShowSaveDialog(false);
+    try {
+      if (characterName.trim()) {
+        saveCharacter(characterName.trim(), activeTab === 'player');
+        setCharacterName('');
+        setShowSaveDialog(false);
+      }
+    } catch (error) {
+      console.error('Error saving character:', error);
     }
   };
 
-  // Load a preset character
+  // Load a preset character with error handling
   const loadPreset = (preset: typeof presetCharacters[0]) => {
-    if (activeTab === 'player') {
-      setPlayerColorTheme(preset.colorTheme);
-      setPlayerFigureStyle(preset.figureStyle);
-      setPlayerAccessory(preset.accessory, preset.accessoryColor);
-      setPlayerAnimationStyle(preset.animationStyle);
-    } else {
-      setCPUColorTheme(preset.colorTheme);
-      setCPUFigureStyle(preset.figureStyle);
-      setCPUAccessory(preset.accessory, preset.accessoryColor);
-      setCPUAnimationStyle(preset.animationStyle);
+    try {
+      if (activeTab === 'player') {
+        setPlayerColorTheme(preset.colorTheme);
+        setPlayerFigureStyle(preset.figureStyle);
+        setPlayerAccessory(preset.accessory, preset.accessoryColor);
+        setPlayerAnimationStyle(preset.animationStyle);
+      } else {
+        setCPUColorTheme(preset.colorTheme);
+        setCPUFigureStyle(preset.figureStyle);
+        setCPUAccessory(preset.accessory, preset.accessoryColor);
+        setCPUAnimationStyle(preset.animationStyle);
+      }
+    } catch (error) {
+      console.error('Error loading preset:', error);
     }
   };
 
@@ -582,22 +590,34 @@ export function FighterCustomizer() {
                   <ColorSelector
                     label="Color Theme"
                     value={activeTab === 'player' ? playerColorTheme : cpuColorTheme}
-                    onChange={(color) => 
-                      activeTab === 'player' 
-                        ? setPlayerColorTheme(color as any)
-                        : setCPUColorTheme(color as any)
-                    }
+                    onChange={(color) => {
+                      try {
+                        if (activeTab === 'player') {
+                          setPlayerColorTheme(color as any);
+                        } else {
+                          setCPUColorTheme(color as any);
+                        }
+                      } catch (error) {
+                        console.error('Error setting color theme:', error);
+                      }
+                    }}
                   />
 
                   {/* Figure Style */}
                   <StyleSelector
                     label="Body Style"
                     value={activeTab === 'player' ? playerFigureStyle : cpuFigureStyle}
-                    onChange={(style) =>
-                      activeTab === 'player'
-                        ? setPlayerFigureStyle(style as any)
-                        : setCPUFigureStyle(style as any)
-                    }
+                    onChange={(style) => {
+                      try {
+                        if (activeTab === 'player') {
+                          setPlayerFigureStyle(style as any);
+                        } else {
+                          setCPUFigureStyle(style as any);
+                        }
+                      } catch (error) {
+                        console.error('Error setting figure style:', error);
+                      }
+                    }}
                     options={figureStyles}
                   />
 
@@ -606,27 +626,45 @@ export function FighterCustomizer() {
                     label="Accessories"
                     value={activeTab === 'player' ? playerAccessory : cpuAccessory}
                     color={activeTab === 'player' ? playerAccessoryColor : cpuAccessoryColor}
-                    onChange={(accessory) =>
-                      activeTab === 'player'
-                        ? setPlayerAccessory(accessory as any, playerAccessoryColor)
-                        : setCPUAccessory(accessory as any, cpuAccessoryColor)
-                    }
-                    onColorChange={(color) =>
-                      activeTab === 'player'
-                        ? setPlayerAccessory(playerAccessory, color)
-                        : setCPUAccessory(cpuAccessory, color)
-                    }
+                    onChange={(accessory) => {
+                      try {
+                        if (activeTab === 'player') {
+                          setPlayerAccessory(accessory as any, playerAccessoryColor);
+                        } else {
+                          setCPUAccessory(accessory as any, cpuAccessoryColor);
+                        }
+                      } catch (error) {
+                        console.error('Error setting accessory:', error);
+                      }
+                    }}
+                    onColorChange={(color) => {
+                      try {
+                        if (activeTab === 'player') {
+                          setPlayerAccessory(playerAccessory, color);
+                        } else {
+                          setCPUAccessory(cpuAccessory, color);
+                        }
+                      } catch (error) {
+                        console.error('Error setting accessory color:', error);
+                      }
+                    }}
                   />
 
                   {/* Animation Style */}
                   <StyleSelector
                     label="Fighting Style"
                     value={activeTab === 'player' ? playerAnimationStyle : cpuAnimationStyle}
-                    onChange={(style) =>
-                      activeTab === 'player'
-                        ? setPlayerAnimationStyle(style)
-                        : setCPUAnimationStyle(style)
-                    }
+                    onChange={(style) => {
+                      try {
+                        if (activeTab === 'player') {
+                          setPlayerAnimationStyle(style);
+                        } else {
+                          setCPUAnimationStyle(style);
+                        }
+                      } catch (error) {
+                        console.error('Error setting animation style:', error);
+                      }
+                    }}
                     options={animationStyles}
                   />
                 </div>

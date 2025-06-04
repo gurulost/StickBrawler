@@ -3,6 +3,7 @@ import { useRef, useState, useEffect } from "react";
 import { useKeyboardControls } from "@react-three/drei";
 import { CharacterState } from "../lib/stores/useFighting";
 import { Controls } from "../lib/stores/useControls";
+import { log } from "../lib/logger";
 import { Group, Mesh, DoubleSide } from "three";
 import * as THREE from "three";
 import { 
@@ -101,25 +102,25 @@ const StickFigure = ({
         // Just occasional logging to avoid spamming
         if (Math.random() < 0.05) {
           // Log basic movement controls
-          if (jump) console.log("Jump key pressed, playerY:", y, "isJumping:", isJumping, "airJumpsLeft:", airJumpsLeft);
-          if (leftward) console.log("Left key detected in StickFigure");
-          if (rightward) console.log("Right key detected in StickFigure");
+          if (jump) log("Jump key pressed, playerY:", y, "isJumping:", isJumping, "airJumpsLeft:", airJumpsLeft);
+          if (leftward) log("Left key detected in StickFigure");
+          if (rightward) log("Right key detected in StickFigure");
           
           // Log attack controls with new scheme
-          if (attack1) console.log("Quick attack key detected in StickFigure");
-          if (attack2) console.log("Strong attack key detected in StickFigure");
-          if (shield) console.log("Shield key detected in StickFigure");
-          if (special) console.log("Special key detected in StickFigure");
+          if (attack1) log("Quick attack key detected in StickFigure");
+          if (attack2) log("Strong attack key detected in StickFigure");
+          if (shield) log("Shield key detected in StickFigure");
+          if (special) log("Special key detected in StickFigure");
           
           // Log Smash Bros style controls
-          if (dodge) console.log("Dodge key detected in StickFigure");
-          if (airAttack) console.log("Air attack key detected in StickFigure");
-          if (grab) console.log("Grab key detected in StickFigure");
-          if (taunt) console.log("Taunt key detected in StickFigure");
+          if (dodge) log("Dodge key detected in StickFigure");
+          if (airAttack) log("Air attack key detected in StickFigure");
+          if (grab) log("Grab key detected in StickFigure");
+          if (taunt) log("Taunt key detected in StickFigure");
           
           // Log jumping state
           if (isJumping && y > 0.1) {
-            console.log("Player in air at height:", y.toFixed(2), "Air jumps left:", airJumpsLeft);
+            log("Player in air at height:", y.toFixed(2), "Air jumps left:", airJumpsLeft);
           }
         }
       }

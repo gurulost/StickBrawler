@@ -156,6 +156,11 @@ const GameManager = () => {
   // Handle player keyboard controls directly with 3D Smash Bros style movement
   useFrame(() => {
     if (gamePhase !== 'fighting') return;
+
+    // Calculate time delta in seconds at the start of the frame
+    const now = Date.now();
+    const delta = (now - lastFrameTime.current) / 1000;
+    lastFrameTime.current = now;
     
     // Get current keyboard state with the new control scheme
     const { 
@@ -262,7 +267,7 @@ const GameManager = () => {
       console.log("Player dropping through platform at height:", platformHeight);
     }
     
-    const [newY, gravityVY] = applyGravity(playerY, newVY, playerX, playerZ, dropThrough);
+    const [newY, gravityVY] = applyGravity(playerY, newVY, playerX, playerZ, dropThrough, delta);
     newVY = gravityVY; // Update with gravity effect
     
     // Update jumping state when landing on a platform or ground
@@ -412,21 +417,17 @@ const GameManager = () => {
     }
     
     // Calculate the new X position, staying within arena bounds
-    const newX = stayInArena(playerX + newVX);
+    const newX = stayInArena(playerX + newVX * delta);
     
     // Calculate the new Z position, staying within arena bounds - NEW 3D MOVEMENT
-    const newZ = stayInArenaZ(playerZ + newVZ);
+    const newZ = stayInArenaZ(playerZ + newVZ * delta);
     
     // Update player position and velocity with 3D movement
     movePlayer(newX, newY, newZ);
     updatePlayerVelocity(newVX, newVY, newVZ);
     
     // Main game update loop
-    // Calculate time delta in seconds
-    const now = Date.now();
-    const delta = (now - lastFrameTime.current) / 1000;
-    lastFrameTime.current = now;
-    
+
     // Update game time
     updateRoundTime(delta);
     
@@ -462,7 +463,8 @@ const GameManager = () => {
       setCPUTaunting,
       setCPUAirAttacking,
       resetCPUAirJumps,
-      useCPUAirJump
+      useCPUAirJump,
+      delta
     );
   });
   

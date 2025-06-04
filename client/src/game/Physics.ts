@@ -158,12 +158,19 @@ export function getPlatformHeight(x: number, z: number): number {
  * Applies gravity to a vertical position and velocity,
  * with platform collision detection
  */
-export function applyGravity(y: number, velocityY: number, x: number = 0, z: number = 0, dropThrough: boolean = false): [number, number] {
-  // Apply gravity to the velocity
-  const newVelocityY = velocityY - GRAVITY;
-  
-  // Calculate new position
-  const newY = y + newVelocityY;
+export function applyGravity(
+  y: number,
+  velocityY: number,
+  x: number = 0,
+  z: number = 0,
+  dropThrough: boolean = false,
+  delta: number = 1
+): [number, number] {
+  // Apply gravity to the velocity scaled by delta
+  const newVelocityY = velocityY - GRAVITY * delta;
+
+  // Calculate new position scaled by delta
+  const newY = y + newVelocityY * delta;
   
   // Find the height of the platform at the current x,z position
   const platformHeight = getPlatformHeight(x, z);
@@ -215,8 +222,10 @@ export function stayInArenaZ(z: number): number {
 /**
  * Apply drag to velocity to slow down over time
  */
-export function applyDrag(velocity: number): number {
-  return velocity * DRAG;
+export function applyDrag(velocity: number, delta: number = 1): number {
+  // Linearly scale drag effect by delta
+  const dragFactor = 1 - (1 - DRAG) * delta;
+  return velocity * dragFactor;
 }
 
 /**

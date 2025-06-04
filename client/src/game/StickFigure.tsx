@@ -41,6 +41,7 @@ const StickFigure = ({
   const groupRef = useRef<Group>(null);
   const [lastPunch, setLastPunch] = useState(0);
   const [lastKick, setLastKick] = useState(0);
+  // animationPhase and attackType use refs to avoid triggering React state updates
   const attackType = useRef<'punch' | 'kick' | 'special' | 'air_attack' | 'grab' | 'dodge' | 'taunt' | null>(null);
   const animationPhase = useRef(0);
   const phaseTimer = useRef(0);

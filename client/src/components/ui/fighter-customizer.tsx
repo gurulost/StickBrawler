@@ -248,8 +248,8 @@ const AccessorySelector = ({
             }`}
           >
             <div className="flex items-center gap-2">
-              <div className="font-medium text-sm">{accessory.name}</div>
-              {accessory.effect && (
+              <div className="font-medium text-sm">{accessory?.name || key}</div>
+              {accessory?.effect && (
                 <div className="flex gap-1">
                   {accessory.emissive && (
                     <div className="w-2 h-2 rounded-full bg-yellow-400 animate-pulse" title="Glowing Effect" />
@@ -260,7 +260,7 @@ const AccessorySelector = ({
                 </div>
               )}
             </div>
-            {accessory.effect && (
+            {accessory?.effect && (
               <div className="text-xs text-gray-400 mt-1 capitalize">
                 {accessory.effect.replace('_', ' ')} effect
               </div>

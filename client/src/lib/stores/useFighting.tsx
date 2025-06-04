@@ -190,21 +190,22 @@ export const useFighting = create<FightingState>((set) => ({
   })),
   
   setPlayerAttacking: (isAttacking) => set((state) => {
-    // When starting an attack, set a cooldown, but when ending the attack keep the cooldown
-    // This way player can't spam attacks too quickly, but can still attack after cooldown
-    let newCooldown = state.player.attackCooldown;
-    
-    if (isAttacking && !state.player.isAttacking) {
-      // Only set a cooldown when first starting an attack
-      newCooldown = 10; // Reduced cooldown so player can attack more frequently
-      console.log("Setting new player attack cooldown:", newCooldown);
+    // Only set cooldown when starting an attack and no cooldown is active
+    if (isAttacking && !state.player.isAttacking && state.player.attackCooldown === 0) {
+      return {
+        player: {
+          ...state.player,
+          isAttacking,
+          attackCooldown: 500 // 500ms cooldown in milliseconds
+        }
+      };
     }
     
+    // Just update attacking state without changing cooldown
     return {
       player: {
         ...state.player,
-        isAttacking,
-        attackCooldown: newCooldown
+        isAttacking
       }
     };
   }),
@@ -226,32 +227,56 @@ export const useFighting = create<FightingState>((set) => ({
       console.log("DODGE! Player takes greatly reduced damage!");
     }
     
-    // If CPU has a combo going, apply combo multiplier
+    // If CPU has a combo going, apply combo multiplier with reasonable cap
     if (state.cpu.comboCount > 0) {
-      const comboMultiplier = 1 + (state.cpu.comboCount * 0.2);
+      // Cap combo multiplier at 2.5x (maximum 7-8 hit combos)
+      const comboMultiplier = Math.min(2.5, 1 + (state.cpu.comboCount * 0.15));
       actualDamage = actualDamage * comboMultiplier;
       console.log(`CPU COMBO x${state.cpu.comboCount + 1}! Damage multiplier: ${comboMultiplier.toFixed(1)}x`);
     }
     
     const newHealth = Math.max(0, state.player.health - actualDamage);
     
+    // Update CPU's combo counter
+    let updatedCPU = {...state.cpu};
+    
+    // If this is another hit within the combo window, increment combo counter
+    if (state.cpu.comboTimer > 0) {
+      updatedCPU.comboCount = Math.min(10, state.cpu.comboCount + 1); // Cap combo at 10 hits
+      updatedCPU.comboTimer = COMBO_WINDOW; // Reset combo timer
+      console.log(`CPU combo hit! Combo counter increased to ${updatedCPU.comboCount}`);
+    } else {
+      // Start a new combo
+      updatedCPU.comboCount = 1;
+      updatedCPU.comboTimer = COMBO_WINDOW;
+      console.log("CPU starts new combo!");
+    }
+    
+    // Reset player's combo when taking damage (combo breaker)
+    let updatedPlayer = {
+      ...state.player,
+      health: newHealth,
+      comboCount: 0,
+      comboTimer: 0
+    };
+    
+    if (state.player.comboCount > 0) {
+      console.log("Player combo broken by taking damage!");
+    }
+    
     // If health is 0, end the round
     if (newHealth === 0 && state.gamePhase === 'fighting') {
       return {
-        player: {
-          ...state.player,
-          health: newHealth
-        },
+        player: updatedPlayer,
+        cpu: updatedCPU,
         gamePhase: 'round_end',
         cpuScore: state.cpuScore + 1
       };
     }
     
     return {
-      player: {
-        ...state.player,
-        health: newHealth
-      }
+      player: updatedPlayer,
+      cpu: updatedCPU
     };
   }),
   
@@ -285,19 +310,22 @@ export const useFighting = create<FightingState>((set) => ({
   })),
   
   setCPUAttacking: (isAttacking) => set((state) => {
-    // When starting an attack, set a cooldown, but when ending the attack keep the cooldown
-    let newCooldown = state.cpu.attackCooldown;
-    
-    if (isAttacking && !state.cpu.isAttacking) {
-      // Only set a cooldown when first starting an attack
-      newCooldown = 10; // Reduced cooldown for faster attacks
+    // Only set cooldown when starting an attack and no cooldown is active
+    if (isAttacking && !state.cpu.isAttacking && state.cpu.attackCooldown === 0) {
+      return {
+        cpu: {
+          ...state.cpu,
+          isAttacking,
+          attackCooldown: 500 // 500ms cooldown in milliseconds
+        }
+      };
     }
     
+    // Just update attacking state without changing cooldown
     return {
       cpu: {
         ...state.cpu,
-        isAttacking,
-        attackCooldown: newCooldown
+        isAttacking
       }
     };
   }),
@@ -319,9 +347,10 @@ export const useFighting = create<FightingState>((set) => ({
       console.log("DODGE! CPU takes greatly reduced damage!");
     }
     
-    // If player has a combo going, apply combo multiplier
+    // If player has a combo going, apply combo multiplier with reasonable cap
     if (state.player.comboCount > 0) {
-      const comboMultiplier = 1 + (state.player.comboCount * 0.2);
+      // Cap combo multiplier at 2.5x (maximum 7-8 hit combos)
+      const comboMultiplier = Math.min(2.5, 1 + (state.player.comboCount * 0.15));
       actualDamage = actualDamage * comboMultiplier;
       console.log(`COMBO x${state.player.comboCount + 1}! Damage multiplier: ${comboMultiplier.toFixed(1)}x`);
     }
@@ -334,23 +363,32 @@ export const useFighting = create<FightingState>((set) => ({
     
     // If this is another hit within the combo window, increment combo counter
     if (state.player.comboTimer > 0) {
-      updatedPlayer.comboCount = state.player.comboCount + 1;
+      updatedPlayer.comboCount = Math.min(10, state.player.comboCount + 1); // Cap combo at 10 hits
       updatedPlayer.comboTimer = COMBO_WINDOW; // Reset combo timer
-      console.log(`Combo hit! Combo counter increased to ${updatedPlayer.comboCount}`);
+      console.log(`Player combo hit! Combo counter increased to ${updatedPlayer.comboCount}`);
     } else {
       // Start a new combo
       updatedPlayer.comboCount = 1;
       updatedPlayer.comboTimer = COMBO_WINDOW;
-      console.log("New combo started!");
+      console.log("Player starts new combo!");
+    }
+    
+    // Reset CPU's combo when taking damage (combo breaker)
+    let updatedCPU = {
+      ...state.cpu,
+      health: newHealth,
+      comboCount: 0,
+      comboTimer: 0
+    };
+    
+    if (state.cpu.comboCount > 0) {
+      console.log("CPU combo broken by taking damage!");
     }
     
     // If health is 0, end the round
     if (newHealth === 0 && state.gamePhase === 'fighting') {
       return {
-        cpu: {
-          ...state.cpu,
-          health: newHealth
-        },
+        cpu: updatedCPU,
         player: updatedPlayer,
         gamePhase: 'round_end',
         playerScore: state.playerScore + 1
@@ -358,10 +396,7 @@ export const useFighting = create<FightingState>((set) => ({
     }
     
     return {
-      cpu: {
-        ...state.cpu,
-        health: newHealth
-      },
+      cpu: updatedCPU,
       player: updatedPlayer
     };
   }),
@@ -552,26 +587,29 @@ export const useFighting = create<FightingState>((set) => ({
 
   // Update player cooldowns
   updatePlayerCooldowns: (delta) => set((state) => {
-    // Update all cooldowns
+    // Convert delta from seconds to milliseconds
+    const deltaMs = delta * 1000;
+    
+    // Update all cooldowns using time-based calculation
     const newAttackCooldown = state.player.attackCooldown > 0 
-      ? Math.max(0, state.player.attackCooldown - 1) 
+      ? Math.max(0, state.player.attackCooldown - deltaMs) 
       : 0;
       
     const newDodgeCooldown = state.player.dodgeCooldown > 0
-      ? Math.max(0, state.player.dodgeCooldown - 1)
+      ? Math.max(0, state.player.dodgeCooldown - deltaMs)
       : 0;
       
     const newGrabCooldown = state.player.grabCooldown > 0
-      ? Math.max(0, state.player.grabCooldown - 1)
+      ? Math.max(0, state.player.grabCooldown - deltaMs)
       : 0;
       
     const newMoveCooldown = state.player.moveCooldown > 0
-      ? Math.max(0, state.player.moveCooldown - 1)
+      ? Math.max(0, state.player.moveCooldown - deltaMs)
       : 0;
     
     // Update combo timer and reset combo if timeout
     let newComboTimer = state.player.comboTimer > 0
-      ? state.player.comboTimer - 1
+      ? Math.max(0, state.player.comboTimer - deltaMs)
       : 0;
     
     let newComboCount = state.player.comboCount;
@@ -580,11 +618,6 @@ export const useFighting = create<FightingState>((set) => ({
     if (state.player.comboTimer > 0 && newComboTimer === 0 && state.player.comboCount > 0) {
       console.log("Player combo reset - timeout!");
       newComboCount = 0;
-    }
-    
-    // Debug output for cooldowns
-    if (state.player.attackCooldown > 0) {
-      console.log("Reducing player attack cooldown from", state.player.attackCooldown);
     }
     
     return {

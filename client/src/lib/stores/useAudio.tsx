@@ -1,4 +1,5 @@
 import { create } from "zustand";
+import { log } from "../logger";
 
 /**
  * Advanced audio system for an immersive fighting game experience
@@ -116,7 +117,7 @@ export const useAudio = create<AudioState>((set, get) => ({
       backgroundMusic.muted = newMutedState;
     }
     
-    console.log(`Sound ${newMutedState ? 'muted' : 'unmuted'}`);
+    log(`Sound ${newMutedState ? 'muted' : 'unmuted'}`);
   },
   
   setMasterVolume: (volume) => {
@@ -130,7 +131,7 @@ export const useAudio = create<AudioState>((set, get) => ({
       backgroundMusic.volume = clampedVolume * 0.3; // Background at 30% of master
     }
     
-    console.log(`Master volume set to ${clampedVolume.toFixed(2)}`);
+    log(`Master volume set to ${clampedVolume.toFixed(2)}`);
   },
   
   // Advanced sound playing functions with pitch variation for more natural sound
@@ -148,10 +149,10 @@ export const useAudio = create<AudioState>((set, get) => ({
       soundClone.volume = masterVolume * 0.4 * intensity;
       
       soundClone.play().catch(error => {
-        console.log("Hit sound play prevented:", error);
+        log("Hit sound play prevented:", error);
       });
     } else if (isMuted) {
-      console.log("Hit sound skipped (muted)");
+      log("Hit sound skipped (muted)");
     }
   },
   
@@ -166,7 +167,7 @@ export const useAudio = create<AudioState>((set, get) => ({
       soundClone.playbackRate = 1.1 + (Math.random() * 0.1);
       soundClone.volume = masterVolume * 0.35;
       soundClone.play().catch(error => {
-        console.log("Punch sound play prevented:", error);
+        log("Punch sound play prevented:", error);
       });
     }
   },
@@ -182,7 +183,7 @@ export const useAudio = create<AudioState>((set, get) => ({
       soundClone.playbackRate = 0.85 + (Math.random() * 0.15);
       soundClone.volume = masterVolume * 0.5; // Slightly louder
       soundClone.play().catch(error => {
-        console.log("Kick sound play prevented:", error);
+        log("Kick sound play prevented:", error);
       });
     }
   },
@@ -198,7 +199,7 @@ export const useAudio = create<AudioState>((set, get) => ({
       soundClone.playbackRate = 0.9;
       soundClone.volume = masterVolume * 0.6; // Louder for impact
       soundClone.play().catch(error => {
-        console.log("Special sound play prevented:", error);
+        log("Special sound play prevented:", error);
       });
     }
   },
@@ -209,7 +210,7 @@ export const useAudio = create<AudioState>((set, get) => ({
       const soundClone = blockSound.cloneNode() as HTMLAudioElement;
       soundClone.volume = masterVolume * 0.4;
       soundClone.play().catch(error => {
-        console.log("Block sound play prevented:", error);
+        log("Block sound play prevented:", error);
       });
     }
   },
@@ -220,7 +221,7 @@ export const useAudio = create<AudioState>((set, get) => ({
       const soundClone = jumpSound.cloneNode() as HTMLAudioElement;
       soundClone.volume = masterVolume * 0.3;
       soundClone.play().catch(error => {
-        console.log("Jump sound play prevented:", error);
+        log("Jump sound play prevented:", error);
       });
     }
   },
@@ -231,7 +232,7 @@ export const useAudio = create<AudioState>((set, get) => ({
       const soundClone = landSound.cloneNode() as HTMLAudioElement;
       soundClone.volume = masterVolume * 0.35;
       soundClone.play().catch(error => {
-        console.log("Land sound play prevented:", error);
+        log("Land sound play prevented:", error);
       });
     }
   },
@@ -242,7 +243,7 @@ export const useAudio = create<AudioState>((set, get) => ({
       const soundClone = dodgeSound.cloneNode() as HTMLAudioElement;
       soundClone.volume = masterVolume * 0.3;
       soundClone.play().catch(error => {
-        console.log("Dodge sound play prevented:", error);
+        log("Dodge sound play prevented:", error);
       });
     }
   },
@@ -253,7 +254,7 @@ export const useAudio = create<AudioState>((set, get) => ({
       const soundClone = grabSound.cloneNode() as HTMLAudioElement;
       soundClone.volume = masterVolume * 0.4;
       soundClone.play().catch(error => {
-        console.log("Grab sound play prevented:", error);
+        log("Grab sound play prevented:", error);
       });
     }
   },
@@ -264,7 +265,7 @@ export const useAudio = create<AudioState>((set, get) => ({
       const soundClone = throwSound.cloneNode() as HTMLAudioElement;
       soundClone.volume = masterVolume * 0.45;
       soundClone.play().catch(error => {
-        console.log("Throw sound play prevented:", error);
+        log("Throw sound play prevented:", error);
       });
     }
   },
@@ -275,7 +276,7 @@ export const useAudio = create<AudioState>((set, get) => ({
       const soundClone = tauntSound.cloneNode() as HTMLAudioElement;
       soundClone.volume = masterVolume * 0.5;
       soundClone.play().catch(error => {
-        console.log("Taunt sound play prevented:", error);
+        log("Taunt sound play prevented:", error);
       });
     }
   },
@@ -287,10 +288,10 @@ export const useAudio = create<AudioState>((set, get) => ({
       successSound.currentTime = 0;
       successSound.volume = masterVolume * 0.6; // Victory sounds are prominent
       successSound.play().catch(error => {
-        console.log("Success sound play prevented:", error);
+        log("Success sound play prevented:", error);
       });
     } else if (isMuted) {
-      console.log("Success sound skipped (muted)");
+      log("Success sound skipped (muted)");
     }
   },
   
@@ -308,7 +309,7 @@ export const useAudio = create<AudioState>((set, get) => ({
       soundClone.volume = masterVolume * 0.4 * intensity;
       
       soundClone.play().catch(error => {
-        console.log("Combo hit sound play prevented:", error);
+        log("Combo hit sound play prevented:", error);
       });
     }
   },
@@ -319,7 +320,7 @@ export const useAudio = create<AudioState>((set, get) => ({
       backgroundMusic.volume = masterVolume * 0.3;
       backgroundMusic.currentTime = 0;
       backgroundMusic.play().catch(error => {
-        console.log("Background music play prevented:", error);
+        log("Background music play prevented:", error);
       });
     }
   }

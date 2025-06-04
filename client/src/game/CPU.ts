@@ -1,4 +1,5 @@
 import { CharacterState } from "../lib/stores/useFighting";
+import { log } from "../lib/logger";
 import { 
   applyGravity, 
   stayInArena, 
@@ -106,9 +107,9 @@ export class CPUController {
     }
 
     // Log the CPU configuration for debugging
-    console.log(`CPU controller initialized with difficulty: ${CPUDifficulty[difficulty]}`);
-    console.log(`Basic actions - Attack: ${this.attackChance.toFixed(2)}, Block: ${this.blockChance.toFixed(2)}, Jump: ${this.jumpChance.toFixed(2)}`);
-    console.log(`Smash Bros actions - Air Attack: ${this.airAttackChance.toFixed(2)}, Air Jump: ${this.airJumpChance.toFixed(2)}, Dodge: ${this.dodgeChance.toFixed(2)}, Grab: ${this.grabChance.toFixed(2)}`);
+    log(`CPU controller initialized with difficulty: ${CPUDifficulty[difficulty]}`);
+    log(`Basic actions - Attack: ${this.attackChance.toFixed(2)}, Block: ${this.blockChance.toFixed(2)}, Jump: ${this.jumpChance.toFixed(2)}`);
+    log(`Smash Bros actions - Air Attack: ${this.airAttackChance.toFixed(2)}, Air Jump: ${this.airJumpChance.toFixed(2)}, Dodge: ${this.dodgeChance.toFixed(2)}, Grab: ${this.grabChance.toFixed(2)}`);
   }
   
   update(
@@ -206,15 +207,15 @@ export class CPUController {
           
           if (attackType < 0.5) {
             // Basic punch - 50% chance
-            console.log("CPU performs a PUNCH");
+            log("CPU performs a PUNCH");
             attackDuration = 400;
           } else if (attackType < 0.85) {
             // Kick - 35% chance
-            console.log("CPU performs a KICK");
+            log("CPU performs a KICK");
             attackDuration = 500;
           } else {
             // Special - 15% chance
-            console.log("CPU performs a SPECIAL ATTACK");
+            log("CPU performs a SPECIAL ATTACK");
             attackDuration = 600;
           }
           
@@ -227,7 +228,7 @@ export class CPUController {
             if (Math.random() < 0.3 && distanceToPlayer <= ATTACK_RANGE) {
               setTimeout(() => {
                 if (!cpuState.isAttacking && cpuState.attackCooldown <= 0) {
-                  console.log("CPU performs a COMBO FOLLOW-UP ATTACK!");
+                  log("CPU performs a COMBO FOLLOW-UP ATTACK!");
                   onAttackingChange(true);
                   
                   // Reset attack after delay
@@ -267,7 +268,7 @@ export class CPUController {
         // Air jump (double/triple jump - Smash Bros style)
         if (isJumping && useAirJump && useAirJump()) {
           // Successful air jump
-          console.log("CPU performs an AIR JUMP");
+          log("CPU performs an AIR JUMP");
           onVelocityChange(newVX, JUMP_FORCE * 0.8, vz); // Slightly weaker air jump
           this.currentAction = CPUAction.AIR_ATTACK; // Follow up with air attack
           this.actionTimer = 10;
@@ -279,7 +280,7 @@ export class CPUController {
       case CPUAction.AIR_ATTACK:
         // Air attack (only when in the air)
         if (isJumping && onAirAttackingChange && !cpuState.isAirAttacking && !cpuState.isAttacking) {
-          console.log("CPU performs an AIR ATTACK");
+          log("CPU performs an AIR ATTACK");
           onAirAttackingChange(true);
           
           // Reset air attack after delay
@@ -294,7 +295,7 @@ export class CPUController {
       case CPUAction.DODGE:
         // Dodge (Smash Bros style)
         if (onDodgingChange && !cpuState.isDodging && cpuState.dodgeCooldown <= 0) {
-          console.log("CPU performs a DODGE");
+          log("CPU performs a DODGE");
           onDodgingChange(true);
           
           // Add a burst of movement when dodging to evade attacks
@@ -314,7 +315,7 @@ export class CPUController {
       case CPUAction.GRAB:
         // Grab attack (Smash Bros style)
         if (onGrabbingChange && !cpuState.isGrabbing && cpuState.grabCooldown <= 0) {
-          console.log("CPU performs a GRAB");
+          log("CPU performs a GRAB");
           onGrabbingChange(true);
           
           // Face player for grab
@@ -335,7 +336,7 @@ export class CPUController {
       case CPUAction.TAUNT:
         // Taunt (just for fun)
         if (onTauntingChange && !cpuState.isTaunting) {
-          console.log("CPU performs a TAUNT");
+          log("CPU performs a TAUNT");
           onTauntingChange(true);
           
           // End taunt after delay
@@ -382,7 +383,7 @@ export class CPUController {
     const platformHeight = getPlatformHeight(newX, newZ);
     if (isJumping && (Math.abs(newY - platformHeight) < 0.1 || newY <= 0.01)) {
       onJumpingChange(false);
-      console.log("CPU landed on platform at height:", platformHeight);
+      log("CPU landed on platform at height:", platformHeight);
     }
     
     // Check if player is attacking and close enough to block
@@ -410,7 +411,7 @@ export class CPUController {
     
     // Log for debugging
     if (Math.random() < 0.05) { // Only log occasionally to avoid console spam
-      console.log(`CPU deciding action. Distance: ${distanceToPlayer.toFixed(2)}, Target: ${this.targetDistance}`);
+      log(`CPU deciding action. Distance: ${distanceToPlayer.toFixed(2)}, Target: ${this.targetDistance}`);
     }
     
     // Within attack range - most likely attack or block
@@ -420,31 +421,31 @@ export class CPUController {
       if (rand < 0.65) {
         this.currentAction = CPUAction.ATTACK;
         this.actionTimer = 10;
-        console.log('CPU decided to ATTACK because in perfect range');
+        log('CPU decided to ATTACK because in perfect range');
       } 
       // Occasionally block to anticipate player attacks
       else if (rand < 0.75) {
         this.currentAction = CPUAction.BLOCK;
         this.actionTimer = 15 + Math.floor(Math.random() * 15);
-        console.log('CPU decided to BLOCK');
+        log('CPU decided to BLOCK');
       } 
       // Mix in some grabs for variety
       else if (rand < 0.85) {
         this.currentAction = CPUAction.GRAB;
         this.actionTimer = 5;
-        console.log('CPU decided to GRAB in perfect range');
+        log('CPU decided to GRAB in perfect range');
       }
       // Sometimes jump to set up air attacks
       else if (rand < 0.95) {
         this.currentAction = CPUAction.JUMP;
         this.actionTimer = 5;
-        console.log('CPU decided to JUMP for air attack');
+        log('CPU decided to JUMP for air attack');
       } 
       // Rarely dodge to avoid predictability
       else {
         this.currentAction = CPUAction.DODGE;
         this.actionTimer = 5;
-        console.log('CPU decided to DODGE unpredictably');
+        log('CPU decided to DODGE unpredictably');
       }
     } 
     // Too far from player, primarily focus on closing the distance
@@ -453,25 +454,25 @@ export class CPUController {
       if (rand < 0.7) {
         this.currentAction = CPUAction.CHASE;
         this.actionTimer = 30 + Math.floor(Math.random() * 30);
-        console.log('CPU decided to CHASE');
+        log('CPU decided to CHASE');
       }
       // Sometimes jump to traverse platforms or take shortcuts
       else if (rand < 0.9) {
         this.currentAction = CPUAction.JUMP;
         this.actionTimer = 5;
-        console.log('CPU decided to JUMP to close distance');
+        log('CPU decided to JUMP to close distance');
       }
       // Occasionally air jump for vertical navigation
       else if (rand < 0.95) {
         this.currentAction = CPUAction.AIR_JUMP;
         this.actionTimer = 5;
-        console.log('CPU decided to AIR JUMP for vertical approach');
+        log('CPU decided to AIR JUMP for vertical approach');
       }
       // Rarely taunt when far away
       else {
         this.currentAction = CPUAction.TAUNT;
         this.actionTimer = 5;
-        console.log('CPU decided to TAUNT from a safe distance');
+        log('CPU decided to TAUNT from a safe distance');
       }
     } 
     // Too close to player, need some space
@@ -480,25 +481,25 @@ export class CPUController {
       if (rand < 0.6) {
         this.currentAction = CPUAction.RETREAT;
         this.actionTimer = 15 + Math.floor(Math.random() * 15);
-        console.log('CPU decided to RETREAT');
+        log('CPU decided to RETREAT');
       }
       // Sometimes attack anyway if very close
       else if (rand < 0.8) {
         this.currentAction = CPUAction.ATTACK;
         this.actionTimer = 10;
-        console.log('CPU decided to ATTACK despite close range');
+        log('CPU decided to ATTACK despite close range');
       }
       // Dodge away
       else if (rand < 0.9) {
         this.currentAction = CPUAction.DODGE;
         this.actionTimer = 5;
-        console.log('CPU decided to DODGE away');
+        log('CPU decided to DODGE away');
       }
       // Jump out
       else {
         this.currentAction = CPUAction.JUMP;
         this.actionTimer = 5;
-        console.log('CPU decided to JUMP away');
+        log('CPU decided to JUMP away');
       }
     } 
     // Within good range but not perfect - balanced strategy
@@ -507,55 +508,55 @@ export class CPUController {
       if (rand < this.attackChance) {
         this.currentAction = CPUAction.ATTACK;
         this.actionTimer = 10;
-        console.log('CPU decided to ATTACK strategically');
+        log('CPU decided to ATTACK strategically');
       } 
       // Block to stay safe
       else if (rand < this.attackChance + this.blockChance) {
         this.currentAction = CPUAction.BLOCK;
         this.actionTimer = 15 + Math.floor(Math.random() * 15);
-        console.log('CPU decided to BLOCK strategically');
+        log('CPU decided to BLOCK strategically');
       } 
       // Jump for positional advantage
       else if (rand < this.attackChance + this.blockChance + this.jumpChance) {
         this.currentAction = CPUAction.JUMP;
         this.actionTimer = 5;
-        console.log('CPU decided to JUMP for position');
+        log('CPU decided to JUMP for position');
       } 
       // Dodge to avoid attacks
       else if (rand < this.attackChance + this.blockChance + this.jumpChance + this.dodgeChance) {
         this.currentAction = CPUAction.DODGE;
         this.actionTimer = 5;
-        console.log('CPU decided to DODGE');
+        log('CPU decided to DODGE');
       } 
       // Grab when player might be blocking
       else if (rand < this.attackChance + this.blockChance + this.jumpChance + this.dodgeChance + this.grabChance) {
         this.currentAction = CPUAction.GRAB;
         this.actionTimer = 5;
-        console.log('CPU decided to GRAB');
+        log('CPU decided to GRAB');
       } 
       // Try air attack for surprise
       else if (rand < this.attackChance + this.blockChance + this.jumpChance + this.dodgeChance + this.grabChance + this.airAttackChance) {
         this.currentAction = CPUAction.AIR_ATTACK;
         this.actionTimer = 5;
-        console.log('CPU decided to use AIR ATTACK');
+        log('CPU decided to use AIR ATTACK');
       }
       // Chase to optimize position
       else if (rand < this.attackChance + this.blockChance + this.jumpChance + this.dodgeChance + this.grabChance + this.airAttackChance + 0.2) {
         this.currentAction = CPUAction.CHASE;
         this.actionTimer = 20 + Math.floor(Math.random() * 20);
-        console.log('CPU decided to CHASE (positioning)');
+        log('CPU decided to CHASE (positioning)');
       } 
       // Taunt rarely
       else if (rand < this.attackChance + this.blockChance + this.jumpChance + this.dodgeChance + this.grabChance + this.airAttackChance + 0.2 + this.tauntChance) {
         this.currentAction = CPUAction.TAUNT;
         this.actionTimer = 5;
-        console.log('CPU decided to TAUNT');
+        log('CPU decided to TAUNT');
       } 
       // Sometimes just pause to reset
       else {
         this.currentAction = CPUAction.IDLE;
         this.actionTimer = 10 + Math.floor(Math.random() * 10);
-        console.log('CPU decided to IDLE (strategic pause)');
+        log('CPU decided to IDLE (strategic pause)');
       }
     }
     
@@ -569,11 +570,11 @@ export class CPUController {
         if (Math.random() < 0.7) {
           this.currentAction = CPUAction.BLOCK;
           this.actionTimer = 20;
-          console.log('CPU decided to BLOCK because player is attacking');
+          log('CPU decided to BLOCK because player is attacking');
         } else {
           this.currentAction = CPUAction.DODGE;
           this.actionTimer = 15;
-          console.log('CPU decided to DODGE because player is attacking');
+          log('CPU decided to DODGE because player is attacking');
         }
       }
     }

@@ -40,6 +40,11 @@ interface FightingState {
   cpuScore: number;
   roundTime: number;
   maxRoundTime: number;
+  currentGameScore: number; // Total score for current game session
+  
+  // High score tracking
+  submitScore: (finalScore: number) => Promise<void>;
+  calculateFinalScore: () => number;
   
   // Actions
   startGame: () => void;
@@ -115,7 +120,7 @@ const createDefaultCharacterState = (position: [number, number, number], directi
   velocity: [0, 0, 0],
 });
 
-export const useFighting = create<FightingState>((set) => ({
+export const useFighting = create<FightingState>((set, get) => ({
   gamePhase: 'menu',
   player: createDefaultCharacterState(DEFAULT_POSITION_PLAYER, 1),
   cpu: createDefaultCharacterState(DEFAULT_POSITION_CPU, -1),
@@ -123,6 +128,7 @@ export const useFighting = create<FightingState>((set) => ({
   cpuScore: 0,
   roundTime: DEFAULT_ROUND_TIME,
   maxRoundTime: DEFAULT_ROUND_TIME,
+  currentGameScore: 0,
   
   startGame: () => set(() => ({
     gamePhase: 'fighting',
@@ -737,5 +743,51 @@ export const useFighting = create<FightingState>((set) => ({
     return {
       roundTime: newTime
     };
-  })
+  }),
+
+  // Score calculation and submission
+  calculateFinalScore: () => {
+    const state = get();
+    let score = 0;
+    
+    // Base score from rounds won
+    score += state.playerScore * 1000;
+    
+    // Bonus for winning quickly (time remaining)
+    if (state.playerScore > state.cpuScore) {
+      score += state.roundTime * 10;
+    }
+    
+    // Bonus for player health remaining
+    score += state.player.health * 5;
+    
+    // Combo bonus
+    score += state.player.comboCount * 50;
+    
+    return Math.max(0, score);
+  },
+
+  submitScore: async (finalScore: number) => {
+    try {
+      const response = await fetch('/api/scores', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          userId: 1, // Default user for now, can be enhanced with authentication
+          score: finalScore,
+        }),
+      });
+      
+      if (!response.ok) {
+        throw new Error('Failed to submit score');
+      }
+      
+      const result = await response.json();
+      console.log('Score submitted successfully:', result);
+    } catch (error) {
+      console.error('Error submitting score:', error);
+    }
+  }
 }));

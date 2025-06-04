@@ -58,7 +58,7 @@ const CharacterPreview = ({
   return (
     <div className={`h-64 w-full bg-gradient-to-b from-gray-900 to-gray-800 rounded-lg overflow-hidden ${className} relative`}>
       <Canvas
-        camera={{ position: [0, 1, 3], fov: 50 }}
+        camera={{ position: [0, 0.8, 4], fov: 60 }}
         style={{ width: '100%', height: '100%' }}
       >
         <Suspense fallback={null}>
@@ -98,9 +98,11 @@ const CharacterPreview = ({
           <OrbitControls 
             enablePan={false} 
             enableZoom={true}
-            minDistance={2}
+            minDistance={2.5}
             maxDistance={6}
-            target={[0, 0.5, 0]}
+            target={[0, 0.9, 0]}
+            maxPolarAngle={Math.PI / 1.8}
+            minPolarAngle={Math.PI / 4}
           />
           
           <Environment preset="studio" />

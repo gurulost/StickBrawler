@@ -13,7 +13,9 @@ const UI = () => {
     maxRoundTime,
     gamePhase,
     resetRound,
-    returnToMenu
+    returnToMenu,
+    calculateFinalScore,
+    submitScore
   } = useFighting();
   
   const { toggleMute, isMuted, playSuccess, setMasterVolume, masterVolume } = useAudio();
@@ -22,6 +24,7 @@ const UI = () => {
   // Animation states for UI elements
   const [showControls, setShowControls] = useState(false);
   const [pulseHealth, setPulseHealth] = useState(false);
+  const [scoreSubmitted, setScoreSubmitted] = useState(false);
   
   // Format time as MM:SS
   const formatTime = (seconds: number) => {
@@ -39,14 +42,28 @@ const UI = () => {
     return "Draw!";
   };
   
-  // Play win sound effect
+  // Play win sound effect and submit score
   useEffect(() => {
-    if (gamePhase === 'round_end') {
+    if (gamePhase === 'round_end' && !scoreSubmitted) {
       if (player.health > cpu.health) {
         playSuccess();
       }
+      
+      // Submit score to leaderboard
+      const finalScore = calculateFinalScore();
+      if (finalScore > 0) {
+        submitScore(finalScore);
+        setScoreSubmitted(true);
+      }
     }
-  }, [gamePhase, player.health, cpu.health, playSuccess]);
+  }, [gamePhase, player.health, cpu.health, playSuccess, scoreSubmitted, calculateFinalScore, submitScore]);
+
+  // Reset score submission flag when starting new game
+  useEffect(() => {
+    if (gamePhase === 'fighting') {
+      setScoreSubmitted(false);
+    }
+  }, [gamePhase]);
   
   // Pulse health bar when low health
   useEffect(() => {

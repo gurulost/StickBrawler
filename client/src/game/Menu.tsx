@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { useFighting } from "../lib/stores/useFighting";
 import { useAudio } from "../lib/stores/useAudio";
-import { CharacterCustomizer } from "../components/ui/character-customizer";
+import { FighterCustomizer } from "../components/ui/fighter-customizer";
 
 // Animated particles for background effect
 const Particle = ({ delay = 0 }: { delay?: number }) => {
@@ -574,18 +574,7 @@ const Menu = () => {
         {/* Character Customization Section */}
         {menuSection === 'customization' && (
           <div className="animate-fadeIn">
-            <h2 className="text-3xl font-bold text-white mb-6">Customize Your Fighter</h2>
-            
-            <div className="bg-black bg-opacity-60 p-8 rounded-xl border border-purple-800 shadow-2xl max-w-4xl mx-auto">
-              <CharacterCustomizer />
-            </div>
-            
-            <button 
-              className="mt-8 bg-gradient-to-r from-gray-700 to-gray-800 text-white font-bold py-3 px-6 rounded-full transition-all hover:shadow-lg transform hover:scale-105"
-              onClick={showMainMenu}
-            >
-              Back to Main Menu
-            </button>
+            <FighterCustomizer />
           </div>
         )}
         

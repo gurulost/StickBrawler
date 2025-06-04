@@ -114,7 +114,9 @@ const GameManager = () => {
           attackName = "SPECIAL ATTACK";
         }
         
-        console.log(`Player hit CPU with a ${attackName} for ${damage} damage!`);
+        if (debugMode) {
+          console.log(`Player hit CPU with a ${attackName} for ${damage} damage!`);
+        }
         damageCPU(damage);
         playHit();
       }
@@ -136,15 +138,21 @@ const GameManager = () => {
         if (attackType < 0.7) {
           // Punch - most common
           damageAmount = PUNCH_DAMAGE;
-          console.log("CPU hit player with a PUNCH for", damageAmount, "damage!");
+          if (debugMode) {
+            console.log("CPU hit player with a PUNCH for", damageAmount, "damage!");
+          }
         } else if (attackType < 0.9) {
           // Kick - medium chance
           damageAmount = KICK_DAMAGE;
-          console.log("CPU hit player with a KICK for", damageAmount, "damage!");
+          if (debugMode) {
+            console.log("CPU hit player with a KICK for", damageAmount, "damage!");
+          }
         } else {
           // Special - rare but powerful
           damageAmount = SPECIAL_DAMAGE;
-          console.log("CPU hit player with a SPECIAL ATTACK for", damageAmount, "damage!");
+          if (debugMode) {
+            console.log("CPU hit player with a SPECIAL ATTACK for", damageAmount, "damage!");
+          }
         }
         
         damagePlayer(damageAmount);
@@ -165,9 +173,9 @@ const GameManager = () => {
     } = getKeyboardState();
     
     // Log keyboard state periodically for debugging
-    if (Math.random() < 0.01) {
-      console.log("Current keyboard state:", { 
-        jump, forward, backward, leftward, rightward, 
+    if (Math.random() < 0.01 && debugMode) {
+      console.log("Current keyboard state:", {
+        jump, forward, backward, leftward, rightward,
         attack1, attack2, shield, special,
         dodge, airAttack, grab, taunt
       });
@@ -190,12 +198,16 @@ const GameManager = () => {
     if (canAct || player.isJumping) { // Allow air control while jumping
       // Left/Right movement (X-axis)
       if (leftward) {
-        console.log("Moving player LEFT");
+        if (debugMode) {
+          console.log("Moving player LEFT");
+        }
         // Air control is more limited (Smash Bros style)
         newVX = player.isJumping ? Math.max(-PLAYER_SPEED * 0.7, playerVX - 0.01) : -PLAYER_SPEED;
         newDirection = -1;
       } else if (rightward) {
-        console.log("Moving player RIGHT");
+        if (debugMode) {
+          console.log("Moving player RIGHT");
+        }
         // Air control is more limited (Smash Bros style)
         newVX = player.isJumping ? Math.min(PLAYER_SPEED * 0.7, playerVX + 0.01) : PLAYER_SPEED;
         newDirection = 1;
@@ -206,11 +218,15 @@ const GameManager = () => {
       
       // Forward/Backward movement (Z-axis) - NEW 3D MOVEMENT
       if (forward) {
-        console.log("Moving player FORWARD"); // In 3D space, "forward" is toward camera (negative Z)
+        if (debugMode) {
+          console.log("Moving player FORWARD"); // In 3D space, "forward" is toward camera (negative Z)
+        }
         // Air control is more limited in the air
         newVZ = player.isJumping ? Math.max(-PLAYER_SPEED * 0.7, playerVZ - 0.01) : -PLAYER_SPEED;
       } else if (backward) {
-        console.log("Moving player BACKWARD"); // In 3D space, "backward" is away from camera (positive Z)
+        if (debugMode) {
+          console.log("Moving player BACKWARD"); // In 3D space, "backward" is away from camera (positive Z)
+        }
         // Air control is more limited in the air
         newVZ = player.isJumping ? Math.min(PLAYER_SPEED * 0.7, playerVZ + 0.01) : PLAYER_SPEED;
       } else {
@@ -228,7 +244,9 @@ const GameManager = () => {
     
     // First jump (normal jump from ground) - now using W key for jump
     if (jump && !player.isJumping && playerY <= 0.01 && canAct) {
-      console.log("Player JUMPING - JUMP_FORCE:", JUMP_FORCE);
+      if (debugMode) {
+        console.log("Player JUMPING - JUMP_FORCE:", JUMP_FORCE);
+      }
       // Apply a strong upward velocity
       newVY = JUMP_FORCE;
       setPlayerJumping(true);
@@ -240,7 +258,9 @@ const GameManager = () => {
     else if (jump && player.isJumping && player.airJumpsLeft > 0) {
       // Only air jump on key press, not hold
       if (Math.random() < 0.2) { // Simulate a key press check (we're running every frame)
-        console.log("Player AIR JUMP! Remaining:", player.airJumpsLeft - 1);
+        if (debugMode) {
+          console.log("Player AIR JUMP! Remaining:", player.airJumpsLeft - 1);
+        }
         // Slightly weaker jump for air jumps
         newVY = JUMP_FORCE * 0.8;
         usePlayerAirJump();
@@ -249,7 +269,7 @@ const GameManager = () => {
     }
     
     // Debug message for jump state
-    if (jump && Math.random() < 0.05) {
+    if (jump && Math.random() < 0.05 && debugMode) {
       console.log("Jump key pressed, playerY:", playerY, "isJumping:", player.isJumping, "airJumpsLeft:", player.airJumpsLeft);
     }
     
@@ -258,7 +278,7 @@ const GameManager = () => {
     const platformHeight = getPlatformHeight(playerX, playerZ);
     const dropThrough = backward && platformHeight > 0 && Math.abs(playerY - platformHeight) < 0.1;
     
-    if (dropThrough) {
+    if (dropThrough && debugMode) {
       console.log("Player dropping through platform at height:", platformHeight);
     }
     
@@ -272,7 +292,9 @@ const GameManager = () => {
       resetPlayerAirJumps();
       // Play landing sound effect
       playLand();
-      console.log("Player landed on platform at height:", platformHeight);
+      if (debugMode) {
+        console.log("Player landed on platform at height:", platformHeight);
+      }
     }
     
     // --- ATTACK SYSTEM (SMASH BROS STYLE) ---
@@ -281,7 +303,9 @@ const GameManager = () => {
     if (!player.isJumping && canAct) {
       // Quick attack (attack1)
       if (attack1 && player.attackCooldown <= 0) {
-        console.log("Player QUICK ATTACK");
+        if (debugMode) {
+          console.log("Player QUICK ATTACK");
+        }
         setPlayerAttacking(true);
         playPunch(); // Use specific punch sound effect
         
@@ -293,7 +317,9 @@ const GameManager = () => {
       
       // Strong attack (attack2)
       else if (attack2 && player.attackCooldown <= 0) {
-        console.log("Player STRONG ATTACK");
+        if (debugMode) {
+          console.log("Player STRONG ATTACK");
+        }
         setPlayerAttacking(true);
         playKick(); // Use specific kick sound effect
         
@@ -305,7 +331,9 @@ const GameManager = () => {
       
       // Special attack
       else if (special && player.attackCooldown <= 0) {
-        console.log("Player SPECIAL");
+        if (debugMode) {
+          console.log("Player SPECIAL");
+        }
         setPlayerAttacking(true);
         playSpecial(); // Use specific special attack sound effect
         
@@ -317,7 +345,9 @@ const GameManager = () => {
       
       // Grab attack (new Smash Bros style)
       else if (grab && player.grabCooldown <= 0) {
-        console.log("Player GRAB");
+        if (debugMode) {
+          console.log("Player GRAB");
+        }
         setPlayerGrabbing(true);
         playGrab(); // Play grab sound
         
@@ -328,7 +358,9 @@ const GameManager = () => {
           // Check if grab connected at the end
           const distanceToCPU = Math.abs(player.position[0] - cpu.position[0]);
           if (distanceToCPU < ATTACK_RANGE * 0.6) { // Grab has shorter range than attacks
-            console.log("Player GRAB CONNECTED!");
+            if (debugMode) {
+              console.log("Player GRAB CONNECTED!");
+            }
             // Apply throw damage
             damageCPU(20);
             playThrow(); // Play throw sound when successful
@@ -344,7 +376,9 @@ const GameManager = () => {
       
       // Taunt (just for fun, no gameplay effect)
       else if (taunt && !player.isTaunting) {
-        console.log("Player TAUNT");
+        if (debugMode) {
+          console.log("Player TAUNT");
+        }
         setPlayerTaunting(true);
         playTaunt(); // Play taunt sound
         
@@ -358,7 +392,9 @@ const GameManager = () => {
     else if (player.isJumping && !player.isAirAttacking && player.attackCooldown <= 0) {
       // Air attack
       if (airAttack || attack1 || attack2) {
-        console.log("Player AIR ATTACK");
+        if (debugMode) {
+          console.log("Player AIR ATTACK");
+        }
         setPlayerAirAttacking(true);
         playPunch(); // Use punch sound for air attacks
         
@@ -369,7 +405,9 @@ const GameManager = () => {
       }
       // Air special
       else if (special) {
-        console.log("Player AIR SPECIAL");
+        if (debugMode) {
+          console.log("Player AIR SPECIAL");
+        }
         setPlayerAirAttacking(true);
         playSpecial(); // Use special sound for air specials
         
@@ -394,7 +432,9 @@ const GameManager = () => {
     
     // Handle dodging (new Smash Bros style)
     if (dodge && canAct && player.dodgeCooldown <= 0) {
-      console.log("Player DODGE");
+      if (debugMode) {
+        console.log("Player DODGE");
+      }
       setPlayerDodging(true);
       playDodge(); // Play dodge sound
       
@@ -435,7 +475,7 @@ const GameManager = () => {
     updateCPUCooldowns(delta);
     
     // Log cooldown values for debugging
-    if (Math.random() < 0.01) {
+    if (Math.random() < 0.01 && debugMode) {
       console.log("Player attack cooldown:", player.attackCooldown);
       console.log("CPU attack cooldown:", cpu.attackCooldown);
       

@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { useFighting } from "../lib/stores/useFighting";
 import { useAudio } from "../lib/stores/useAudio";
+import { log } from "../lib/logger";
 import { FighterCustomizer } from "../components/ui/fighter-customizer";
 
 // Animated particles for background effect
@@ -244,7 +245,7 @@ const Menu = () => {
     // Short delay to ensure audio is loaded
     const timer = setTimeout(() => {
       playBackgroundMusic();
-      console.log("Background music started from menu");
+      log("Background music started from menu");
     }, 800);
     
     return () => {

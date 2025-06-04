@@ -4,7 +4,8 @@
     // modify the interface with any CRUD methods
     // you might need
 
-    // Resolved Conflict 2: Took interface from e144449 (more methods, optional limit)
+    // Kept the IStorage interface from HEAD (which was based on e144449 resolution)
+    // as it's identical in methods to what c899993 offered for the interface.
     export interface IStorage {
       getUser(id: number): Promise<User | undefined>;
       getUserByUsername(username: string): Promise<User | undefined>;
@@ -15,8 +16,9 @@
       updateUserHighScore(userId: number, score: number): Promise<void>;
     }
 
+    // The MemStorage class below is the one we want, based on the e144449 resolution.
+    // The conflicting block from c899993 has been removed.
     export class MemStorage implements IStorage {
-      // Resolved Conflict 3: Took class members and constructor from e144449
       private users: Map<number, User>;
       private scores: Map<number, GameScore>; // Using Map for scores
       private currentUserId: number; // Separate ID for users
@@ -40,27 +42,22 @@
       }
 
       async createUser(insertUser: InsertUser): Promise<User> {
-        // Resolved Conflict 4: Took id generation from e144449
         const id = this.currentUserId++;
-        const user: User = { ...insertUser, id, highScore: 0 }; // highScore is initialized to 0 in both versions
+        const user: User = { ...insertUser, id, highScore: 0 }; 
         this.users.set(id, user);
         return user;
       }
 
-      // Resolved Conflict 5: Took all score-related methods from e144449
       async saveScore(scoreData: InsertGameScore): Promise<GameScore> {
         const id = this.currentScoreId++;
         const score: GameScore = { 
           id, 
-          // Assuming scoreData.userId can be undefined and schema expects number | null
-          // Using ?? null for explicit handling of undefined/null.
-          userId: scoreData.userId ?? null, 
+          userId: scoreData.userId ?? null, // Handle potential undefined/null from input
           score: scoreData.score, 
           timestamp: scoreData.timestamp 
         };
         this.scores.set(id, score);
 
-        // Update user's high score if this is better
         if (scoreData.userId != null) { // Check for null or undefined explicitly
           await this.updateUserHighScore(scoreData.userId, scoreData.score);
         }
@@ -68,8 +65,8 @@
         return score;
       }
 
-      async getTopScores(limit: number = 10): Promise<GameScore[]> { // limit is optional with default from e144449
-        const allScores = Array.from(this.scores.values()); // Converts Map values to array
+      async getTopScores(limit: number = 10): Promise<GameScore[]> { 
+        const allScores = Array.from(this.scores.values()); 
         return allScores
           .sort((a, b) => b.score - a.score)
           .slice(0, limit);
@@ -83,9 +80,8 @@
 
       async updateUserHighScore(userId: number, newScore: number): Promise<void> {
         const user = this.users.get(userId);
-        // Ensure highScore is treated as a number, defaulting to 0 if null/undefined for comparison
-        if (user && newScore > (user.highScore ?? 0)) {
-          const updatedUser = { ...user, highScore: newScore };
+        if (user && newScore > (user.highScore ?? 0)) { // Safe comparison for highScore
+          const updatedUser: User = { ...user, highScore: newScore };
           this.users.set(userId, updatedUser);
         }
       }

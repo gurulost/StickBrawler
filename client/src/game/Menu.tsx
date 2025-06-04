@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import { useFighting } from "../lib/stores/useFighting";
 import { useAudio } from "../lib/stores/useAudio";
 import { FighterCustomizer } from "../components/ui/fighter-customizer";
+import { Leaderboard } from "../components/ui/leaderboard";
 
 // Animated particles for background effect
 const Particle = ({ delay = 0 }: { delay?: number }) => {
@@ -134,7 +135,7 @@ const Menu = () => {
   const [isAnimating, setIsAnimating] = useState(false);
   const [showCustomizer, setShowCustomizer] = useState(false);
   const [showAdvancedControls, setShowAdvancedControls] = useState(false);
-  const [menuSection, setMenuSection] = useState<'main' | 'controls' | 'customization'>('main');
+  const [menuSection, setMenuSection] = useState<'main' | 'controls' | 'customization' | 'leaderboard'>('main');
   
   // Animation states
   const [titleEffect, setTitleEffect] = useState(0);
@@ -282,6 +283,10 @@ const Menu = () => {
     setShowCustomizer(true);
   };
   
+  const showLeaderboardMenu = () => {
+    setMenuSection('leaderboard');
+  };
+  
   // Title animation variations based on effect state
   const getTitleClass = () => {
     switch(titleEffect) {
@@ -381,6 +386,13 @@ const Menu = () => {
                 onClick={showControlsMenu}
               >
                 GAME CONTROLS
+              </button>
+              
+              <button 
+                className="bg-gradient-to-r from-green-600 to-green-800 text-white font-bold py-3 px-8 rounded-full transition-all hover:shadow-lg transform hover:scale-105"
+                onClick={showLeaderboardMenu}
+              >
+                LEADERBOARD
               </button>
               
               {/* Audio controls in a styled container */}
@@ -575,6 +587,25 @@ const Menu = () => {
         {menuSection === 'customization' && (
           <div className="animate-fadeIn">
             <FighterCustomizer />
+          </div>
+        )}
+
+        {/* Leaderboard Section */}
+        {menuSection === 'leaderboard' && (
+          <div className="animate-fadeIn max-w-2xl mx-auto">
+            <div className="mb-8">
+              <h2 className="text-4xl font-bold text-white mb-4">Global Leaderboard</h2>
+              <p className="text-gray-300">Compete for the highest score and claim your place among the champions!</p>
+            </div>
+            
+            <Leaderboard className="mb-8" />
+            
+            <button 
+              className="bg-gradient-to-r from-gray-700 to-gray-800 text-white font-bold py-3 px-6 rounded-full transition-all hover:shadow-lg transform hover:scale-105"
+              onClick={showMainMenu}
+            >
+              Back to Main Menu
+            </button>
           </div>
         )}
         

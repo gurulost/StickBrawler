@@ -41,8 +41,8 @@ const StickFigure = ({
   const groupRef = useRef<Group>(null);
   const [lastPunch, setLastPunch] = useState(0);
   const [lastKick, setLastKick] = useState(0);
-  const [attackType, setAttackType] = useState<'punch' | 'kick' | 'special' | 'air_attack' | 'grab' | 'dodge' | 'taunt' | null>(null);
-  const [animationPhase, setAnimationPhase] = useState(0);
+  const attackType = useRef<'punch' | 'kick' | 'special' | 'air_attack' | 'grab' | 'dodge' | 'taunt' | null>(null);
+  const animationPhase = useRef(0);
   const { playHit } = useAudio();
   
   // Get customization settings
@@ -129,117 +129,41 @@ const StickFigure = ({
     return () => clearInterval(keyDebugInterval);
   }, []);
 
-  // Enhanced animation system for fluid, realistic martial arts movements
-  useEffect(() => {
-    // Set up a consistent animation interval that won't block controls
-    // Using smaller interval (60ms) for smoother animations
-    const animationInterval = setInterval(() => {
-      // Attacking animations - dynamic based on attack type
-      if (isAttacking) {
-        // Determine which attack type is being performed
-        if (isPlayer) {
-          // Check current key states with prioritization for better control feel
-          // Smash Bros style advanced techniques have highest priority
-          if (isAirAttacking || (airAttack && isJumping)) {
-            setAttackType('air_attack');
-          } 
-          else if (isDodging || dodge) {
-            setAttackType('dodge');
-          }
-          else if (isGrabbing || grab) {
-            setAttackType('grab');
-          }
-          else if (isTaunting || taunt) {
-            setAttackType('taunt');
-          }
-          // Basic attack controls follow in priority
-          else if (attack1) {
-            setAttackType('punch'); // Quick attack -> punch animation
-          }
-          else if (attack2) {
-            setAttackType('kick');  // Strong attack -> kick animation
-          }
-          else if (special) {
-            setAttackType('special');
-          }
-          else {
-            // Default - use punch as fallback for consistent animation
-            setAttackType('punch'); 
-          }
-        } else {
-          // For CPU, randomly choose attack type if not already set
-          // This makes CPU animations match their actual attacks
-          if (!attackType) {
-            const attackRandom = Math.random();
-            // Distribute CPU attacks with varied probabilities for more realistic combat
-            if (attackRandom < 0.45) {
-              setAttackType('punch'); // Most common
-            }
-            else if (attackRandom < 0.75) {
-              setAttackType('kick');  // Medium probability
-            }
-            else if (attackRandom < 0.9) {
-              setAttackType('special'); // Rare but powerful
-            }
-            else if (attackRandom < 0.95) {
-              setAttackType('grab'); // Occasional grab attempt
-            }
-            else {
-              setAttackType('air_attack'); // Rare air attack
-            }
-          }
-        }
-        
-        // Update animation phase with non-linear progression for more natural movement
-        // Use 6 phases instead of 4 for smoother transitions
-        setAnimationPhase(phase => {
-          // Wind-up, execution, follow-through pattern for martial arts moves
-          const nextPhase = (phase + 1) % 6;
-          
-          // Add some randomization to make CPU movements less predictable
-          if (!isPlayer && Math.random() < 0.1) {
-            // Occasionally skip a frame for CPU to create variation
-            return (phase + 2) % 6;
-          }
-          
-          return nextPhase;
-        });
-      } 
-      // Non-attacking animations (idle, walking, jumping)
-      else {
-        // Gradual reset for more natural transition out of attacks
-        if (attackType !== null) {
-          setAttackType(null);
-        }
-        
-        // Smoothly reset animation phase rather than jumping to 0
-        if (animationPhase > 0) {
-          setAnimationPhase(phase => Math.max(0, phase - 1));
-        }
-      }
-    }, 60); // Faster interval for smoother animations
-    
-    return () => clearInterval(animationInterval);
-  }, [isAttacking, isPlayer, attackType, animationPhase, 
-      isAirAttacking, isDodging, isGrabbing, isTaunting, 
-      airAttack, dodge, grab, taunt, attack1, attack2, special, isJumping]);
   
-  // Process attack type changes independently
+  // Process attack animations and attack type each frame without triggering React state updates
   useFrame(() => {
-    // Game frame-specific logic that doesn't block controls
-    if (isAttacking && !attackType) {
-      // Set a default attack type if none was detected
+    if (isAttacking) {
+      // Determine which attack type is being performed
       if (isPlayer) {
-        // First check Smash Bros style attacks
-        if (isAirAttacking || (airAttack && isJumping)) setAttackType('air_attack');
-        else if (isDodging || dodge) setAttackType('dodge');
-        else if (isGrabbing || grab) setAttackType('grab');
-        else if (isTaunting || taunt) setAttackType('taunt');
-        // Then check the basic attacks with new control scheme
-        else if (attack1) setAttackType('punch'); // Quick attack -> punch animation
-        else if (attack2) setAttackType('kick');  // Strong attack -> kick animation
-        else if (special) setAttackType('special');
-        else setAttackType('punch'); // Default fallback
+        if (isAirAttacking || (airAttack && isJumping)) attackType.current = 'air_attack';
+        else if (isDodging || dodge) attackType.current = 'dodge';
+        else if (isGrabbing || grab) attackType.current = 'grab';
+        else if (isTaunting || taunt) attackType.current = 'taunt';
+        else if (attack1) attackType.current = 'punch';
+        else if (attack2) attackType.current = 'kick';
+        else if (special) attackType.current = 'special';
+        else if (!attackType.current) attackType.current = 'punch';
+      } else if (!attackType.current) {
+        const attackRandom = Math.random();
+        if (attackRandom < 0.45) attackType.current = 'punch';
+        else if (attackRandom < 0.75) attackType.current = 'kick';
+        else if (attackRandom < 0.9) attackType.current = 'special';
+        else if (attackRandom < 0.95) attackType.current = 'grab';
+        else attackType.current = 'air_attack';
+      }
+
+      // Advance animation phase
+      const next = (animationPhase.current + 1) % 6;
+      if (!isPlayer && Math.random() < 0.1) {
+        animationPhase.current = (animationPhase.current + 2) % 6;
+      } else {
+        animationPhase.current = next;
+      }
+    } else {
+      // Reset values when not attacking
+      if (attackType.current !== null) attackType.current = null;
+      if (animationPhase.current > 0) {
+        animationPhase.current = Math.max(0, animationPhase.current - 1);
       }
     }
   });
@@ -254,7 +178,7 @@ const StickFigure = ({
     >
       <Head colors={characterColors} style={characterStyle} accessory={characterAccessory} isAttacking={isAttacking} />
       <Torso colors={characterColors} style={characterStyle} />
-      <Limbs colors={characterColors} style={characterStyle} attackType={attackType} animationPhase={animationPhase} isBlocking={isBlocking} isAttacking={isAttacking} isJumping={isJumping} direction={direction} />
+      <Limbs colors={characterColors} style={characterStyle} attackType={attackType.current} animationPhase={animationPhase.current} isBlocking={isBlocking} isAttacking={isAttacking} isJumping={isJumping} direction={direction} />
 
       
       {/* Visual indicators for different actions */}
@@ -281,7 +205,7 @@ const StickFigure = ({
             <meshStandardMaterial 
               color={"#1e90ff"} 
               transparent={true}
-              opacity={0.6 - animationPhase * 0.1}
+              opacity={0.6 - animationPhase.current * 0.1}
               emissive={"#1e90ff"}
               emissiveIntensity={0.6}
             />
@@ -293,7 +217,7 @@ const StickFigure = ({
             <meshStandardMaterial 
               color={"#87cefa"} 
               transparent={true}
-              opacity={0.3 - animationPhase * 0.1}
+              opacity={0.3 - animationPhase.current * 0.1}
               emissive={"#87cefa"}
               emissiveIntensity={0.4}
             />
@@ -312,7 +236,7 @@ const StickFigure = ({
               transparent={true}
               opacity={0.7}
               emissive={"#ff4500"}
-              emissiveIntensity={0.5 + animationPhase * 0.2}
+              emissiveIntensity={0.5 + animationPhase.current * 0.2}
             />
           </mesh>
           

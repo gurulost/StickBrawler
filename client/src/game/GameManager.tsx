@@ -62,7 +62,6 @@ const GameManager = () => {
     updateCPUCooldowns
   } = useFighting();
   
-  const { debugMode } = useControls();
   const { 
     playHit, 
     playPunch, 
@@ -114,7 +113,7 @@ const GameManager = () => {
           attackName = "SPECIAL ATTACK";
         }
         
-        if (debugMode) {
+        if (useControls.getState().debugMode) {
           console.log(`Player hit CPU with a ${attackName} for ${damage} damage!`);
         }
         damageCPU(damage);
@@ -138,19 +137,19 @@ const GameManager = () => {
         if (attackType < 0.7) {
           // Punch - most common
           damageAmount = PUNCH_DAMAGE;
-          if (debugMode) {
+          if (useControls.getState().debugMode) {
             console.log("CPU hit player with a PUNCH for", damageAmount, "damage!");
           }
         } else if (attackType < 0.9) {
           // Kick - medium chance
           damageAmount = KICK_DAMAGE;
-          if (debugMode) {
+          if (useControls.getState().debugMode) {
             console.log("CPU hit player with a KICK for", damageAmount, "damage!");
           }
         } else {
           // Special - rare but powerful
           damageAmount = SPECIAL_DAMAGE;
-          if (debugMode) {
+          if (useControls.getState().debugMode) {
             console.log("CPU hit player with a SPECIAL ATTACK for", damageAmount, "damage!");
           }
         }
@@ -159,7 +158,7 @@ const GameManager = () => {
         playHit();
       }
     }
-  }, [player.isAttacking, cpu.isAttacking, player.position, cpu.position, player.direction, cpu.direction, damagePlayer, damageCPU, playHit, getKeyboardState, debugMode]); // Added debugMode to dependencies
+  }, [player.isAttacking, cpu.isAttacking, player.position, cpu.position, player.direction, cpu.direction, damagePlayer, damageCPU, playHit, getKeyboardState]);
   
   // Handle player keyboard controls directly with 3D Smash Bros style movement
   useFrame((state, frameDelta) => { // Renamed useFrame's delta to frameDelta to avoid confusion
@@ -178,7 +177,7 @@ const GameManager = () => {
     } = getKeyboardState();
     
     // Log keyboard state periodically for debugging
-    if (Math.random() < 0.01 && debugMode) {
+    if (Math.random() < 0.01 && useControls.getState().debugMode) {
       console.log("Current keyboard state:", {
         jump, forward, backward, leftward, rightward,
         attack1, attack2, shield, special,
@@ -203,13 +202,13 @@ const GameManager = () => {
     if (canAct || player.isJumping) { // Allow air control while jumping
       // Left/Right movement (X-axis)
       if (leftward) {
-        if (debugMode) {
+        if (useControls.getState().debugMode) {
           console.log("Moving player LEFT");
         }
         newVX = player.isJumping ? Math.max(-PLAYER_SPEED * 0.7, playerVX - 0.01) : -PLAYER_SPEED;
         newDirection = -1;
       } else if (rightward) {
-        if (debugMode) {
+        if (useControls.getState().debugMode) {
           console.log("Moving player RIGHT");
         }
         newVX = player.isJumping ? Math.min(PLAYER_SPEED * 0.7, playerVX + 0.01) : PLAYER_SPEED;
@@ -220,12 +219,12 @@ const GameManager = () => {
       
       // Forward/Backward movement (Z-axis) - NEW 3D MOVEMENT
       if (forward) {
-        if (debugMode) {
+        if (useControls.getState().debugMode) {
           console.log("Moving player FORWARD"); 
         }
         newVZ = player.isJumping ? Math.max(-PLAYER_SPEED * 0.7, playerVZ - 0.01) : -PLAYER_SPEED;
       } else if (backward) {
-        if (debugMode) {
+        if (useControls.getState().debugMode) {
           console.log("Moving player BACKWARD"); 
         }
         newVZ = player.isJumping ? Math.min(PLAYER_SPEED * 0.7, playerVZ + 0.01) : PLAYER_SPEED;
@@ -239,7 +238,7 @@ const GameManager = () => {
     }
     
     if (jump && !player.isJumping && playerY <= 0.01 && canAct) {
-      if (debugMode) {
+      if (useControls.getState().debugMode) {
         console.log("Player JUMPING - JUMP_FORCE:", JUMP_FORCE);
       }
       newVY = JUMP_FORCE;
@@ -249,7 +248,7 @@ const GameManager = () => {
     }
     else if (jump && player.isJumping && player.airJumpsLeft > 0) {
       if (Math.random() < 0.2) { 
-        if (debugMode) {
+        if (useControls.getState().debugMode) {
           console.log("Player AIR JUMP! Remaining:", player.airJumpsLeft - 1);
         }
         newVY = JUMP_FORCE * 0.8;
@@ -258,14 +257,14 @@ const GameManager = () => {
       }
     }
     
-    if (jump && Math.random() < 0.05 && debugMode) {
+    if (jump && Math.random() < 0.05 && useControls.getState().debugMode) {
       console.log("Jump key pressed, playerY:", playerY, "isJumping:", player.isJumping, "airJumpsLeft:", player.airJumpsLeft);
     }
     
     const platformHeight = getPlatformHeight(playerX, playerZ);
     const dropThrough = backward && platformHeight > 0 && Math.abs(playerY - platformHeight) < 0.1;
     
-    if (dropThrough && debugMode) {
+    if (dropThrough && useControls.getState().debugMode) {
       console.log("Player dropping through platform at height:", platformHeight);
     }
     
@@ -276,14 +275,14 @@ const GameManager = () => {
       setPlayerJumping(false);
       resetPlayerAirJumps();
       playLand();
-      if (debugMode) {
+      if (useControls.getState().debugMode) {
         console.log("Player landed on platform at height:", platformHeight);
       }
     }
     
     if (!player.isJumping && canAct) {
       if (attack1 && player.attackCooldown <= 0) {
-        if (debugMode) {
+        if (useControls.getState().debugMode) {
           console.log("Player QUICK ATTACK");
         }
         setPlayerAttacking(true);
@@ -293,7 +292,7 @@ const GameManager = () => {
         }, 400);
       }
       else if (attack2 && player.attackCooldown <= 0) {
-        if (debugMode) {
+        if (useControls.getState().debugMode) {
           console.log("Player STRONG ATTACK");
         }
         setPlayerAttacking(true);
@@ -303,7 +302,7 @@ const GameManager = () => {
         }, 500);
       }
       else if (special && player.attackCooldown <= 0) {
-        if (debugMode) {
+        if (useControls.getState().debugMode) {
           console.log("Player SPECIAL");
         }
         setPlayerAttacking(true);
@@ -313,7 +312,7 @@ const GameManager = () => {
         }, 600);
       }
       else if (grab && player.grabCooldown <= 0) {
-        if (debugMode) {
+        if (useControls.getState().debugMode) {
           console.log("Player GRAB");
         }
         setPlayerGrabbing(true);
@@ -322,7 +321,7 @@ const GameManager = () => {
           setPlayerGrabbing(false);
           const distanceToCPU = Math.abs(player.position[0] - cpu.position[0]);
           if (distanceToCPU < ATTACK_RANGE * 0.6) { 
-            if (debugMode) {
+            if (useControls.getState().debugMode) {
               console.log("Player GRAB CONNECTED!");
             }
             damageCPU(20);
@@ -335,7 +334,7 @@ const GameManager = () => {
         }, 400);
       }
       else if (taunt && !player.isTaunting) {
-        if (debugMode) {
+        if (useControls.getState().debugMode) {
           console.log("Player TAUNT");
         }
         setPlayerTaunting(true);
@@ -347,7 +346,7 @@ const GameManager = () => {
     }
     else if (player.isJumping && !player.isAirAttacking && player.attackCooldown <= 0) {
       if (airAttack || attack1 || attack2) {
-        if (debugMode) {
+        if (useControls.getState().debugMode) {
           console.log("Player AIR ATTACK");
         }
         setPlayerAirAttacking(true);
@@ -357,7 +356,7 @@ const GameManager = () => {
         }, 500);
       }
       else if (special) {
-        if (debugMode) {
+        if (useControls.getState().debugMode) {
           console.log("Player AIR SPECIAL");
         }
         setPlayerAirAttacking(true);
@@ -378,7 +377,7 @@ const GameManager = () => {
     }
     
     if (dodge && canAct && player.dodgeCooldown <= 0) {
-      if (debugMode) {
+      if (useControls.getState().debugMode) {
         console.log("Player DODGE");
       }
       setPlayerDodging(true);
@@ -405,7 +404,7 @@ const GameManager = () => {
     updatePlayerCooldowns(delta);
     updateCPUCooldowns(delta);
     
-    if (Math.random() < 0.01 && debugMode) {
+    if (Math.random() < 0.01 && useControls.getState().debugMode) {
       console.log("Player attack cooldown:", player.attackCooldown);
       console.log("CPU attack cooldown:", cpu.attackCooldown);
       const [px] = player.position; // Renamed to avoid conflict

@@ -2,7 +2,7 @@ import { useFrame } from "@react-three/fiber";
 import { useRef, useEffect, useState } from "react"; // Added useState back for lastPunch, lastKick
 import { useKeyboardControls } from "@react-three/drei";
 import { CharacterState } from "../lib/stores/useFighting";
-import { Controls } from "../lib/stores/useControls";
+import { Controls, useControls } from "../lib/stores/useControls";
 import { Group, Mesh, DoubleSide } from "three"; // Mesh, DoubleSide might not be directly used here but kept if Stickfigure/* needs it
 import * as THREE from "three";
 import { 
@@ -96,7 +96,7 @@ const StickFigure = ({
 
   useEffect(() => {
     const keyDebugInterval = setInterval(() => {
-      if (isPlayer) {
+      if (isPlayer && useControls.getState().debugMode) {
         if (Math.random() < 0.05) {
           if (jump) console.log("Jump key pressed, playerY:", y, "isJumping:", isJumping, "airJumpsLeft:", airJumpsLeft);
           if (leftward) console.log("Left key detected in StickFigure");

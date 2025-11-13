@@ -1,0 +1,93 @@
+Here’s the full audit of StickBrawler along with the highest‑impact fixes and enhancements I’d prioritize next.
+
+  Game State
+
+  - client/src/game/GameManager.tsx:49-809 contains the entire simulation loop (input handling, CPU AI,
+    combat state machine, stamina/guard meters, knockback, telemetry, audio, network calls). At ~1k lines it’s
+    effectively an inlined engine; it relies on Date.now() deltas instead of the useFrame delta (line 125),
+    mutates Zustand state directly in the render loop, and drives mechanics such as guard break, dodges, taunts,
+    grabs, and combo state via setTimeout calls (client/src/game/GameManager.tsx:500-720). This design makes
+    deterministic behavior, replay, and testing nearly impossible and causes timers to keep firing even if the
+    scene unmounts.
+  - Combat fidelity is still shallow compared to the roadmap: resolveHits only checks a single sphere against
+    the defender’s origin with no per-limb hurtboxes or capsule collisions (client/src/combat/hitResolver.ts:25-
+    63), there’s no blockstun/hitstun routing despite the state machine supporting it, and movement physics still
+    depend on basic clamping (client/src/game/Physics.ts:25-122). As a result, juggling, DI, wall bounce, tech
+    rolls, and fast-fall from the roadmap aren’t actually implemented.
+  - CPU logic ignores the authored combat state. cpuBrain.ts picks actions based purely on random timers and
+    planar distance, and its outputs bypass stamina/guard/resource checks that the player state machine enforces.
+    This causes desyncs between AI and players and prevents deterministic replays or telemetry validation.
+  - Telemetry batching runs straight out of useFrame, issuing a fetch("/api/telemetry") on every frame
+    that produces hits (client/src/game/GameManager.tsx:760-773). There’s no backpressure, retry budget, or
+    acknowledgement that the server only keeps an in-memory buffer (server/telemetry.ts:1-33), so data vanishes
+    if the process restarts.
+  - Audio and UI still block the main thread: App.tsx:44-111 instantiates 13 <audio> elements synchronously
+    on mount and tries to autoplay background music after 1 s, which modern browsers typically block unless
+    triggered by user interaction. Debug console.log statements remain sprinkled through runtime code (e.g.,
+    App.tsx:34, useAudio.tsx:137,161,196).
+
+  Backend & Economy
+
+  - The backend expects an @engine package (server/gameRuntime.ts:6 and tests/engine/engine.test.ts:4-6), but
+    there is no engine/ directory in the repo. Neither the server bundle nor the tests can resolve those imports,
+    which blocks any authoritative simulation work promised in the roadmap.
+  - /api/economy accepts arbitrary snapshots with any profileId and no authentication enforcement (server/
+    routes.ts:146-204). On the client, useEconomySync invents a random profile id per install (client/src/
+    lib/stores/useCustomization.tsx:531-556) and PUTs every 1.5 s (client/src/hooks/use-economy-sync.ts:8-74)
+    regardless of whether a user is logged in. Anyone can POST any coin balance, so the entire coin economy is
+    trivially spoofed.
+  - Score submission sidesteps the session system entirely: the client always posts { userId: 1 } (client/src/
+    lib/stores/useFighting.tsx:942-964), while the server is already capable of reading req.user. That means
+    leaderboard entries are always attributed to user 1 even if another user is logged in.
+  - server/storage 2.ts is a leftover merge artifact that redefines IStorage and MemStorage. Because it exports
+    the same symbols as server/storage.ts, TypeScript will either emit duplicate identifier errors or the bundler
+    will pull in the wrong version. The file should be deleted.
+  - Telemetry persistence is incomplete: storeTelemetry writes to an in-memory ring buffer (server/
+    telemetry.ts:24-33) that no route ever drains, yet the roadmap calls for feeding telemetry into anti-cheat
+    and match summaries. There’s also no signing or validation of client-provided coin events.
+
+  Tooling & Quality
+
+  - npm test fails immediately with Cannot start service: Host version "0.23.1" does not match binary version
+    "0.25.0" (esbuild mismatch). The command we ran (node --test --import tsx tests/**/*.test.ts) aborted before
+    executing any suite, so no automated tests currently run.
+  - npm run build fails because vite cannot be found on PATH, and npm run check fails because tsc is not
+    available. node_modules/.bin currently only contains esbuild, which indicates the dependency installation was
+    interrupted or the lockfile doesn’t match the local node_modules. Until the toolchain is reinstalled (npm ci)
+    and pinned, no build or type-check is possible.
+  - There’s no runtime linting/formatting step in package scripts, no GitHub Actions pipeline, and the
+    existing tests only cover HTTP endpoints (tests/server/*.test.ts) and the phantom engine (tests/engine/
+    engine.test.ts). Combat logic, physics, and Zustand stores remain completely untested.
+  - Debugging artifacts are still present in production paths (e.g., frequent useControls.getState().debugMode
+    console logging in useFighting.tsx and GameManager.tsx), which hurts performance and leaks internal state in
+    release builds.
+
+  Top Opportunities
+
+  1. Restore the deterministic engine module and share it between client and server. Add the missing engine/
+     package referenced by server/gameRuntime.ts:6 and tests/engine/engine.test.ts:4-6, then refactor GameManager
+     to delegate inputs, hit resolution, and resource updates to that engine instead of inlining everything in
+     React. This unlocks authoritative simulation, telemetry validation, and reduces the 1k-line component.
+  2. Fix the toolchain so builds and tests run again. Re-run npm ci to repair node_modules, align esbuild/tsx
+     versions, and ensure vite, tsc, and other binaries exist. Once the toolchain is healthy, wire up CI (lint +
+     type-check + tests) to prevent future regressions.
+  3. Secure the progression economy and telemetry endpoints. Tie /api/economy snapshots to authenticated users
+     instead of random profile ids, reject unsigned/negative deltas, and move coin awards server-side based on
+     match telemetry rather than trusting the client (client/src/hooks/use-economy-sync.ts:34-74). Implement rate
+     limiting and persistence for storeTelemetry.
+  4. Modularize the simulation loop. Break client/src/game/GameManager.tsx into subsystems (input aggregation,
+     movement/physics, combat resolution, AI, telemetry) with deterministic timers instead of setTimeout. Use the
+     useFrame-provided delta consistently and eliminate side-effectful async calls from the render loop.
+  5. Finish the combat backlog. Expand move definitions with real hurtboxes, implement blockstun/hitstun and DI,
+     and add capsule/platform collisions in client/src/game/Physics.ts to deliver the Smash-like depth promised
+     in ROADMAP.md. Add targeted tests for the combat state machine (client/src/combat/stateMachine.ts) and hit
+     resolver.
+  6. Align frontend auth usage with backend sessions. Update submitScore to rely on req.user (remove hard-
+     coded userId: 1), surface auth errors to the UI, and ensure the leaderboard differentiates anonymous vs
+     authenticated scores.
+  7. Clean up repository cruft and debugging hooks. Delete server/storage 2.ts, strip stray console.logs, and
+     move background audio initialization behind an explicit user interaction to avoid autoplay blockers.
+
+  Once the above are addressed, rerun npm test/npm run build to verify the toolchain is healthy, and consider
+  adding scenario tests (e.g., deterministic combat snapshots) to protect future changes.
+

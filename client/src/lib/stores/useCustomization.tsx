@@ -525,7 +525,7 @@ type CostTableMap = typeof COST_TABLES;
 
 const hasOwn = <T extends Record<string, unknown>>(
   obj: T,
-  key: string,
+  key: string | number | symbol,
 ): key is keyof T => Object.prototype.hasOwnProperty.call(obj, key);
 
 const createEconomyProfileId = () =>
@@ -903,7 +903,7 @@ export const useCustomization = create<CustomizationState>()(
           credited = Math.min(available, normalized);
           balance = state.coins + credited;
           if (credited <= 0) {
-            return undefined;
+            return {};
           }
           const entry: CoinLedgerEntry = {
             direction: 'credit',
@@ -947,7 +947,7 @@ export const useCustomization = create<CustomizationState>()(
               balance: state.coins,
               error: 'insufficient_funds',
             };
-            return undefined;
+            return {};
           }
           const nextBalance = state.coins - normalized;
           result = {
@@ -1009,30 +1009,30 @@ export const useCustomization = create<CustomizationState>()(
           switch (slot) {
             case 'colorTheme': {
               const next = appendIfMissing(state.unlockedColorThemes, normalized as ColorTheme);
-              if (next === state.unlockedColorThemes) return undefined;
+              if (next === state.unlockedColorThemes) return {};
               applied = true;
               return { unlockedColorThemes: next };
             }
             case 'figureStyle': {
               const next = appendIfMissing(state.unlockedFigureStyles, normalized as FigureStyle);
-              if (next === state.unlockedFigureStyles) return undefined;
+              if (next === state.unlockedFigureStyles) return {};
               applied = true;
               return { unlockedFigureStyles: next };
             }
             case 'accessory': {
               const next = appendIfMissing(state.unlockedAccessories, normalized as Accessory);
-              if (next === state.unlockedAccessories) return undefined;
+              if (next === state.unlockedAccessories) return {};
               applied = true;
               return { unlockedAccessories: next };
             }
             case 'animationStyle': {
               const next = appendIfMissing(state.unlockedAnimationStyles, normalized as AnimationStyle);
-              if (next === state.unlockedAnimationStyles) return undefined;
+              if (next === state.unlockedAnimationStyles) return {};
               applied = true;
               return { unlockedAnimationStyles: next };
             }
             default:
-              return undefined;
+              return {};
           }
         });
         return applied;
@@ -1076,6 +1076,43 @@ export const useCustomization = create<CustomizationState>()(
           balance: spendResult.balance,
           cost,
         };
+      },
+      
+      addPresetToSaved: (preset, options = {}) => {
+        const state = get();
+        const newCharacter: SavedCharacter = {
+          id: `preset_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+          name: options.name || preset.name,
+          colorTheme: preset.colorTheme,
+          figureStyle: preset.figureStyle,
+          accessory: preset.accessory,
+          accessoryColor: preset.accessoryColor,
+          animationStyle: preset.animationStyle,
+          createdAt: new Date().toISOString(),
+        };
+        
+        set({
+          savedCharacters: [...state.savedCharacters, newCharacter],
+        });
+        
+        if (options.isPlayer !== undefined) {
+          get().loadCharacter(newCharacter, options.isPlayer);
+        }
+      },
+      
+      togglePresetFavorite: (presetId) => {
+        set((state) => {
+          const isFavorite = state.favoritePresetIds.includes(presetId);
+          return {
+            favoritePresetIds: isFavorite
+              ? state.favoritePresetIds.filter(id => id !== presetId)
+              : [...state.favoritePresetIds, presetId],
+          };
+        });
+      },
+      
+      markCollectionsTourSeen: () => {
+        set({ collectionsTourSeen: true });
       },
     }),
     {

@@ -14,6 +14,7 @@ import {
   resolveCapsuleBounds,
   computeHitLagSeconds,
   applyHitLagTimer,
+  ATTACK_RANGE,
 } from "./Physics";
 import { useControls } from "../lib/stores/useControls";
 import { usePlayerControls } from "../hooks/use-player-controls";
@@ -138,19 +139,27 @@ const GameManager = () => {
     } = keyboardState;
 
     const cpuControlState = cpuBrainRef.current.tick(
-      cpuCombatStateRef.current,
-      playerCombatStateRef.current,
+      {
+        position: cpu.position,
+        isJumping: cpu.isJumping,
+        attackCooldown: cpu.attackCooldown,
+        dodgeCooldown: cpu.dodgeCooldown,
+        guardMeter: cpuCombatStateRef.current.guardMeter,
+      },
+      {
+        position: player.position,
+        isAttacking: player.isAttacking,
+      },
       delta,
     );
     
-    const playerInputs: PlayerInputState & Record<string, boolean> = {
+    const playerInputs: PlayerInputState = {
       attack1,
       attack2,
       special,
       airAttack,
       grab,
       dodge,
-      ...keyboardState,
     };
     if (playerInHitLag) {
       playerInputs.attack1 = false;

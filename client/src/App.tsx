@@ -105,13 +105,7 @@ function App() {
 
     // Show the canvas once everything is loaded
     setShowCanvas(true);
-  }, [
-    setBackgroundMusic, setHitSound, setSuccessSound, 
-    setPunchSound, setKickSound, setSpecialSound, 
-    setBlockSound, setJumpSound, setLandSound, 
-    setDodgeSound, setGrabSound, setThrowSound, 
-    setTauntSound, playBackgroundMusic
-  ]);
+  }, []);
 
   return (
     <div style={{ width: '100vw', height: '100vh', position: 'relative', overflow: 'hidden' }}>

@@ -4,10 +4,30 @@ import { useCustomization } from "../lib/stores/useCustomization";
 const SYNC_DEBOUNCE_MS = 1500;
 
 export function useEconomySync() {
-  const snapshot = useCustomization((state) => state.getEconomySnapshot());
+  const profileId = useCustomization((state) => state.economyProfileId);
+  const coins = useCustomization((state) => state.coins);
+  const lifetimeCoins = useCustomization((state) => state.lifetimeCoinsEarned);
+  const colorThemes = useCustomization((state) => state.unlockedColorThemes);
+  const figureStyles = useCustomization((state) => state.unlockedFigureStyles);
+  const accessories = useCustomization((state) => state.unlockedAccessories);
+  const animationStyles = useCustomization((state) => state.unlockedAnimationStyles);
+  const lastCoinEvent = useCustomization((state) => state.lastCoinEvent);
   const hydrateEconomySnapshot = useCustomization((state) => state.hydrateEconomySnapshot);
   const setEconomySyncError = useCustomization((state) => state.setEconomySyncError);
   const markEconomySyncComplete = useCustomization((state) => state.markEconomySyncComplete);
+  
+  const snapshot = useMemo(() => ({
+    profileId,
+    coins,
+    lifetimeCoins,
+    unlocks: {
+      colorThemes,
+      figureStyles,
+      accessories,
+      animationStyles,
+    },
+    lastCoinEvent,
+  }), [profileId, coins, lifetimeCoins, colorThemes, figureStyles, accessories, animationStyles, lastCoinEvent]);
 
   useEffect(() => {
     const controller = new AbortController();

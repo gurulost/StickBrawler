@@ -10,11 +10,16 @@ const envSchema = z.object({
   NODE_ENV: z
     .enum(["development", "test", "production"])
     .default("development"),
+  SESSION_SECRET: z
+    .string()
+    .min(32)
+    .default("dev-secret-change-in-production-min-32-chars-long"),
 });
 
 const parsed = envSchema.safeParse({
   DATABASE_URL: process.env.DATABASE_URL,
   NODE_ENV: process.env.NODE_ENV ?? "development",
+  SESSION_SECRET: process.env.SESSION_SECRET,
 });
 
 if (!parsed.success) {

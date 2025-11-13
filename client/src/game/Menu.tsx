@@ -1,8 +1,10 @@
 import { useState, useEffect, useRef } from "react";
 import { useFighting } from "../lib/stores/useFighting";
 import { useAudio } from "../lib/stores/useAudio";
+import { useAuth } from "../lib/stores/useAuth";
 import { FighterCustomizer } from "../components/ui/fighter-customizer";
 import { Leaderboard } from "../components/ui/leaderboard";
+import { AuthModal } from "../components/ui/auth-modal";
 
 // Animated particles for background effect
 const Particle = ({ delay = 0 }: { delay?: number }) => {
@@ -130,11 +132,13 @@ const StickFigure = ({
 const Menu = () => {
   const { startGame } = useFighting();
   const { playBackgroundMusic, toggleMute, isMuted, setMasterVolume, masterVolume } = useAudio();
+  const { user, status, logout } = useAuth();
   
   // UI state management
   const [isAnimating, setIsAnimating] = useState(false);
   const [showCustomizer, setShowCustomizer] = useState(false);
   const [showAdvancedControls, setShowAdvancedControls] = useState(false);
+  const [showAuthModal, setShowAuthModal] = useState(false);
   const [menuSection, setMenuSection] = useState<'main' | 'controls' | 'customization' | 'leaderboard'>('main');
   
   // Animation states
@@ -287,6 +291,14 @@ const Menu = () => {
     setMenuSection('leaderboard');
   };
   
+  const handleLogout = async () => {
+    try {
+      await logout();
+    } catch (error) {
+      console.error("Logout failed:", error);
+    }
+  };
+  
   // Title animation variations based on effect state
   const getTitleClass = () => {
     switch(titleEffect) {
@@ -306,6 +318,28 @@ const Menu = () => {
       ref={containerRef}
       className={`w-full h-full flex flex-col items-center justify-center bg-gradient-to-b from-gray-900 via-indigo-900 to-purple-900 transition-opacity duration-700 overflow-hidden ${isAnimating ? 'opacity-0' : 'opacity-100'}`}
     >
+      {/* Auth status - top right */}
+      <div className="absolute top-4 right-4 z-20">
+        {status === "authenticated" && user ? (
+          <div className="flex items-center gap-3 bg-black bg-opacity-70 px-4 py-2 rounded-full border border-indigo-700">
+            <span className="text-white font-semibold">👤 {user.username}</span>
+            <button
+              onClick={handleLogout}
+              className="text-xs bg-red-600 hover:bg-red-700 text-white px-3 py-1 rounded-full transition-colors"
+            >
+              Logout
+            </button>
+          </div>
+        ) : (
+          <button
+            onClick={() => setShowAuthModal(true)}
+            className="bg-gradient-to-r from-green-600 to-green-800 hover:from-green-700 hover:to-green-900 text-white font-bold px-6 py-2 rounded-full transition-all shadow-lg"
+          >
+            Login / Register
+          </button>
+        )}
+      </div>
+      
       {/* Particle background */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
         {particles.map((_, index) => (
@@ -618,6 +652,9 @@ const Menu = () => {
           <span>Built with React + Three.js</span>
         </div>
       </div>
+      
+      {/* Auth Modal */}
+      <AuthModal isOpen={showAuthModal} onClose={() => setShowAuthModal(false)} />
     </div>
   );
 };

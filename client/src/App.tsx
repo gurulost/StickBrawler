@@ -2,6 +2,7 @@ import { Canvas } from "@react-three/fiber";
 import { Suspense, useEffect, useState } from "react";
 import { KeyboardControls } from "@react-three/drei";
 import { useAudio } from "./lib/stores/useAudio";
+import { useAuth } from "./lib/stores/useAuth";
 import "@fontsource/inter";
 import { Controls } from "./lib/stores/useControls";
 import GameManager from "./game/GameManager";
@@ -38,8 +39,13 @@ console.log("Keyboard controls configuration:", keyboardMap);
 // Main App component
 function App() {
   const { gamePhase } = useFighting();
+  const { fetchMe } = useAuth();
   useEconomySync();
   const [showCanvas, setShowCanvas] = useState(false);
+  
+  useEffect(() => {
+    fetchMe();
+  }, [fetchMe]);
   const { 
     setBackgroundMusic, 
     setHitSound, 

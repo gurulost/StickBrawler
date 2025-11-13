@@ -1,10 +1,43 @@
 import express, { type Request, Response, NextFunction } from "express";
+import session from "express-session";
+import passport from "passport";
+import connectPgSimple from "connect-pg-simple";
+import { Pool } from "@neondatabase/serverless";
 import { registerRoutes } from "./routes";
+import { registerAuthRoutes } from "./auth-routes";
+import { configurePassport } from "./auth";
 import { setupVite, serveStatic, log } from "./vite";
+import { env } from "./env";
 
 const app = express();
+app.set("trust proxy", 1);
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
+
+const PgSession = connectPgSimple(session);
+const sessionStore = new PgSession({
+  pool: new Pool({ connectionString: env.DATABASE_URL }),
+  createTableIfMissing: true,
+});
+
+app.use(
+  session({
+    store: sessionStore,
+    secret: env.SESSION_SECRET,
+    resave: false,
+    saveUninitialized: false,
+    cookie: {
+      httpOnly: true,
+      sameSite: "lax",
+      secure: env.NODE_ENV === "production",
+      maxAge: 30 * 24 * 60 * 60 * 1000,
+    },
+  }),
+);
+
+configurePassport();
+app.use(passport.initialize());
+app.use(passport.session());
 
 app.use((req, res, next) => {
   const start = Date.now();
@@ -37,6 +70,7 @@ app.use((req, res, next) => {
 });
 
 (async () => {
+  registerAuthRoutes(app);
   const server = await registerRoutes(app);
 
   app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {

@@ -92,11 +92,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
           .json({ error: "Invalid score data", details: parsed.error.flatten() });
       }
 
-      const { userId, score } = parsed.data;
+      const { score } = parsed.data;
       const timestamp = new Date().toISOString();
 
+      const authenticatedUserId = (req.user as any)?.id ?? null;
+
       const savedScore = await storage.saveScore({
-        userId: userId ?? null,
+        userId: authenticatedUserId,
         score,
         timestamp,
       });
@@ -115,9 +117,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
           .json({ error: "Invalid economy payload", details: parsed.error.flatten() });
       }
 
+      const authenticatedUserId = (req.user as any)?.id ?? null;
+
       const snapshot = await storage.saveEconomySnapshot({
         profileId: parsed.data.profileId,
-        userId: parsed.data.userId ?? null,
+        userId: authenticatedUserId,
         coins: parsed.data.coins,
         lifetimeCoins: parsed.data.lifetimeCoins,
         unlocks: parsed.data.unlocks,

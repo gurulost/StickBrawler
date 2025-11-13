@@ -8,6 +8,7 @@ import GameManager from "./game/GameManager";
 import Menu from "./game/Menu";
 import UI from "./game/UI";
 import { useFighting } from "./lib/stores/useFighting";
+import { useEconomySync } from "./hooks/use-economy-sync";
 
 // Define control keys for the game - Updated control scheme
 const keyboardMap = [
@@ -37,6 +38,7 @@ console.log("Keyboard controls configuration:", keyboardMap);
 // Main App component
 function App() {
   const { gamePhase } = useFighting();
+  useEconomySync();
   const [showCanvas, setShowCanvas] = useState(false);
   const { 
     setBackgroundMusic, 

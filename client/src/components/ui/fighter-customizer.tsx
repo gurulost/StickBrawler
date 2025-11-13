@@ -1,4 +1,4 @@
-import React, { useState, useRef, Suspense } from 'react';
+import React, { useState, useRef, Suspense, useEffect, useMemo } from 'react';
 import { Canvas } from '@react-three/fiber';
 import { OrbitControls, Environment } from '@react-three/drei';
 import { Button } from './button';
@@ -7,12 +7,45 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from './tabs';
 import { Badge } from './badge';
 import { Separator } from './separator';
 import { Input } from './input';
-import { useCustomization, colorThemes, figureStyles, accessories, animationStyles, SavedCharacter } from '../../lib/stores/useCustomization';
+import { useCustomization, colorThemes, figureStyles, accessories, animationStyles, SavedCharacter, type CoinLedgerEntry, type ColorTheme, type FigureStyle, type Accessory, type AnimationStyle } from '../../lib/stores/useCustomization';
+import type { CosmeticSlot } from '../../lib/stores/useCustomization';
 import StickFigure from '../../game/StickFigure';
 import { useFighting } from '../../lib/stores/useFighting';
 import { ParticleEffect, AuraEffect } from './particle-effects';
-import { Palette, User, Zap, Crown, Save, RotateCcw, Eye } from 'lucide-react';
+import { Palette, User, Zap, Crown, Save, RotateCcw, Eye, Coins, Lock, ArrowUpRight, ArrowDownRight, CheckCircle2, AlertCircle, Shuffle, Copy, ArrowLeftRight } from 'lucide-react';
 import * as THREE from 'three';
+
+const formatLedgerTimestamp = (timestamp: string) => {
+  const date = new Date(timestamp);
+  if (Number.isNaN(date.getTime())) return 'Just now';
+  return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+};
+
+const describeLedgerReason = (entry: CoinLedgerEntry) => {
+  const { reason } = entry;
+  if (reason.startsWith('purchase:')) {
+    const [, slot] = reason.split(':');
+    return `Purchased ${slot ?? 'cosmetic'}`;
+  }
+  switch (reason) {
+    case 'hit':
+      return 'Hit confirm bonus';
+    case 'ko':
+      return 'Knockout payout';
+    case 'round_win_ko':
+      return 'Round victory (KO)';
+    case 'round_win_timeout':
+      return 'Round victory (time)';
+    case 'round_loss_ko':
+      return 'Round loss consolation';
+    case 'round_timeout':
+      return 'Timeout bonus';
+    case 'unspecified':
+      return 'Bonus payout';
+    default:
+      return reason.replace(/_/g, ' ');
+  }
+};
 
 // Character preview component
 const CharacterPreview = ({ 
@@ -131,42 +164,77 @@ const ColorSelector = ({
   label, 
   value, 
   onChange, 
+  isUnlocked,
+  getCost,
+  onAttemptPurchase,
   className = "" 
 }: {
   label: string;
   value: string;
   onChange: (color: string) => void;
+  isUnlocked?: (id: string) => boolean;
+  getCost?: (id: string) => number | undefined;
+  onAttemptPurchase?: (id: string) => boolean | void;
   className?: string;
 }) => {
   return (
     <div className={`space-y-3 ${className}`}>
       <label className="text-sm font-medium text-gray-200">{label}</label>
       <div className="grid grid-cols-2 gap-3">
-        {Object.entries(colorThemes).map(([key, theme]) => (
-          <button
-            key={key}
-            onClick={() => onChange(key)}
-            className={`p-3 rounded-lg border-2 transition-all hover:scale-105 ${
-              value === key 
-                ? 'border-white ring-2 ring-blue-400 bg-gray-700' 
-                : 'border-gray-600 hover:border-gray-400 bg-gray-800'
-            }`}
-          >
-            <div className="flex items-center gap-3">
-              <div 
-                className="w-8 h-8 rounded-full border border-gray-500"
-                style={{ 
-                  background: `linear-gradient(135deg, ${theme.primary}, ${theme.secondary})`,
-                  boxShadow: `0 0 8px ${theme.glow}40`
-                }}
-              />
-              <div className="text-left">
-                <div className="text-sm font-medium text-white">{theme?.name || key}</div>
-                <div className="text-xs text-gray-400">{theme?.specialEffect || 'Default'}</div>
+        {Object.entries(colorThemes).map(([key, theme]) => {
+          const unlocked = isUnlocked ? isUnlocked(key) : true;
+          const cost = getCost?.(key);
+          const handleSelect = () => {
+            if (!unlocked) {
+              const unlockedNow = onAttemptPurchase?.(key);
+              if (unlockedNow) {
+                onChange(key);
+              }
+              return;
+            }
+            onChange(key);
+          };
+          return (
+            <button
+              type="button"
+              key={key}
+              onClick={handleSelect}
+              className={`relative p-3 rounded-lg border-2 transition-all hover:scale-105 ${
+                value === key 
+                  ? 'border-white ring-2 ring-blue-400 bg-gray-700' 
+                  : 'border-gray-600 hover:border-gray-400 bg-gray-800'
+              } ${unlocked ? '' : 'opacity-70 hover:scale-100'}`}
+            >
+              <div className="flex items-center gap-3">
+                <div 
+                  className="w-8 h-8 rounded-full border border-gray-500"
+                  style={{ 
+                    background: `linear-gradient(135deg, ${theme.primary}, ${theme.secondary})`,
+                    boxShadow: `0 0 8px ${theme.glow}40`
+                  }}
+                />
+                <div className="text-left">
+                  <div className="text-sm font-medium text-white flex items-center gap-2">
+                    {theme?.name || key}
+                    {!unlocked && (
+                      <Lock className="w-3 h-3 text-amber-300" aria-label="Locked" />
+                    )}
+                  </div>
+                  <div className="text-xs text-gray-400">
+                    {unlocked 
+                      ? (theme?.specialEffect || 'Default') 
+                      : `Locked • ${cost?.toLocaleString() ?? '—'} coins`}
+                  </div>
+                </div>
               </div>
-            </div>
-          </button>
-        ))}
+              {!unlocked && (
+                <div className="absolute top-2 right-2 text-[10px] uppercase tracking-wide text-amber-200 bg-black/70 px-2 py-0.5 rounded-full">
+                  {cost?.toLocaleString() ?? '—'} coins
+                </div>
+              )}
+            </button>
+          );
+        })}
       </div>
     </div>
   );
@@ -178,42 +246,76 @@ const StyleSelector = ({
   value, 
   onChange, 
   options,
+  isUnlocked,
+  getCost,
+  onAttemptPurchase,
   className = "" 
 }: {
   label: string;
   value: string;
   onChange: (style: string) => void;
   options: Record<string, any>;
+  isUnlocked?: (id: string) => boolean;
+  getCost?: (id: string) => number | undefined;
+  onAttemptPurchase?: (id: string) => boolean | void;
   className?: string;
 }) => {
   return (
     <div className={`space-y-3 ${className}`}>
       <label className="text-sm font-medium text-gray-200">{label}</label>
       <div className="grid grid-cols-1 gap-2">
-        {Object.keys(options).map((key) => (
-          <button
-            key={key}
-            onClick={() => onChange(key)}
-            className={`p-3 rounded-lg border text-left transition-all hover:bg-gray-700 ${
-              value === key 
-                ? 'border-blue-400 bg-blue-900/30 text-blue-200' 
-                : 'border-gray-600 bg-gray-800 text-gray-300 hover:border-gray-500'
-            }`}
-          >
-            <div className="font-medium">{key.charAt(0).toUpperCase() + key.slice(1)}</div>
-            <div className="text-xs text-gray-400 mt-1">
-              {key === 'normal' && 'Balanced fighter with standard proportions'}
-              {key === 'bulky' && 'Heavy fighter with increased durability'}
-              {key === 'slim' && 'Fast fighter with quick movements'}
-              {key === 'cartoonish' && 'Fun fighter with exaggerated features'}
-              {key === 'robot' && 'Mechanical fighter with metallic finish'}
-              {key === 'fast' && 'Quick attacks and enhanced mobility'}
-              {key === 'powerful' && 'Slower but devastating strikes'}
-              {key === 'acrobatic' && 'Enhanced jumping and air control'}
-              {key === 'robotic' && 'Precise mechanical movements'}
-            </div>
-          </button>
-        ))}
+        {Object.keys(options).map((key) => {
+          const unlocked = isUnlocked ? isUnlocked(key) : true;
+          const cost = getCost?.(key);
+          const handleClick = () => {
+            if (!unlocked) {
+              const unlockedNow = onAttemptPurchase?.(key);
+              if (unlockedNow) {
+                onChange(key);
+              }
+              return;
+            }
+            onChange(key);
+          };
+          return (
+            <button
+              type="button"
+              key={key}
+              onClick={handleClick}
+              className={`relative p-3 rounded-lg border text-left transition-all hover:bg-gray-700 ${
+                value === key 
+                  ? 'border-blue-400 bg-blue-900/30 text-blue-200' 
+                  : 'border-gray-600 bg-gray-800 text-gray-300 hover:border-gray-500'
+              } ${unlocked ? '' : 'opacity-70 hover:scale-100'}`}
+            >
+              <div className="font-medium flex items-center gap-2">
+                {key.charAt(0).toUpperCase() + key.slice(1)}
+                {!unlocked && <Lock className="w-3 h-3 text-amber-300" />}
+              </div>
+              <div className="text-xs text-gray-400 mt-1">
+                {key === 'normal' && 'Balanced fighter with standard proportions'}
+                {key === 'bulky' && 'Heavy fighter with increased durability'}
+                {key === 'slim' && 'Fast fighter with quick movements'}
+                {key === 'cartoonish' && 'Fun fighter with exaggerated features'}
+                {key === 'robot' && 'Mechanical fighter with metallic finish'}
+                {key === 'fast' && 'Quick attacks and enhanced mobility'}
+                {key === 'powerful' && 'Slower but devastating strikes'}
+                {key === 'acrobatic' && 'Enhanced jumping and air control'}
+                {key === 'robotic' && 'Precise mechanical movements'}
+                {!unlocked && (
+                  <span className="block text-amber-200 mt-1">
+                    Locked • {cost?.toLocaleString() ?? '—'} coins
+                  </span>
+                )}
+              </div>
+              {!unlocked && (
+                <div className="absolute top-2 right-2 text-[10px] uppercase tracking-wide text-amber-200 bg-black/70 px-2 py-0.5 rounded-full">
+                  Unlock
+                </div>
+              )}
+            </button>
+          );
+        })}
       </div>
     </div>
   );
@@ -226,6 +328,9 @@ const AccessorySelector = ({
   color,
   onChange, 
   onColorChange,
+  isUnlocked,
+  getCost,
+  onAttemptPurchase,
   className = "" 
 }: {
   label: string;
@@ -233,63 +338,83 @@ const AccessorySelector = ({
   color: string;
   onChange: (accessory: string) => void;
   onColorChange: (color: string) => void;
+  isUnlocked?: (id: string) => boolean;
+  getCost?: (id: string) => number | undefined;
+  onAttemptPurchase?: (id: string) => boolean | void;
   className?: string;
 }) => {
+  const canCustomizeColor = value !== 'none' && (!isUnlocked || isUnlocked(value));
   return (
     <div className={`space-y-3 ${className}`}>
       <label className="text-sm font-medium text-gray-200">{label}</label>
       <div className="grid grid-cols-2 gap-2 max-h-48 overflow-y-auto">
-        {Object.entries(accessories).map(([key, accessory]) => (
-          <button
-            key={key}
-            onClick={() => onChange(key)}
-            className={`p-3 rounded-lg border text-left transition-all hover:bg-gray-700 ${
-              value === key 
-                ? 'border-blue-400 bg-blue-900/30 text-blue-200' 
-                : 'border-gray-600 bg-gray-800 text-gray-300 hover:border-gray-500'
-            }`}
-          >
-            <div className="flex items-center gap-2">
-              <div className="font-medium text-sm">{accessory?.name || key}</div>
+        {Object.entries(accessories).map(([key, accessory]) => {
+          const unlocked = isUnlocked ? isUnlocked(key) : true;
+          const cost = getCost?.(key);
+          const handleSelect = () => {
+            if (!unlocked) {
+              const unlockedNow = onAttemptPurchase?.(key);
+              if (unlockedNow) {
+                onChange(key);
+              }
+              return;
+            }
+            onChange(key);
+          };
+          return (
+            <button
+              type="button"
+              key={key}
+              onClick={handleSelect}
+              className={`relative p-3 rounded-lg border text-left transition-all hover:bg-gray-700 ${
+                value === key 
+                  ? 'border-blue-400 bg-blue-900/30 text-blue-200' 
+                  : 'border-gray-600 bg-gray-800 text-gray-300 hover:border-gray-500'
+              } ${unlocked ? '' : 'opacity-70 hover:scale-100'}`}
+            >
+              <div className="flex items-center gap-2">
+                <div className="font-medium text-sm flex items-center gap-1">
+                  {accessory?.name || key}
+                  {!unlocked && <Lock className="w-3 h-3 text-amber-300" />}
+                </div>
+                {accessory?.effect && (
+                  <div className="flex gap-1">
+                    {accessory.emissive && (
+                      <div className="w-2 h-2 rounded-full bg-yellow-400 animate-pulse" title="Glowing Effect" />
+                    )}
+                    {accessory.animated && (
+                      <div className="w-2 h-2 rounded-full bg-blue-400 animate-spin" title="Animated Effect" />
+                    )}
+                  </div>
+                )}
+              </div>
               {accessory?.effect && (
-                <div className="flex gap-1">
-                  {accessory.emissive && (
-                    <div className="w-2 h-2 rounded-full bg-yellow-400 animate-pulse" title="Glowing Effect" />
-                  )}
-                  {accessory.animated && (
-                    <div className="w-2 h-2 rounded-full bg-blue-400 animate-spin" title="Animated Effect" />
-                  )}
+                <div className="text-xs text-gray-400 mt-1 capitalize">
+                  {accessory.effect.replace('_', ' ')} effect
                 </div>
               )}
-            </div>
-            {accessory?.effect && (
-              <div className="text-xs text-gray-400 mt-1 capitalize">
-                {accessory.effect.replace('_', ' ')} effect
-              </div>
-            )}
-          </button>
-        ))}
+              {!unlocked && (
+                <div className="text-xs text-amber-200 mt-1">
+                  Locked • {cost?.toLocaleString() ?? '—'} coins
+                </div>
+              )}
+              {!unlocked && (
+                <div className="absolute top-2 right-2 text-[10px] uppercase tracking-wide text-amber-200 bg-black/70 px-2 py-0.5 rounded-full">
+                  Unlock
+                </div>
+              )}
+            </button>
+          );
+        })}
       </div>
       
-      {value !== 'none' && (
+      {canCustomizeColor && (
         <div className="space-y-2">
           <label className="text-xs font-medium text-gray-300">Accessory Color</label>
           <div className="grid grid-cols-4 gap-2">
-            {[
-              { color: '#ffffff', name: 'White' },
-              { color: '#ff4444', name: 'Fire Red' },
-              { color: '#44ff44', name: 'Nature Green' },
-              { color: '#4444ff', name: 'Ocean Blue' },
-              { color: '#ffff44', name: 'Solar Gold' },
-              { color: '#ff44ff', name: 'Magic Purple' },
-              { color: '#444444', name: 'Shadow Black' },
-              { color: '#ff8844', name: 'Ember Orange' },
-              { color: '#44ffff', name: 'Cyber Cyan' },
-              { color: '#ff88ff', name: 'Sakura Pink' },
-              { color: '#88ff88', name: 'Crystal Green' },
-              { color: '#8888ff', name: 'Mystic Blue' }
-            ].map((colorOption) => (
+            {accessoryColorPalette.map((colorOption) => (
               <button
+                type="button"
                 key={colorOption.color}
                 onClick={() => onColorChange(colorOption.color)}
                 className={`w-8 h-8 rounded border-2 transition-all hover:scale-110 ${
@@ -310,93 +435,184 @@ const AccessorySelector = ({
 };
 
 // Enhanced preset characters with new accessories
-const presetCharacters = [
+type PresetRarity = 'common' | 'rare' | 'epic' | 'legendary';
+type PresetFilter = PresetRarity | 'all' | 'owned' | 'locked';
+
+type PresetCharacter = {
+  name: string;
+  description: string;
+  rarity: PresetRarity;
+  baseCost: number;
+  colorTheme: ColorTheme;
+  figureStyle: FigureStyle;
+  accessory: Accessory;
+  accessoryColor: string;
+  animationStyle: AnimationStyle;
+};
+
+const rarityStyles: Record<PresetRarity, { label: string; className: string }> = {
+  common: { label: 'Common', className: 'bg-gray-700 text-gray-200' },
+  rare: { label: 'Rare', className: 'bg-blue-700/60 text-blue-100' },
+  epic: { label: 'Epic', className: 'bg-purple-700/60 text-purple-100' },
+  legendary: { label: 'Legendary', className: 'bg-amber-600/70 text-amber-50' },
+};
+
+const presetCharacters: PresetCharacter[] = [
   {
     name: "Ocean Warrior",
-    colorTheme: 'blue' as const,
-    figureStyle: 'normal' as const,
-    accessory: 'crystal_shield' as const,
-    accessoryColor: '#87ceeb',
-    animationStyle: 'normal'
+    description: "Balanced striker with crystalline shield shimmer.",
+    rarity: "common",
+    baseCost: 0,
+    colorTheme: "blue",
+    figureStyle: "normal",
+    accessory: "crystal_shield",
+    accessoryColor: "#87ceeb",
+    animationStyle: "normal",
   },
   {
     name: "Fire Champion",
-    colorTheme: 'red' as const,
-    figureStyle: 'bulky' as const,
-    accessory: 'flame_sword' as const,
-    accessoryColor: '#ff4444',
-    animationStyle: 'powerful'
+    description: "Heavy bruiser wielding the emberblade.",
+    rarity: "rare",
+    baseCost: 350,
+    colorTheme: "red",
+    figureStyle: "bulky",
+    accessory: "flame_sword",
+    accessoryColor: "#ff4444",
+    animationStyle: "powerful",
   },
   {
     name: "Shadow Ninja",
-    colorTheme: 'black' as const,
-    figureStyle: 'slim' as const,
-    accessory: 'ninja_mask' as const,
-    accessoryColor: '#2c3e50',
-    animationStyle: 'fast'
+    description: "Speed demon cloaked in midnight cloth.",
+    rarity: "rare",
+    baseCost: 420,
+    colorTheme: "black",
+    figureStyle: "slim",
+    accessory: "ninja_mask",
+    accessoryColor: "#2c3e50",
+    animationStyle: "fast",
   },
   {
     name: "Mystic Sorcerer",
-    colorTheme: 'purple' as const,
-    figureStyle: 'cartoonish' as const,
-    accessory: 'wizard_hat' as const,
-    accessoryColor: '#8e44ad',
-    animationStyle: 'acrobatic'
+    description: "Arcane caster with shimmering glyphs.",
+    rarity: "epic",
+    baseCost: 520,
+    colorTheme: "purple",
+    figureStyle: "cartoonish",
+    accessory: "wizard_hat",
+    accessoryColor: "#8e44ad",
+    animationStyle: "acrobatic",
   },
   {
     name: "Cyber Ninja",
-    colorTheme: 'cyber' as const,
-    figureStyle: 'robot' as const,
-    accessory: 'cyber_visor' as const,
-    accessoryColor: '#00ffff',
-    animationStyle: 'robotic'
+    description: "Neon assassin with visor-linked HUD.",
+    rarity: "epic",
+    baseCost: 650,
+    colorTheme: "cyber",
+    figureStyle: "robot",
+    accessory: "cyber_visor",
+    accessoryColor: "#00ffff",
+    animationStyle: "robotic",
   },
   {
     name: "Light Paladin",
-    colorTheme: 'white' as const,
-    figureStyle: 'normal' as const,
-    accessory: 'halo' as const,
-    accessoryColor: '#ffffff',
-    animationStyle: 'normal'
+    description: "Guardian bathed in cathedral glow.",
+    rarity: "rare",
+    baseCost: 300,
+    colorTheme: "white",
+    figureStyle: "normal",
+    accessory: "halo",
+    accessoryColor: "#ffffff",
+    animationStyle: "normal",
   },
   {
     name: "Angel Guardian",
-    colorTheme: 'white' as const,
-    figureStyle: 'ethereal' as const,
-    accessory: 'wings' as const,
-    accessoryColor: '#f0f8ff',
-    animationStyle: 'acrobatic'
+    description: "Graceful aerialist with luminous wings.",
+    rarity: "epic",
+    baseCost: 700,
+    colorTheme: "white",
+    figureStyle: "ethereal",
+    accessory: "wings",
+    accessoryColor: "#f0f8ff",
+    animationStyle: "acrobatic",
   },
   {
     name: "Demon Lord",
-    colorTheme: 'red' as const,
-    figureStyle: 'bulky' as const,
-    accessory: 'demon_horns' as const,
-    accessoryColor: '#8b0000',
-    animationStyle: 'powerful'
+    description: "Infernal powerhouse with molten horns.",
+    rarity: "epic",
+    baseCost: 540,
+    colorTheme: "red",
+    figureStyle: "bulky",
+    accessory: "demon_horns",
+    accessoryColor: "#8b0000",
+    animationStyle: "powerful",
   },
   {
     name: "Royal Champion",
-    colorTheme: 'orange' as const,
-    figureStyle: 'normal' as const,
-    accessory: 'crown' as const,
-    accessoryColor: '#ffd700',
-    animationStyle: 'normal'
+    description: "Tournament-ready monarch of the arena.",
+    rarity: "rare",
+    baseCost: 420,
+    colorTheme: "orange",
+    figureStyle: "normal",
+    accessory: "crown",
+    accessoryColor: "#ffd700",
+    animationStyle: "normal",
   },
   {
     name: "Prism Warrior",
-    colorTheme: 'rainbow' as const,
-    figureStyle: 'crystal' as const,
-    accessory: 'energy_cape' as const,
-    accessoryColor: '#ff6b6b',
-    animationStyle: 'acrobatic'
-  }
+    description: "Crystal avatar that refracts every blow.",
+    rarity: "legendary",
+    baseCost: 900,
+    colorTheme: "rainbow",
+    figureStyle: "crystal",
+    accessory: "energy_cape",
+    accessoryColor: "#ff6b6b",
+    animationStyle: "acrobatic",
+  },
+  {
+    name: "Solar Strider",
+    description: "Radiant striker with solar flares.",
+    rarity: "legendary",
+    baseCost: 950,
+    colorTheme: "orange",
+    figureStyle: "robot",
+    accessory: "energy_cape",
+    accessoryColor: "#ffaa00",
+    animationStyle: "fast",
+  },
+  {
+    name: "Frost Sentinel",
+    description: "Glacial defender wielding aurora steel.",
+    rarity: "epic",
+    baseCost: 680,
+    colorTheme: "blue",
+    figureStyle: "crystal",
+    accessory: "crystal_shield",
+    accessoryColor: "#cce7ff",
+    animationStyle: "powerful",
+  },
+];
+
+const accessoryColorPalette = [
+  { color: '#ffffff', name: 'White' },
+  { color: '#ff4444', name: 'Fire Red' },
+  { color: '#44ff44', name: 'Nature Green' },
+  { color: '#4444ff', name: 'Ocean Blue' },
+  { color: '#ffff44', name: 'Solar Gold' },
+  { color: '#ff44ff', name: 'Magic Purple' },
+  { color: '#444444', name: 'Shadow Black' },
+  { color: '#ff8844', name: 'Ember Orange' },
+  { color: '#44ffff', name: 'Cyber Cyan' },
+  { color: '#ff88ff', name: 'Sakura Pink' },
+  { color: '#88ff88', name: 'Crystal Green' },
+  { color: '#8888ff', name: 'Mystic Blue' },
 ];
 
 export function FighterCustomizer() {
   const [activeTab, setActiveTab] = useState('player');
   const [showSaveDialog, setShowSaveDialog] = useState(false);
   const [characterName, setCharacterName] = useState('');
+  const [economyNotice, setEconomyNotice] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
+  const [presetFilter, setPresetFilter] = useState<PresetFilter>('all');
   
   const {
     playerColorTheme, playerFigureStyle, playerAccessory, playerAccessoryColor, playerAnimationStyle,
@@ -405,8 +621,183 @@ export function FighterCustomizer() {
     setPlayerColorTheme, setPlayerFigureStyle, setPlayerAccessory, setPlayerAnimationStyle,
     setCPUColorTheme, setCPUFigureStyle, setCPUAccessory, setCPUAnimationStyle,
     saveCharacter, loadCharacter, deleteCharacter,
-    resetCustomizations
+    resetCustomizations,
+    coins,
+    purchaseCosmetic,
+    isCosmeticUnlocked,
+    getCostForCosmetic,
+    recentCoinEvents = [],
+    economySyncError,
+    unlockedColorThemes,
+    unlockedFigureStyles,
+    unlockedAccessories,
+    unlockedAnimationStyles,
   } = useCustomization();
+
+  const describeCosmetic = (slot: CosmeticSlot, id: string) => {
+    switch (slot) {
+      case 'colorTheme':
+        return colorThemes[id as keyof typeof colorThemes]?.name ?? id;
+      case 'figureStyle':
+        return figureStyles[id as keyof typeof figureStyles]?.name ?? id;
+      case 'accessory':
+        return accessories[id as keyof typeof accessories]?.name ?? id;
+      case 'animationStyle':
+        return animationStyles[id as keyof typeof animationStyles]?.name ?? id;
+      default:
+        return id;
+    }
+  };
+
+  const attemptPurchase = (slot: CosmeticSlot, id: string) => {
+    const result = purchaseCosmetic(slot, id);
+    if (!result.success) {
+      const message =
+        result.error === 'insufficient_funds'
+          ? 'Not enough coins. Land more hits and finish rounds to earn currency.'
+          : 'Unable to unlock this cosmetic right now.';
+      setEconomyNotice({ type: 'error', message });
+      return false;
+    }
+    const prettyName = describeCosmetic(slot, id);
+    const costText = result.cost ? `${result.cost.toLocaleString()} coin${result.cost === 1 ? '' : 's'}` : 'coins';
+    setEconomyNotice({
+      type: 'success',
+      message: `Unlocked ${prettyName} for ${costText}!`,
+    });
+    return true;
+  };
+
+  const randomChoice = <T,>(items: T[]): T | null => {
+    if (!items.length) return null;
+    return items[Math.floor(Math.random() * items.length)];
+  };
+
+  const getPresetRequirements = (preset: PresetCharacter) => [
+    { slot: 'colorTheme' as const, id: preset.colorTheme },
+    { slot: 'figureStyle' as const, id: preset.figureStyle },
+    { slot: 'accessory' as const, id: preset.accessory },
+    { slot: 'animationStyle' as const, id: preset.animationStyle },
+  ];
+
+  const getPresetUnlockCost = (preset: PresetCharacter) =>
+    getPresetRequirements(preset).reduce((total, req) => {
+      if (isCosmeticUnlocked(req.slot, req.id)) return total;
+      return total + (getCostForCosmetic(req.slot, req.id) ?? 0);
+    }, 0);
+
+  const ensurePresetUnlocked = (preset: PresetCharacter) => {
+    return getPresetRequirements(preset).every((req) => {
+      if (isCosmeticUnlocked(req.slot, req.id)) return true;
+      return attemptPurchase(req.slot, req.id);
+    });
+  };
+
+  const handlePresetEquip = (preset: PresetCharacter, target: 'player' | 'cpu' = (activeTab === 'player' ? 'player' : 'cpu')) => {
+    if (!ensurePresetUnlocked(preset)) {
+      return;
+    }
+    loadPreset(preset, target);
+    setEconomyNotice({
+      type: 'success',
+      message: `${preset.name} equipped on ${target === 'player' ? 'Player' : 'CPU'}!`,
+    });
+  };
+
+  const randomizeFighter = (target: 'player' | 'cpu') => {
+    const themePool = unlockedColorThemes.length
+      ? (unlockedColorThemes as ColorTheme[])
+      : (Object.keys(colorThemes) as ColorTheme[]);
+    const stylePool = unlockedFigureStyles.length
+      ? (unlockedFigureStyles as FigureStyle[])
+      : (Object.keys(figureStyles) as FigureStyle[]);
+    const accessoryPool = unlockedAccessories.length
+      ? (unlockedAccessories as Accessory[])
+      : (Object.keys(accessories) as Accessory[]);
+    const animationPool = unlockedAnimationStyles.length
+      ? (unlockedAnimationStyles as AnimationStyle[])
+      : (Object.keys(animationStyles) as AnimationStyle[]);
+
+    const theme = randomChoice(themePool) ?? 'blue';
+    const style = randomChoice(stylePool) ?? 'normal';
+    const accessory = randomChoice(accessoryPool) ?? 'none';
+    const animation = randomChoice(animationPool) ?? 'normal';
+    const accessoryColor = randomChoice(accessoryColorPalette)?.color ?? '#ffffff';
+
+    if (target === 'player') {
+      setPlayerColorTheme(theme);
+      setPlayerFigureStyle(style);
+      setPlayerAccessory(accessory, accessoryColor);
+      setPlayerAnimationStyle(animation);
+    } else {
+      setCPUColorTheme(theme);
+      setCPUFigureStyle(style);
+      setCPUAccessory(accessory, accessoryColor);
+      setCPUAnimationStyle(animation);
+    }
+  };
+
+  const copyPlayerToCpu = () => {
+    setCPUColorTheme(playerColorTheme);
+    setCPUFigureStyle(playerFigureStyle);
+    setCPUAccessory(playerAccessory, playerAccessoryColor);
+    setCPUAnimationStyle(playerAnimationStyle);
+    setEconomyNotice({
+      type: 'success',
+      message: 'Copied player style to CPU.',
+    });
+  };
+
+  const copyCpuToPlayer = () => {
+    setPlayerColorTheme(cpuColorTheme);
+    setPlayerFigureStyle(cpuFigureStyle);
+    setPlayerAccessory(cpuAccessory, cpuAccessoryColor);
+    setPlayerAnimationStyle(cpuAnimationStyle);
+    setEconomyNotice({
+      type: 'success',
+      message: 'Copied CPU style to player.',
+    });
+  };
+
+  const handleRandomizeActive = () => {
+    randomizeFighter(activeTab === 'player' ? 'player' : 'cpu');
+  };
+
+  const filteredPresets = useMemo(() => {
+    return presetCharacters.filter((preset) => {
+      const missingCost = getPresetUnlockCost(preset);
+      const owned = missingCost === 0;
+      switch (presetFilter) {
+        case 'owned':
+          return owned;
+        case 'locked':
+          return !owned;
+        case 'common':
+        case 'rare':
+        case 'epic':
+        case 'legendary':
+          return preset.rarity === presetFilter;
+        default:
+          return true;
+      }
+    });
+  }, [presetFilter, unlockedAccessories, unlockedAnimationStyles, unlockedColorThemes, unlockedFigureStyles, coins]);
+
+  const presetFilterOptions: Array<{ id: PresetFilter; label: string }> = [
+    { id: 'all', label: 'All' },
+    { id: 'owned', label: 'Owned' },
+    { id: 'locked', label: 'Locked' },
+    { id: 'common', label: 'Common' },
+    { id: 'rare', label: 'Rare' },
+    { id: 'epic', label: 'Epic' },
+    { id: 'legendary', label: 'Legendary' },
+  ];
+
+  useEffect(() => {
+    if (!economyNotice) return;
+    const timeout = setTimeout(() => setEconomyNotice(null), 3500);
+    return () => clearTimeout(timeout);
+  }, [economyNotice]);
 
   const { startGame } = useFighting();
 
@@ -424,9 +815,9 @@ export function FighterCustomizer() {
   };
 
   // Load a preset character with error handling
-  const loadPreset = (preset: typeof presetCharacters[0]) => {
+  const loadPreset = (preset: PresetCharacter, targetTab: 'player' | 'cpu' = activeTab as 'player' | 'cpu') => {
     try {
-      if (activeTab === 'player') {
+      if (targetTab === 'player') {
         setPlayerColorTheme(preset.colorTheme);
         setPlayerFigureStyle(preset.figureStyle);
         setPlayerAccessory(preset.accessory, preset.accessoryColor);
@@ -461,6 +852,104 @@ export function FighterCustomizer() {
           </h1>
           <p className="text-gray-300">Design your ultimate fighter and dominate the arena</p>
         </div>
+
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+          <Card className="bg-gray-900/60 border-gray-700">
+            <CardContent className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+              <div className="flex items-center gap-3 text-amber-300">
+                <Coins className="w-8 h-8" />
+                <div>
+                  <p className="text-xs uppercase tracking-wide text-gray-400">Coin Balance</p>
+                  <p className="text-3xl font-bold text-amber-100">{coins.toLocaleString()}</p>
+                </div>
+              </div>
+              <div className="text-sm text-gray-400 max-w-2xl">
+                Earn coins automatically during fights by landing hits, extending combos, and closing out rounds. Spend them here to unlock premium color themes, figure styles, accessories, and animation sets.
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="bg-gray-900/60 border-gray-700">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-white">
+                <Palette className="w-5 h-5 text-amber-300" />
+                Recent Coin Activity
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              {recentCoinEvents.length === 0 ? (
+                <p className="text-sm text-gray-400">
+                  Play a match to start building a ledger of hits, knockouts, and cosmetic purchases.
+                </p>
+              ) : (
+                <ul className="space-y-3">
+                  {recentCoinEvents.map((entry, index) => {
+                    const isCredit = entry.direction === 'credit';
+                    return (
+                      <li
+                        key={`${entry.timestamp}-${entry.reason}-${index}`}
+                        className="flex items-start gap-3"
+                      >
+                        <div
+                          className={`p-2 rounded-full ${
+                            isCredit ? 'bg-green-500/20 text-green-300' : 'bg-rose-500/20 text-rose-300'
+                          }`}
+                        >
+                          {isCredit ? (
+                            <ArrowUpRight className="w-4 h-4" />
+                          ) : (
+                            <ArrowDownRight className="w-4 h-4" />
+                          )}
+                        </div>
+                        <div className="flex-1 text-sm text-gray-200">
+                          <div className="flex items-center justify-between gap-3">
+                            <span>{describeLedgerReason(entry)}</span>
+                            <span className={isCredit ? 'text-green-300' : 'text-rose-300'}>
+                              {isCredit ? '+' : '-'}
+                              {entry.amount.toLocaleString()}
+                            </span>
+                          </div>
+                          <div className="text-xs text-gray-500">
+                            {formatLedgerTimestamp(entry.timestamp)}
+                          </div>
+                        </div>
+                      </li>
+                    );
+                  })}
+                </ul>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+
+        {economySyncError && (
+          <div className="mb-6 rounded-lg border border-amber-500/40 bg-amber-500/10 px-4 py-3 text-sm text-amber-200">
+            {economySyncError}
+          </div>
+        )}
+
+        {economyNotice && (
+          <div
+            className="fixed bottom-6 right-6 z-50 pointer-events-auto"
+            role="status"
+            aria-live="polite"
+          >
+            <div
+              className={`flex items-center gap-3 rounded-2xl px-4 py-3 shadow-2xl border ${
+                economyNotice.type === 'success'
+                  ? 'bg-green-900/80 border-green-500 text-green-100'
+                  : 'bg-rose-900/80 border-rose-500 text-rose-100'
+              }`}
+            >
+              {economyNotice.type === 'success' ? (
+                <CheckCircle2 className="w-5 h-5" />
+              ) : (
+                <AlertCircle className="w-5 h-5" />
+              )}
+              <span className="text-sm font-medium">{economyNotice.message}</span>
+            </div>
+          </div>
+        )}
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Character Preview Section */}
@@ -505,6 +994,36 @@ export function FighterCustomizer() {
                 </Tabs>
 
                 <Separator className="bg-gray-600" />
+
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 pointer-events-auto">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={handleRandomizeActive}
+                    className="border-gray-600 text-gray-200 hover:bg-gray-700"
+                  >
+                    <Shuffle className="w-4 h-4 mr-2" />
+                    Randomize {activeTab === 'player' ? 'Player' : 'CPU'}
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={copyPlayerToCpu}
+                    className="border-gray-600 text-gray-200 hover:bg-gray-700"
+                  >
+                    <ArrowLeftRight className="w-4 h-4 mr-2" />
+                    Player → CPU
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={copyCpuToPlayer}
+                    className="border-gray-600 text-gray-200 hover:bg-gray-700"
+                  >
+                    <ArrowLeftRight className="w-4 h-4 mr-2 rotate-180" />
+                    CPU → Player
+                  </Button>
+                </div>
 
                 <div className="space-y-3">
                   <Button 
@@ -601,6 +1120,9 @@ export function FighterCustomizer() {
                         console.error('Error setting color theme:', error);
                       }
                     }}
+                    isUnlocked={(colorId) => isCosmeticUnlocked('colorTheme', colorId)}
+                    getCost={(colorId) => getCostForCosmetic('colorTheme', colorId)}
+                    onAttemptPurchase={(colorId) => attemptPurchase('colorTheme', colorId)}
                   />
 
                   {/* Figure Style */}
@@ -619,6 +1141,9 @@ export function FighterCustomizer() {
                       }
                     }}
                     options={figureStyles}
+                    isUnlocked={(styleId) => isCosmeticUnlocked('figureStyle', styleId)}
+                    getCost={(styleId) => getCostForCosmetic('figureStyle', styleId)}
+                    onAttemptPurchase={(styleId) => attemptPurchase('figureStyle', styleId)}
                   />
 
                   {/* Accessories */}
@@ -648,6 +1173,9 @@ export function FighterCustomizer() {
                         console.error('Error setting accessory color:', error);
                       }
                     }}
+                    isUnlocked={(accessoryId) => isCosmeticUnlocked('accessory', accessoryId)}
+                    getCost={(accessoryId) => getCostForCosmetic('accessory', accessoryId)}
+                    onAttemptPurchase={(accessoryId) => attemptPurchase('accessory', accessoryId)}
                   />
 
                   {/* Animation Style */}
@@ -666,6 +1194,9 @@ export function FighterCustomizer() {
                       }
                     }}
                     options={animationStyles}
+                    isUnlocked={(styleId) => isCosmeticUnlocked('animationStyle', styleId)}
+                    getCost={(styleId) => getCostForCosmetic('animationStyle', styleId)}
+                    onAttemptPurchase={(styleId) => attemptPurchase('animationStyle', styleId)}
                   />
                 </div>
 
@@ -721,27 +1252,86 @@ export function FighterCustomizer() {
                 <div className="space-y-4">
                   <h3 className="text-lg font-semibold text-white flex items-center gap-2">
                     <Crown className="w-5 h-5" />
-                    Preset Characters
+                    Curated Presets
                   </h3>
-                  <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-                    {presetCharacters.map((preset, index) => (
+                  <div className="flex flex-wrap gap-2">
+                    {presetFilterOptions.map((option) => (
                       <button
-                        key={index}
-                        onClick={() => loadPreset(preset)}
-                        className="p-4 rounded-lg border border-gray-600 bg-gray-800 hover:bg-gray-700 hover:border-gray-500 transition-all text-left"
+                        key={option.id}
+                        type="button"
+                        onClick={() => setPresetFilter(option.id)}
+                        className={`px-3 py-1 rounded-full border text-xs font-semibold uppercase ${
+                          presetFilter === option.id
+                            ? 'border-amber-400 text-amber-200 bg-amber-500/10'
+                            : 'border-gray-600 text-gray-300 hover:border-gray-400'
+                        }`}
                       >
-                        <div className="font-medium text-white text-sm">{preset.name}</div>
-                        <div className="text-xs text-gray-400 mt-1">
-                          {preset.figureStyle} • {preset.colorTheme}
-                        </div>
-                        <div 
-                          className="w-full h-2 rounded mt-2"
-                          style={{ 
-                            background: `linear-gradient(90deg, ${colorThemes[preset.colorTheme].primary}, ${colorThemes[preset.colorTheme].secondary})` 
-                          }}
-                        />
+                        {option.label}
                       </button>
                     ))}
+                  </div>
+                  <div className="text-xs text-gray-400">
+                    {filteredPresets.length} preset{filteredPresets.length === 1 ? '' : 's'} match your filter.
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {filteredPresets.map((preset) => {
+                      const rarityMeta = rarityStyles[preset.rarity];
+                      const missingCost = getPresetUnlockCost(preset);
+                      const owned = missingCost === 0;
+                      const canAfford = owned || coins >= missingCost;
+                      return (
+                        <div
+                          key={preset.name}
+                          className="p-4 rounded-xl border border-gray-700 bg-gray-900/40 hover:border-gray-500 transition-all flex flex-col gap-3"
+                        >
+                          <div className="flex items-center justify-between">
+                            <div>
+                              <div className="text-sm font-semibold text-white">{preset.name}</div>
+                              <div className="text-xs text-gray-400">
+                                {figureStyles[preset.figureStyle].name} • {colorThemes[preset.colorTheme].name}
+                              </div>
+                            </div>
+                            <span className={`text-[10px] px-2 py-1 rounded-full font-semibold uppercase ${rarityMeta.className}`}>
+                              {rarityMeta.label}
+                            </span>
+                          </div>
+                          <p className="text-xs text-gray-400 min-h-[40px]">{preset.description}</p>
+                          <div 
+                            className="w-full h-2 rounded"
+                            style={{ 
+                              background: `linear-gradient(90deg, ${colorThemes[preset.colorTheme].primary}, ${colorThemes[preset.colorTheme].secondary})` 
+                            }}
+                          />
+                          <div className="flex items-center justify-between text-xs">
+                            <span className="text-gray-400">
+                              {owned ? 'All cosmetics unlocked' : `Needs ${missingCost.toLocaleString()} coins`}
+                            </span>
+                            <span className="text-amber-200">
+                              Base value: {preset.baseCost.toLocaleString()}c
+                            </span>
+                          </div>
+                          <div className="grid grid-cols-2 gap-2">
+                            <Button
+                              type="button"
+                              onClick={() => handlePresetEquip(preset, 'player')}
+                              disabled={!canAfford}
+                              className={`w-full ${owned ? 'bg-blue-600 hover:bg-blue-700' : 'bg-amber-600 hover:bg-amber-700'} disabled:opacity-50 disabled:cursor-not-allowed`}
+                            >
+                              {owned ? 'Equip Player' : canAfford ? 'Unlock+Equip' : 'Need coins'}
+                            </Button>
+                            <Button
+                              type="button"
+                              variant="outline"
+                              onClick={() => handlePresetEquip(preset, 'cpu')}
+                              disabled={!canAfford}
+                              className="border-gray-600 text-gray-200 hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                            >
+                              {owned ? 'Equip CPU' : 'Locked'}
+                            </Button>
+                          </div>
+                        </div>
+                      );
+                    })}
                   </div>
                 </div>
               </CardContent>

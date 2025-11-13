@@ -1,6 +1,9 @@
 import { create } from 'zustand';
 import { COMBO_WINDOW, COMBO_MULTIPLIER } from '../../game/Physics';
 import { useControls } from './useControls';
+import { clamp } from '../clamp';
+import { useCustomization } from './useCustomization';
+import type { CoinAwardPayload } from './useCustomization';
 
 export type GamePhase = 'menu' | 'fighting' | 'round_end' | 'match_end';
 export type Character = 'stick_hero' | 'stick_villain';
@@ -17,6 +20,9 @@ export interface CharacterState {
   isTaunting: boolean;    // Taunt animation
   isAirAttacking: boolean; // Aerial attack
   airJumpsLeft: number;   // Double/triple jump capability (Smash Bros style)
+  guardMeter: number;
+  staminaMeter: number;
+  specialMeter: number;
   
   // Cooldowns
   attackCooldown: number;
@@ -38,6 +44,8 @@ interface FightingState {
   cpu: CharacterState;
   playerScore: number;
   cpuScore: number;
+  playerStatus?: "guard_break";
+  cpuStatus?: "guard_break";
   roundTime: number;
   maxRoundTime: number;
   currentGameScore: number; // Total score for current game session
@@ -67,6 +75,8 @@ interface FightingState {
   usePlayerAirJump: () => boolean;                       // Use an air jump, returns success
   damagePlayer: (amount: number) => void;
   updatePlayerCooldowns: (delta: number) => void;
+  updatePlayerMeters: (meters: Partial<{ guard: number; stamina: number; special: number }>) => void;
+  updatePlayerGuardBreak: () => void;
   
   // CPU actions
   moveCPU: (x: number, y: number, z: number) => void;
@@ -77,21 +87,112 @@ interface FightingState {
   setCPUBlocking: (isBlocking: boolean) => void;
   setCPUDodging: (isDodging: boolean) => void;           // New dodge action
   setCPUGrabbing: (isGrabbing: boolean) => void;         // New grab action
-  setCPUTaunting: (isTaunting: boolean) => void;         // New taunt action
   setCPUAirAttacking: (isAirAttacking: boolean) => void; // New air attack
   resetCPUAirJumps: () => void;                          // Reset air jumps when landing
   useCPUAirJump: () => boolean;                          // Use an air jump, returns success
   damageCPU: (amount: number) => void;
   updateCPUCooldowns: (delta: number) => void;
+  updateCPUMeters: (meters: Partial<{ guard: number; stamina: number; special: number }>) => void;
+  updateCPUGuardBreak: () => void;
   
   // Game time
   updateRoundTime: (delta: number) => void;
 }
 
 const DEFAULT_HEALTH = 100;
+const DEFAULT_GUARD = 80;
+const DEFAULT_STAMINA = 100;
+const DEFAULT_SPECIAL = 0;
+const MAX_SPECIAL = 100;
+const GUARD_BREAK_THRESHOLD = 5;
 const DEFAULT_POSITION_PLAYER: [number, number, number] = [-2, 0, 0];
 const DEFAULT_POSITION_CPU: [number, number, number] = [2, 0, 0];
 const DEFAULT_ROUND_TIME = 60; // 60 seconds per round
+
+const roundToHundredth = (value: number) => Math.round(value * 100) / 100;
+
+const getCoinStore = () => useCustomization.getState();
+
+const awardCoinsSafe = (payload: CoinAwardPayload) => {
+  const store = getCoinStore();
+  if (!store?.earnCoins) return;
+  try {
+    store.earnCoins(payload);
+  } catch (error) {
+    console.warn('[economy] Failed to award coins', error);
+  }
+};
+
+type RoundContext = 'ko' | 'timeout';
+
+const awardRoundResolutionCoins = (
+  winner: 'player' | 'cpu' | 'timeout',
+  context: RoundContext,
+  snapshot: { playerHealth: number; cpuHealth: number },
+) => {
+  let amount = 0;
+  if (winner === 'player') {
+    amount = 40;
+  } else if (winner === 'cpu') {
+    amount = 15;
+  } else {
+    amount = 25;
+  }
+  if (winner === 'player') {
+    const damageTaken = DEFAULT_HEALTH - snapshot.playerHealth;
+    if (damageTaken < 10) {
+      amount += 25;
+    }
+  }
+  if (amount <= 0) return;
+  awardCoinsSafe({
+    amount,
+    reason:
+      winner === 'player'
+        ? `round_win_${context}`
+        : winner === 'cpu'
+          ? `round_loss_${context}`
+          : 'round_timeout',
+    metadata: {
+      context,
+      winner,
+      playerHealth: roundToHundredth(snapshot.playerHealth),
+      cpuHealth: roundToHundredth(snapshot.cpuHealth),
+    },
+  });
+};
+
+type DamageCoinContext = {
+  damage: number;
+  comboDepth: number;
+  finisher: boolean;
+  playerHealth: number;
+};
+
+const awardDamageCoins = ({
+  damage,
+  comboDepth,
+  finisher,
+  playerHealth,
+}: DamageCoinContext) => {
+  if (damage <= 0) return;
+  const base = Math.max(1, Math.floor(damage * 1.1));
+  const comboBonus = comboDepth >= 2 ? (comboDepth - 1) * 2 : 0;
+  const finisherBonus = finisher ? 35 + Math.round(playerHealth * 0.4) : 0;
+  const total = base + comboBonus + finisherBonus;
+  if (total <= 0) return;
+  awardCoinsSafe({
+    amount: total,
+    reason: finisher ? 'ko' : 'hit',
+    metadata: {
+      damage: roundToHundredth(damage),
+      comboDepth,
+      finisher,
+      playerHealth: roundToHundredth(playerHealth),
+      total,
+    },
+  });
+};
 
 const createDefaultCharacterState = (position: [number, number, number], direction: 1 | -1): CharacterState => ({
   health: DEFAULT_HEALTH,
@@ -105,6 +206,9 @@ const createDefaultCharacterState = (position: [number, number, number], directi
   isTaunting: false,
   isAirAttacking: false,
   airJumpsLeft: 2, // Allow 2 additional jumps (triple jump total - Smash Bros style)
+  guardMeter: DEFAULT_GUARD,
+  staminaMeter: DEFAULT_STAMINA,
+  specialMeter: DEFAULT_SPECIAL,
   
   // Cooldowns
   attackCooldown: 0,
@@ -126,6 +230,8 @@ export const useFighting = create<FightingState>((set, get) => ({
   cpu: createDefaultCharacterState(DEFAULT_POSITION_CPU, -1),
   playerScore: 0,
   cpuScore: 0,
+  playerStatus: undefined,
+  cpuStatus: undefined,
   roundTime: DEFAULT_ROUND_TIME,
   maxRoundTime: DEFAULT_ROUND_TIME,
   currentGameScore: 0,
@@ -281,6 +387,10 @@ export const useFighting = create<FightingState>((set, get) => ({
     
     // If health is 0, end the round
     if (newHealth === 0 && state.gamePhase === 'fighting') {
+      awardRoundResolutionCoins('cpu', 'ko', {
+        playerHealth: newHealth,
+        cpuHealth: state.cpu.health,
+      });
       return {
         player: updatedPlayer,
         cpu: updatedCPU,
@@ -376,6 +486,21 @@ export const useFighting = create<FightingState>((set, get) => ({
     
     // Apply the damage
     const newHealth = Math.max(0, state.cpu.health - actualDamage);
+    const comboDepthBeforeHit =
+      state.player.comboTimer > 0 ? Math.max(1, state.player.comboCount) : 0;
+    const deliveredKO = newHealth === 0 && state.gamePhase === 'fighting';
+    awardDamageCoins({
+      damage: actualDamage,
+      comboDepth: comboDepthBeforeHit,
+      finisher: deliveredKO,
+      playerHealth: state.player.health,
+    });
+    if (deliveredKO) {
+      awardRoundResolutionCoins('player', 'ko', {
+        playerHealth: state.player.health,
+        cpuHealth: newHealth,
+      });
+    }
     
     // Update player's combo counter
     let updatedPlayer = {...state.player};
@@ -547,27 +672,18 @@ export const useFighting = create<FightingState>((set, get) => ({
   }),
 
   setCPUGrabbing: (isGrabbing) => set((state) => {
-    // Start grab cooldown when beginning to grab
     let newCooldown = state.cpu.grabCooldown;
     if (isGrabbing && !state.cpu.isGrabbing) {
-      newCooldown = 30; // Grab has longer cooldown
+      newCooldown = 30;
     }
-    
     return {
       cpu: {
         ...state.cpu,
         isGrabbing,
-        grabCooldown: newCooldown
-      }
+        grabCooldown: newCooldown,
+      },
     };
   }),
-
-  setCPUTaunting: (isTaunting) => set((state) => ({
-    cpu: {
-      ...state.cpu,
-      isTaunting
-    }
-  })),
 
   setCPUAirAttacking: (isAirAttacking) => set((state) => {
     if (isAirAttacking && !state.cpu.isJumping) {
@@ -668,6 +784,32 @@ export const useFighting = create<FightingState>((set, get) => ({
     };
   }),
   
+  updatePlayerMeters: (meters) => set((state) => {
+    const nextGuard = meters.guard !== undefined ? clamp(meters.guard, 0, DEFAULT_GUARD) : state.player.guardMeter;
+    const guardBroken = nextGuard <= GUARD_BREAK_THRESHOLD;
+    return {
+      player: {
+        ...state.player,
+        guardMeter: nextGuard,
+        staminaMeter: meters.stamina !== undefined ? clamp(meters.stamina, 0, DEFAULT_STAMINA) : state.player.staminaMeter,
+        specialMeter: meters.special !== undefined ? clamp(meters.special, 0, MAX_SPECIAL) : state.player.specialMeter,
+        isBlocking: guardBroken ? false : state.player.isBlocking,
+        isDodging: guardBroken ? false : state.player.isDodging,
+      },
+      playerStatus: guardBroken ? "guard_break" : state.playerStatus,
+    };
+  }),
+  
+  updatePlayerGuardBreak: () => set((state) => ({
+    player: {
+      ...state.player,
+      guardMeter: 0,
+      isBlocking: false,
+      isDodging: false,
+    },
+    playerStatus: "guard_break",
+  })),
+  
   // Update CPU cooldowns
   updateCPUCooldowns: (delta) => set((state) => {
     // Convert delta from seconds to milliseconds
@@ -718,6 +860,32 @@ export const useFighting = create<FightingState>((set, get) => ({
     };
   }),
   
+  updateCPUMeters: (meters) => set((state) => {
+    const nextGuard = meters.guard !== undefined ? clamp(meters.guard, 0, DEFAULT_GUARD) : state.cpu.guardMeter;
+    const guardBroken = nextGuard <= GUARD_BREAK_THRESHOLD;
+    return {
+      cpu: {
+        ...state.cpu,
+        guardMeter: nextGuard,
+        staminaMeter: meters.stamina !== undefined ? clamp(meters.stamina, 0, DEFAULT_STAMINA) : state.cpu.staminaMeter,
+        specialMeter: meters.special !== undefined ? clamp(meters.special, 0, MAX_SPECIAL) : state.cpu.specialMeter,
+        isBlocking: guardBroken ? false : state.cpu.isBlocking,
+        isDodging: guardBroken ? false : state.cpu.isDodging,
+      },
+      cpuStatus: guardBroken ? "guard_break" : state.cpuStatus,
+    };
+  }),
+  
+  updateCPUGuardBreak: () => set((state) => ({
+    cpu: {
+      ...state.cpu,
+      guardMeter: 0,
+      isBlocking: false,
+      isDodging: false,
+    },
+    cpuStatus: "guard_break",
+  })),
+  
   // Game time
   updateRoundTime: (delta) => set((state) => {
     const newTime = Math.max(0, state.roundTime - delta);
@@ -731,6 +899,10 @@ export const useFighting = create<FightingState>((set, get) => ({
       } else if (state.cpu.health > state.player.health) {
         winner = 'cpu';
       }
+      awardRoundResolutionCoins(winner, 'timeout', {
+        playerHealth: state.player.health,
+        cpuHealth: state.cpu.health,
+      });
       
       return {
         roundTime: newTime,

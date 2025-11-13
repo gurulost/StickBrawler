@@ -397,11 +397,207 @@ export const animationStyles = {
   }
 };
 
-// Type definitions for our customization options
+// Type definitions & economy data
 export type ColorTheme = keyof typeof colorThemes;
 export type FigureStyle = keyof typeof figureStyles;
 export type Accessory = keyof typeof accessories;
 export type AnimationStyle = keyof typeof animationStyles;
+
+export const colorThemeCosts: Record<ColorTheme, number> = {
+  blue: 0,
+  red: 0,
+  green: 150,
+  purple: 150,
+  orange: 250,
+  pink: 250,
+  black: 400,
+  white: 400,
+  rainbow: 650,
+  cyber: 650,
+};
+
+export const figureStyleCosts: Record<FigureStyle, number> = {
+  normal: 0,
+  bulky: 350,
+  slim: 350,
+  cartoonish: 450,
+  robot: 500,
+  ethereal: 550,
+  crystal: 600,
+};
+
+export const accessoryCosts: Record<Accessory, number> = {
+  none: 0,
+  wizard_hat: 200,
+  cyber_visor: 220,
+  energy_cape: 320,
+  flame_sword: 420,
+  crystal_shield: 360,
+  ninja_mask: 240,
+  halo: 480,
+  demon_horns: 330,
+  wings: 650,
+  crown: 520,
+};
+
+export const animationStyleCosts: Record<AnimationStyle, number> = {
+  normal: 0,
+  fast: 400,
+  powerful: 320,
+  acrobatic: 420,
+  robotic: 300,
+};
+
+const DEFAULT_UNLOCKED_COLOR_THEMES: ColorTheme[] = ["blue", "red", "green"];
+const DEFAULT_UNLOCKED_FIGURE_STYLES: FigureStyle[] = ["normal"];
+const DEFAULT_UNLOCKED_ACCESSORIES: Accessory[] = ["none", "wizard_hat"];
+const DEFAULT_UNLOCKED_ANIMATION_STYLES: AnimationStyle[] = ["normal"];
+const DEFAULT_COINS = 0;
+const MAX_COINS = 999999;
+
+export type CosmeticSlot =
+  | "colorTheme"
+  | "figureStyle"
+  | "accessory"
+  | "animationStyle";
+
+type UnlockState = {
+  colorThemes: ColorTheme[];
+  figureStyles: FigureStyle[];
+  accessories: Accessory[];
+  animationStyles: AnimationStyle[];
+};
+
+const DEFAULT_UNLOCK_STATE: UnlockState = {
+  colorThemes: DEFAULT_UNLOCKED_COLOR_THEMES,
+  figureStyles: DEFAULT_UNLOCKED_FIGURE_STYLES,
+  accessories: DEFAULT_UNLOCKED_ACCESSORIES,
+  animationStyles: DEFAULT_UNLOCKED_ANIMATION_STYLES,
+};
+
+const createInitialUnlockState = (): UnlockState => ({
+  colorThemes: [...DEFAULT_UNLOCK_STATE.colorThemes],
+  figureStyles: [...DEFAULT_UNLOCK_STATE.figureStyles],
+  accessories: [...DEFAULT_UNLOCK_STATE.accessories],
+  animationStyles: [...DEFAULT_UNLOCK_STATE.animationStyles],
+});
+
+const clampCoinValue = (value: number) =>
+  Math.min(MAX_COINS, Math.max(0, Math.floor(value)));
+
+const appendIfMissing = <T extends string>(collection: T[], value: T): T[] =>
+  collection.includes(value) ? collection : [...collection, value];
+
+const normalizeCosmeticId = (
+  slot: CosmeticSlot,
+  id: string,
+): ColorTheme | FigureStyle | Accessory | AnimationStyle | undefined => {
+  switch (slot) {
+    case "colorTheme":
+      return hasOwn(colorThemes, id) ? (id as ColorTheme) : undefined;
+    case "figureStyle":
+      return hasOwn(figureStyles, id) ? (id as FigureStyle) : undefined;
+    case "accessory":
+      return hasOwn(accessories, id) ? (id as Accessory) : undefined;
+    case "animationStyle":
+      return hasOwn(animationStyles, id) ? (id as AnimationStyle) : undefined;
+    default:
+      return undefined;
+  }
+};
+
+const MAX_LEDGER_ENTRIES = 12;
+
+const pushLedgerEntry = (entries: CoinLedgerEntry[], entry: CoinLedgerEntry) => {
+  const next = [entry, ...entries];
+  if (next.length <= MAX_LEDGER_ENTRIES) return next;
+  return next.slice(0, MAX_LEDGER_ENTRIES);
+};
+
+const COST_TABLES = {
+  colorTheme: colorThemeCosts,
+  figureStyle: figureStyleCosts,
+  accessory: accessoryCosts,
+  animationStyle: animationStyleCosts,
+} as const;
+
+type CostTableMap = typeof COST_TABLES;
+
+const hasOwn = <T extends Record<string, unknown>>(
+  obj: T,
+  key: string,
+): key is keyof T => Object.prototype.hasOwnProperty.call(obj, key);
+
+const createEconomyProfileId = () =>
+  `eco_${Math.random().toString(36).slice(2, 10)}${Date.now().toString(36)}`;
+
+const mergeUnlockLists = <T extends string>(
+  slot: CosmeticSlot,
+  current: T[],
+  incoming: readonly string[],
+): T[] => {
+  const merged = new Set<string>(current);
+  incoming.forEach((id) => {
+    const normalized = normalizeCosmeticId(slot, id);
+    if (normalized) {
+      merged.add(normalized);
+    }
+  });
+  return Array.from(merged) as T[];
+};
+
+export interface CoinLedgerEntry {
+  direction: "credit" | "debit";
+  amount: number;
+  reason: string;
+  timestamp: string;
+  metadata?: Record<string, unknown>;
+}
+
+export interface CoinAwardPayload {
+  amount: number;
+  reason?: string;
+  metadata?: Record<string, unknown>;
+}
+
+export interface CoinAwardResult {
+  amount: number;
+  balance: number;
+  wasCapped: boolean;
+}
+
+export interface CoinDebitResult {
+  success: boolean;
+  cost?: number;
+  balance: number;
+  error?: "insufficient_funds" | "invalid_amount";
+}
+
+export interface PurchaseResult {
+  success: boolean;
+  balance: number;
+  cost?: number;
+  error?:
+    | "insufficient_funds"
+    | "already_unlocked"
+    | "unknown_cosmetic"
+    | "invalid_amount";
+}
+
+export interface EconomyUnlockSnapshot {
+  colorThemes: ColorTheme[];
+  figureStyles: FigureStyle[];
+  accessories: Accessory[];
+  animationStyles: AnimationStyle[];
+}
+
+export interface EconomySyncPayload {
+  profileId: string;
+  coins: number;
+  lifetimeCoins: number;
+  unlocks: EconomyUnlockSnapshot;
+  lastCoinEvent?: CoinLedgerEntry;
+}
 
 // Interface for all customization options
 export interface CustomizationOptions {
@@ -433,6 +629,20 @@ export interface SavedCharacter {
 
 // Zustand store interface with customization options and actions
 interface CustomizationState extends CustomizationOptions {
+  economyProfileId: string;
+  coins: number;
+  lifetimeCoinsEarned: number;
+  lastCoinEvent?: CoinLedgerEntry;
+  recentCoinEvents: CoinLedgerEntry[];
+  unlockedColorThemes: ColorTheme[];
+  unlockedFigureStyles: FigureStyle[];
+  unlockedAccessories: Accessory[];
+  unlockedAnimationStyles: AnimationStyle[];
+  lastEconomySyncAt?: string;
+  economySyncError?: string;
+  favoritePresetIds: string[];
+  collectionsTourSeen: boolean;
+  
   // Saved characters
   savedCharacters: SavedCharacter[];
   
@@ -451,6 +661,7 @@ interface CustomizationState extends CustomizationOptions {
   saveCharacter: (name: string, isPlayer: boolean) => void;
   loadCharacter: (character: SavedCharacter, isPlayer: boolean) => void;
   deleteCharacter: (id: string) => void;
+  addPresetToSaved: (preset: PresetSnapshot, options?: { name?: string; isPlayer?: boolean }) => void;
   
   // Helper functions to get computed values
   getPlayerColors: () => typeof colorThemes[ColorTheme];
@@ -463,6 +674,29 @@ interface CustomizationState extends CustomizationOptions {
   
   // Reset customizations
   resetCustomizations: () => void;
+  
+  // Economy actions
+  earnCoins: (payload: CoinAwardPayload) => CoinAwardResult;
+  spendCoins: (amount: number, reason?: string) => CoinDebitResult;
+  purchaseCosmetic: (slot: CosmeticSlot, id: string) => PurchaseResult;
+  unlockCosmetic: (slot: CosmeticSlot, id: string) => boolean;
+  isCosmeticUnlocked: (slot: CosmeticSlot, id: string) => boolean;
+  getCostForCosmetic: (slot: CosmeticSlot, id: string) => number | undefined;
+  getEconomySnapshot: () => EconomySyncPayload;
+  hydrateEconomySnapshot: (payload: EconomySyncPayload & { updatedAt?: string }) => void;
+  setEconomySyncError: (message?: string) => void;
+  markEconomySyncComplete: () => void;
+  togglePresetFavorite: (presetId: string) => void;
+  markCollectionsTourSeen: () => void;
+}
+
+interface PresetSnapshot {
+  name: string;
+  colorTheme: ColorTheme;
+  figureStyle: FigureStyle;
+  accessory: Accessory;
+  accessoryColor: string;
+  animationStyle: AnimationStyle;
 }
 
 // Default customization settings
@@ -486,6 +720,19 @@ export const useCustomization = create<CustomizationState>()(
     (set, get) => ({
       // Initial state
       ...DEFAULT_CUSTOMIZATION,
+      economyProfileId: createEconomyProfileId(),
+      coins: DEFAULT_COINS,
+      lifetimeCoinsEarned: 0,
+      lastCoinEvent: undefined,
+      recentCoinEvents: [],
+      lastEconomySyncAt: undefined,
+      economySyncError: undefined,
+      favoritePresetIds: [],
+      collectionsTourSeen: false,
+      unlockedColorThemes: [...DEFAULT_UNLOCKED_COLOR_THEMES],
+      unlockedFigureStyles: [...DEFAULT_UNLOCKED_FIGURE_STYLES],
+      unlockedAccessories: [...DEFAULT_UNLOCKED_ACCESSORIES],
+      unlockedAnimationStyles: [...DEFAULT_UNLOCKED_ANIMATION_STYLES],
       savedCharacters: [],
       
       // Actions for player customization
@@ -583,12 +830,253 @@ export const useCustomization = create<CustomizationState>()(
           color: state.cpuAccessoryColor
         };
       },
+
+      getEconomySnapshot: () => {
+        const state = get();
+        return {
+          profileId: state.economyProfileId,
+          coins: state.coins,
+          lifetimeCoins: state.lifetimeCoinsEarned,
+          unlocks: {
+            colorThemes: state.unlockedColorThemes,
+            figureStyles: state.unlockedFigureStyles,
+            accessories: state.unlockedAccessories,
+            animationStyles: state.unlockedAnimationStyles,
+          },
+          lastCoinEvent: state.lastCoinEvent,
+        } satisfies EconomySyncPayload;
+      },
+
+      hydrateEconomySnapshot: (payload) => set((state) => ({
+        economyProfileId: payload.profileId || state.economyProfileId,
+        coins: payload.coins,
+        lifetimeCoinsEarned: Math.max(state.lifetimeCoinsEarned, payload.lifetimeCoins),
+        unlockedColorThemes: mergeUnlockLists(
+          "colorTheme",
+          state.unlockedColorThemes,
+          payload.unlocks.colorThemes,
+        ),
+        unlockedFigureStyles: mergeUnlockLists(
+          "figureStyle",
+          state.unlockedFigureStyles,
+          payload.unlocks.figureStyles,
+        ),
+        unlockedAccessories: mergeUnlockLists(
+          "accessory",
+          state.unlockedAccessories,
+          payload.unlocks.accessories,
+        ),
+        unlockedAnimationStyles: mergeUnlockLists(
+          "animationStyle",
+          state.unlockedAnimationStyles,
+          payload.unlocks.animationStyles,
+        ),
+        lastCoinEvent: payload.lastCoinEvent ?? state.lastCoinEvent,
+        lastEconomySyncAt: payload.updatedAt ?? new Date().toISOString(),
+        economySyncError: undefined,
+      })),
+
+      setEconomySyncError: (message) => set({
+        economySyncError: message,
+      }),
+
+      markEconomySyncComplete: () => set({
+        lastEconomySyncAt: new Date().toISOString(),
+        economySyncError: undefined,
+      }),
       
       // Reset to default customizations
-      resetCustomizations: () => set({
+      resetCustomizations: () => set((state) => ({
+        ...state,
         ...DEFAULT_CUSTOMIZATION,
-        savedCharacters: get().savedCharacters // Keep saved characters
-      })
+      })),
+      
+      earnCoins: ({ amount, reason = 'unspecified', metadata }) => {
+        const normalized = clampCoinValue(amount ?? 0);
+        if (normalized <= 0) {
+          return { amount: 0, balance: get().coins, wasCapped: false };
+        }
+        let credited = 0;
+        let balance = get().coins;
+        set((state) => {
+          const available = MAX_COINS - state.coins;
+          credited = Math.min(available, normalized);
+          balance = state.coins + credited;
+          if (credited <= 0) {
+            return undefined;
+          }
+          const entry: CoinLedgerEntry = {
+            direction: 'credit',
+            amount: credited,
+            reason,
+            timestamp: new Date().toISOString(),
+            metadata,
+          };
+          return {
+            coins: balance,
+            lifetimeCoinsEarned: state.lifetimeCoinsEarned + credited,
+            lastCoinEvent: entry,
+            recentCoinEvents: pushLedgerEntry(state.recentCoinEvents ?? [], entry),
+          };
+        });
+        return {
+          amount: credited,
+          balance,
+          wasCapped: credited < normalized,
+        };
+      },
+      
+      spendCoins: (amount, reason = 'spend') => {
+        const normalized = clampCoinValue(amount ?? 0);
+        if (normalized <= 0) {
+          return {
+            success: false,
+            balance: get().coins,
+            error: 'invalid_amount',
+          };
+        }
+        let result: CoinDebitResult = {
+          success: false,
+          balance: get().coins,
+          error: 'insufficient_funds',
+        };
+        set((state) => {
+          if (state.coins < normalized) {
+            result = {
+              success: false,
+              balance: state.coins,
+              error: 'insufficient_funds',
+            };
+            return undefined;
+          }
+          const nextBalance = state.coins - normalized;
+          result = {
+            success: true,
+            cost: normalized,
+            balance: nextBalance,
+          };
+          const entry: CoinLedgerEntry = {
+            direction: 'debit',
+            amount: normalized,
+            reason,
+            timestamp: new Date().toISOString(),
+          };
+          return {
+            coins: nextBalance,
+            lastCoinEvent: entry,
+            recentCoinEvents: pushLedgerEntry(state.recentCoinEvents ?? [], entry),
+          };
+        });
+        return result;
+      },
+      
+      getCostForCosmetic: (slot, id) => {
+        const normalized = normalizeCosmeticId(slot, id);
+        if (!normalized) {
+          return undefined;
+        }
+        const table = COST_TABLES[slot] as Record<string, number>;
+        return table[normalized] ?? undefined;
+      },
+      
+      isCosmeticUnlocked: (slot, id) => {
+        const normalized = normalizeCosmeticId(slot, id);
+        if (!normalized) {
+          return false;
+        }
+        const state = get();
+        switch (slot) {
+          case 'colorTheme':
+            return state.unlockedColorThemes.includes(normalized as ColorTheme);
+          case 'figureStyle':
+            return state.unlockedFigureStyles.includes(normalized as FigureStyle);
+          case 'accessory':
+            return state.unlockedAccessories.includes(normalized as Accessory);
+          case 'animationStyle':
+            return state.unlockedAnimationStyles.includes(normalized as AnimationStyle);
+          default:
+            return false;
+        }
+      },
+      
+      unlockCosmetic: (slot, id) => {
+        const normalized = normalizeCosmeticId(slot, id);
+        if (!normalized) {
+          return false;
+        }
+        let applied = false;
+        set((state) => {
+          switch (slot) {
+            case 'colorTheme': {
+              const next = appendIfMissing(state.unlockedColorThemes, normalized as ColorTheme);
+              if (next === state.unlockedColorThemes) return undefined;
+              applied = true;
+              return { unlockedColorThemes: next };
+            }
+            case 'figureStyle': {
+              const next = appendIfMissing(state.unlockedFigureStyles, normalized as FigureStyle);
+              if (next === state.unlockedFigureStyles) return undefined;
+              applied = true;
+              return { unlockedFigureStyles: next };
+            }
+            case 'accessory': {
+              const next = appendIfMissing(state.unlockedAccessories, normalized as Accessory);
+              if (next === state.unlockedAccessories) return undefined;
+              applied = true;
+              return { unlockedAccessories: next };
+            }
+            case 'animationStyle': {
+              const next = appendIfMissing(state.unlockedAnimationStyles, normalized as AnimationStyle);
+              if (next === state.unlockedAnimationStyles) return undefined;
+              applied = true;
+              return { unlockedAnimationStyles: next };
+            }
+            default:
+              return undefined;
+          }
+        });
+        return applied;
+      },
+      
+      purchaseCosmetic: (slot, id) => {
+        const normalized = normalizeCosmeticId(slot, id);
+        if (!normalized) {
+          return {
+            success: false,
+            balance: get().coins,
+            error: 'unknown_cosmetic',
+          };
+        }
+        if (get().isCosmeticUnlocked(slot, normalized)) {
+          return {
+            success: false,
+            balance: get().coins,
+            error: 'already_unlocked',
+          };
+        }
+        const cost = get().getCostForCosmetic(slot, normalized);
+        if (!cost || cost < 0) {
+          return {
+            success: false,
+            balance: get().coins,
+            error: 'invalid_amount',
+          };
+        }
+        const spendResult = get().spendCoins(cost, `purchase:${slot}:${normalized}`);
+        if (!spendResult.success) {
+          return {
+            success: false,
+            balance: spendResult.balance,
+            error: spendResult.error ?? 'insufficient_funds',
+          };
+        }
+        get().unlockCosmetic(slot, normalized);
+        return {
+          success: true,
+          balance: spendResult.balance,
+          cost,
+        };
+      },
     }),
     {
       name: 'fighter-customization-storage',
@@ -600,7 +1088,17 @@ export const useCustomization = create<CustomizationState>()(
         getPlayerAccessory: undefined,
         getCPUColors: undefined,
         getCPUStyle: undefined,
-        getCPUAccessory: undefined
+        getCPUAccessory: undefined,
+        getEconomySnapshot: undefined,
+        earnCoins: undefined,
+        spendCoins: undefined,
+        purchaseCosmetic: undefined,
+        unlockCosmetic: undefined,
+        isCosmeticUnlocked: undefined,
+        getCostForCosmetic: undefined,
+        hydrateEconomySnapshot: undefined,
+        setEconomySyncError: undefined,
+        markEconomySyncComplete: undefined,
       })
     }
   )

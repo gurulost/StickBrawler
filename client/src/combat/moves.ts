@@ -1,0 +1,212 @@
+import type { MoveDefinition } from "./types";
+
+const defaultWindows = (startup: number, active: number, recovery: number) => ({
+  startup: { start: 1, end: startup },
+  active: { start: startup + 1, end: startup + active },
+  recovery: {
+    start: startup + active + 1,
+    end: startup + active + recovery,
+  },
+});
+
+export const coreMoves: Record<string, MoveDefinition> = {
+  lightJab: {
+    id: "lightJab",
+    name: "Quick Jab",
+    category: "light",
+    totalFrames: 22,
+    windows: defaultWindows(5, 4, 13),
+    hitboxes: [
+      {
+        id: "jab-hit",
+        frames: { start: 6, end: 9 },
+        radius: 0.35,
+        offset: [0.8, 1.2, 0],
+        height: 0.4,
+        priority: 1,
+        damage: 4,
+        launchAngleDeg: 15,
+        guard: "mid",
+        hitLag: 4,
+        knockback: {
+          base: 6,
+          scaling: 0.25,
+        },
+      },
+    ],
+    cancelBranches: [
+      {
+        to: "lightJab2",
+        window: { start: 10, end: 16 },
+        condition: "onHit",
+      },
+    ],
+    meterGain: { stamina: 2, specialMeter: 1 },
+    autoTurn: true,
+  },
+  lightJab2: {
+    id: "lightJab2",
+    name: "Hook",
+    category: "light",
+    totalFrames: 26,
+    windows: defaultWindows(6, 5, 15),
+    hitboxes: [
+      {
+        id: "hook-hit",
+        frames: { start: 7, end: 11 },
+        radius: 0.45,
+        offset: [0.9, 1.1, 0.1],
+        height: 0.5,
+        priority: 2,
+        damage: 5,
+        launchAngleDeg: 20,
+        guard: "mid",
+        hitLag: 5,
+        knockback: {
+          base: 8,
+          scaling: 0.3,
+        },
+      },
+    ],
+    cancelBranches: [
+      {
+        to: "launcher",
+        window: { start: 12, end: 20 },
+        condition: "onHit",
+      },
+    ],
+    meterGain: { stamina: 2, specialMeter: 1 },
+  },
+  launcher: {
+    id: "launcher",
+    name: "Rising Smash",
+    category: "medium",
+    totalFrames: 38,
+    windows: defaultWindows(10, 6, 22),
+    hitboxes: [
+      {
+        id: "launcher-lift",
+        frames: { start: 11, end: 16 },
+        radius: 0.5,
+        offset: [0.2, 0.6, 0],
+        height: 1,
+        priority: 3,
+        damage: 9,
+        launchAngleDeg: 75,
+        guard: "mid",
+        hitLag: 7,
+        knockback: {
+          base: 12,
+          scaling: 0.6,
+          gravityMultiplier: 0.8,
+        },
+      },
+    ],
+    meterCost: { stamina: 5 },
+    autoTurn: true,
+  },
+  diveKick: {
+    id: "diveKick",
+    name: "Meteor Dive",
+    category: "aerial",
+    totalFrames: 35,
+    windows: defaultWindows(4, 12, 19),
+    hitboxes: [
+      {
+        id: "dive-hit",
+        frames: { start: 5, end: 16 },
+        radius: 0.55,
+        offset: [0.4, 0.2, 0],
+        height: 0.8,
+        priority: 2,
+        damage: 8,
+        launchAngleDeg: -60,
+        guard: "mid",
+        hitLag: 8,
+        knockback: {
+          base: 10,
+          scaling: 0.5,
+          gravityMultiplier: 1.2,
+        },
+        causesTrip: true,
+      },
+    ],
+    aerialOnly: true,
+    meterCost: { stamina: 7 },
+    meterGain: { specialMeter: 3 },
+  },
+  guardBreak: {
+    id: "guardBreak",
+    name: "Shield Crusher",
+    category: "heavy",
+    totalFrames: 48,
+    windows: defaultWindows(16, 4, 28),
+    hitboxes: [
+      {
+        id: "guard-break",
+        frames: { start: 17, end: 20 },
+        radius: 0.65,
+        offset: [1, 1.2, 0],
+        height: 1,
+        priority: 4,
+        damage: 12,
+        launchAngleDeg: 35,
+        guard: "mid",
+        hitLag: 10,
+        knockback: {
+          base: 14,
+          scaling: 0.7,
+        },
+        ignoresArmor: true,
+      },
+    ],
+    meterCost: { stamina: 10 },
+    autoTurn: true,
+  },
+  parry: {
+    id: "parry",
+    name: "Perfect Guard",
+    category: "grab",
+    totalFrames: 24,
+    windows: defaultWindows(3, 6, 15),
+    hitboxes: [],
+    invulnerableFrames: [{ start: 3, end: 8 }],
+    armorFrames: [{ start: 3, end: 10 }],
+    cancelBranches: [
+      {
+        to: "parryCounter",
+        window: { start: 4, end: 8 },
+        condition: "onBlock",
+      },
+    ],
+    meterCost: { guard: 8 },
+  },
+  parryCounter: {
+    id: "parryCounter",
+    name: "Riposte",
+    category: "special",
+    totalFrames: 30,
+    windows: defaultWindows(6, 6, 18),
+    hitboxes: [
+      {
+        id: "riposte-hit",
+        frames: { start: 7, end: 12 },
+        radius: 0.6,
+        offset: [0.7, 1, 0],
+        height: 1,
+        priority: 5,
+        damage: 14,
+        launchAngleDeg: 10,
+        guard: "mid",
+        hitLag: 9,
+        knockback: {
+          base: 18,
+          scaling: 0.9,
+        },
+      },
+    ],
+    meterGain: { specialMeter: 5 },
+  },
+};
+
+export type MoveSet = typeof coreMoves;

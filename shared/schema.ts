@@ -1,4 +1,4 @@
-import { pgTable, text, serial, integer, boolean } from "drizzle-orm/pg-core";
+import { pgTable, text, serial, integer, boolean, jsonb } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -16,6 +16,35 @@ export const gameScores = pgTable("game_scores", {
   timestamp: text("timestamp").notNull(),
 });
 
+export const economySnapshots = pgTable("economy_snapshots", {
+  id: serial("id").primaryKey(),
+  profileId: text("profile_id").notNull().unique(),
+  userId: integer("user_id").references(() => users.id),
+  coins: integer("coins").notNull().default(0),
+  lifetimeCoins: integer("lifetime_coins").notNull().default(0),
+  unlocks: jsonb("unlocks")
+    .$type<{
+      colorThemes: string[];
+      figureStyles: string[];
+      accessories: string[];
+      animationStyles: string[];
+    }>()
+    .notNull(),
+  lastCoinEvent: jsonb("last_coin_event")
+    .$type<
+      | {
+          direction: "credit" | "debit";
+          amount: number;
+          reason: string;
+          timestamp: string;
+          metadata?: Record<string, unknown>;
+        }
+      | null
+    >()
+    .default(null),
+  updatedAt: text("updated_at").notNull(),
+});
+
 export const insertUserSchema = createInsertSchema(users).pick({
   username: true,
   password: true,
@@ -31,3 +60,5 @@ export type InsertUser = z.infer<typeof insertUserSchema>;
 export type User = typeof users.$inferSelect;
 export type GameScore = typeof gameScores.$inferSelect;
 export type InsertGameScore = z.infer<typeof insertScoreSchema>;
+export type EconomySnapshot = typeof economySnapshots.$inferSelect;
+export type InsertEconomySnapshot = typeof economySnapshots.$inferInsert;

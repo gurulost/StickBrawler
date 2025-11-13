@@ -2,6 +2,8 @@ import { useEffect, useState } from "react";
 import { useFighting } from "../lib/stores/useFighting";
 import { useAudio } from "../lib/stores/useAudio";
 import { useControls } from "../lib/stores/useControls";
+import { useCustomization } from "../lib/stores/useCustomization";
+import { Coins } from "lucide-react";
 
 const UI = () => {
   const {
@@ -20,11 +22,13 @@ const UI = () => {
   
   const { toggleMute, isMuted, playSuccess, setMasterVolume, masterVolume } = useAudio();
   const { debugMode, toggleDebugMode } = useControls();
+  const { coins, lastCoinEvent } = useCustomization();
   
   // Animation states for UI elements
   const [showControls, setShowControls] = useState(false);
   const [pulseHealth, setPulseHealth] = useState(false);
   const [scoreSubmitted, setScoreSubmitted] = useState(false);
+  const [coinFlash, setCoinFlash] = useState<string | null>(null);
   
   // Format time as MM:SS
   const formatTime = (seconds: number) => {
@@ -64,6 +68,13 @@ const UI = () => {
       setScoreSubmitted(false);
     }
   }, [gamePhase]);
+
+  useEffect(() => {
+    if (!lastCoinEvent || lastCoinEvent.direction !== "credit") return;
+    setCoinFlash(`+${lastCoinEvent.amount}`);
+    const timeout = setTimeout(() => setCoinFlash(null), 1500);
+    return () => clearTimeout(timeout);
+  }, [lastCoinEvent]);
   
   // Pulse health bar when low health
   useEffect(() => {
@@ -90,8 +101,31 @@ const UI = () => {
     setMasterVolume(newVolume);
   };
   
+  const renderMeter = (label: string, value: number, colorClass: string) => (
+    <div className="mt-2">
+      <div className="flex justify-between text-xs text-gray-300">
+        <span>{label}</span>
+        <span>{Math.round(value)}</span>
+      </div>
+      <div className="w-full bg-gray-800 h-2.5 rounded-full overflow-hidden">
+        <div
+          className={`h-full ${colorClass} transition-all duration-200`}
+          style={{ width: `${Math.max(0, Math.min(100, value))}%` }}
+        />
+      </div>
+    </div>
+  );
+  
   return (
     <div className="absolute top-0 left-0 w-full h-full pointer-events-none">
+      <div className="absolute top-4 right-4 pointer-events-none">
+        <div className="bg-black bg-opacity-70 text-amber-200 px-4 py-2 rounded-full shadow-lg flex items-center gap-2">
+          <Coins className="w-4 h-4" />
+          <span className="font-semibold">{coins.toLocaleString()}</span>
+          {coinFlash && <span className="text-green-300 text-sm font-semibold">{coinFlash}</span>}
+        </div>
+      </div>
+      
       {/* Health bars with improved styling */}
       <div className="flex justify-between p-4">
         <div className="w-2/5">
@@ -103,6 +137,9 @@ const UI = () => {
               style={{ width: `${Math.max(0, player.health)}%` }}
             ></div>
           </div>
+          {renderMeter("Guard", player.guardMeter, "bg-blue-500")}
+          {renderMeter("Stamina", player.staminaMeter, "bg-cyan-400")}
+          {renderMeter("Special", player.specialMeter, "bg-indigo-400")}
         </div>
         
         <div className="bg-black bg-opacity-70 text-white font-bold text-xl px-5 py-2 rounded-full shadow-lg">
@@ -118,6 +155,9 @@ const UI = () => {
               style={{ width: `${Math.max(0, cpu.health)}%` }}
             ></div>
           </div>
+          {renderMeter("Guard", cpu.guardMeter, "bg-rose-500")}
+          {renderMeter("Stamina", cpu.staminaMeter, "bg-amber-400")}
+          {renderMeter("Special", cpu.specialMeter, "bg-fuchsia-500")}
         </div>
       </div>
       

@@ -13,6 +13,12 @@ export const ARENA_HALF_DEPTH = ARENA_DEPTH / 2;
 // Player bounding box dimensions
 export const PLAYER_WIDTH = 0.5;
 export const PLAYER_HEIGHT = 1.8;
+export const CAPSULE_RADIUS = PLAYER_WIDTH * 0.5;
+
+export const FLOOR_FRICTION = 0.82;
+export const AIR_FRICTION = 0.97;
+export const WALL_BOUNCE_RESTITUTION = 0.35;
+export const HIT_LAG_DECAY = 0.9;
 
 // Attack parameters (further reduced damage per hit for better balance)
 export const PUNCH_DAMAGE = 2; // Reduced from 3
@@ -129,7 +135,8 @@ export function applyGravity(
   x: number = 0,
   z: number = 0,
   dropThrough: boolean = false,
-  delta: number = 1
+  delta: number = 1,
+  capsuleRadius: number = CAPSULE_RADIUS,
 ): [number, number] {
   // Apply gravity to the velocity scaled by delta
   const newVelocityY = velocityY - GRAVITY * delta;
@@ -146,7 +153,7 @@ export function applyGravity(
     return [y - 0.1, newVelocityY - 0.01]; // Push through the platform
   }
   // Check if on a platform or the ground 
-  else if (newY <= platformHeight && y > platformHeight - 0.5) {
+  else if (newY <= platformHeight && y > platformHeight - capsuleRadius - 0.1) {
     // We're landing on a platform from above
     return [platformHeight, 0]; // Reset velocity when on platform
   }
@@ -191,6 +198,62 @@ export function applyDrag(velocity: number, delta: number = 1): number {
   // Linearly scale drag effect by delta
   const dragFactor = 1 - (1 - DRAG) * delta;
   return velocity * dragFactor;
+}
+
+export function applyHorizontalFriction(
+  velocity: number,
+  inAir: boolean,
+  delta: number,
+): number {
+  const friction = inAir ? AIR_FRICTION : FLOOR_FRICTION;
+  const factor = 1 - (1 - friction) * delta;
+  return velocity * factor;
+}
+
+export function resolveCapsuleBounds(
+  position: [number, number, number],
+  velocity: [number, number, number],
+  capsuleRadius: number = CAPSULE_RADIUS,
+): {
+  position: [number, number, number];
+  velocity: [number, number, number];
+} {
+  let [x, y, z] = position;
+  let [vx, vy, vz] = velocity;
+
+  const minX = -ARENA_HALF_WIDTH + capsuleRadius;
+  const maxX = ARENA_HALF_WIDTH - capsuleRadius;
+  if (x < minX) {
+    x = minX;
+    vx = Math.abs(vx) * WALL_BOUNCE_RESTITUTION;
+  } else if (x > maxX) {
+    x = maxX;
+    vx = -Math.abs(vx) * WALL_BOUNCE_RESTITUTION;
+  }
+
+  const minZ = -ARENA_HALF_DEPTH + capsuleRadius;
+  const maxZ = ARENA_HALF_DEPTH - capsuleRadius;
+  if (z < minZ) {
+    z = minZ;
+    vz = Math.abs(vz) * WALL_BOUNCE_RESTITUTION;
+  } else if (z > maxZ) {
+    z = maxZ;
+    vz = -Math.abs(vz) * WALL_BOUNCE_RESTITUTION;
+  }
+
+  return {
+    position: [x, y, z],
+    velocity: [vx, vy, vz],
+  };
+}
+
+export function computeHitLagSeconds(hitLagFrames: number): number {
+  return hitLagFrames / 60;
+}
+
+export function applyHitLagTimer(timer: number, delta: number): number {
+  if (timer <= 0) return 0;
+  return Math.max(0, timer - delta * HIT_LAG_DECAY);
 }
 
 /**

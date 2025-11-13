@@ -1,90 +1,259 @@
-    // Resolved Conflict 1: Took import from e144449 (includes gameScores)
-    import { users, gameScores, type User, type InsertUser, type GameScore, type InsertGameScore } from "@shared/schema";
+import {
+  users,
+  gameScores,
+  economySnapshots,
+  type User,
+  type InsertUser,
+  type GameScore,
+  type InsertGameScore,
+  type EconomySnapshot,
+  type InsertEconomySnapshot,
+} from "@shared/schema";
+import { and, desc, eq, isNull, lt, or } from "drizzle-orm";
+import type { NeonHttpDatabase } from "drizzle-orm/neon-http";
+import * as schema from "@shared/schema";
+import { env } from "./env";
+import { getDb } from "./db";
+import { log } from "./vite";
 
-    // modify the interface with any CRUD methods
-    // you might need
+type StickDatabase = NeonHttpDatabase<typeof schema>;
 
-    // Kept the IStorage interface from HEAD (which was based on e144449 resolution)
-    // as it's identical in methods to what c899993 offered for the interface.
-    export interface IStorage {
-      getUser(id: number): Promise<User | undefined>;
-      getUserByUsername(username: string): Promise<User | undefined>;
-      createUser(user: InsertUser): Promise<User>;
-      saveScore(score: InsertGameScore): Promise<GameScore>;
-      getTopScores(limit?: number): Promise<GameScore[]>;
-      getUserScores(userId: number): Promise<GameScore[]>;
-      updateUserHighScore(userId: number, score: number): Promise<void>;
+export interface IStorage {
+  getUser(id: number): Promise<User | undefined>;
+  getUserByUsername(username: string): Promise<User | undefined>;
+  createUser(user: InsertUser): Promise<User>;
+  saveScore(score: InsertGameScore): Promise<GameScore>;
+  getTopScores(limit?: number): Promise<GameScore[]>;
+  getUserScores(userId: number): Promise<GameScore[]>;
+  updateUserHighScore(userId: number, score: number): Promise<void>;
+  saveEconomySnapshot(snapshot: InsertEconomySnapshot): Promise<EconomySnapshot>;
+  getEconomySnapshot(profileId: string): Promise<EconomySnapshot | undefined>;
+  /**
+   * Testing/maintenance helper to wipe transient data.
+   */
+  reset(): Promise<void>;
+}
+
+class DbStorage implements IStorage {
+  constructor(private readonly db: StickDatabase) {}
+
+  async getUser(id: number): Promise<User | undefined> {
+    const [user] = await this.db
+      .select()
+      .from(users)
+      .where(eq(users.id, id))
+      .limit(1);
+    return user;
+  }
+
+  async getUserByUsername(username: string): Promise<User | undefined> {
+    const [user] = await this.db
+      .select()
+      .from(users)
+      .where(eq(users.username, username))
+      .limit(1);
+    return user;
+  }
+
+  async createUser(insertUser: InsertUser): Promise<User> {
+    const [user] = await this.db.insert(users).values(insertUser).returning();
+    return user;
+  }
+
+  async saveScore(scoreData: InsertGameScore): Promise<GameScore> {
+    const payload = {
+      ...scoreData,
+      userId: scoreData.userId ?? null,
+    };
+
+    const [score] = await this.db.insert(gameScores).values(payload).returning();
+
+    if (payload.userId != null) {
+      await this.updateUserHighScore(payload.userId, payload.score);
     }
 
-    // The MemStorage class below is the one we want, based on the e144449 resolution.
-    // The conflicting block from c899993 has been removed.
-    export class MemStorage implements IStorage {
-      private users: Map<number, User>;
-      private scores: Map<number, GameScore>; // Using Map for scores
-      private currentUserId: number; // Separate ID for users
-      private currentScoreId: number; // Separate ID for scores
+    return score;
+  }
 
-      constructor() {
-        this.users = new Map();
-        this.scores = new Map(); // Initialize scores as a Map
-        this.currentUserId = 1;
-        this.currentScoreId = 1;
-      }
+  async getTopScores(limit = 10): Promise<GameScore[]> {
+    return this.db
+      .select()
+      .from(gameScores)
+      .orderBy(desc(gameScores.score), desc(gameScores.timestamp))
+      .limit(limit);
+  }
 
-      async getUser(id: number): Promise<User | undefined> {
-        return this.users.get(id);
-      }
+  async getUserScores(userId: number): Promise<GameScore[]> {
+    return this.db
+      .select()
+      .from(gameScores)
+      .where(eq(gameScores.userId, userId))
+      .orderBy(desc(gameScores.score));
+  }
 
-      async getUserByUsername(username: string): Promise<User | undefined> {
-        return Array.from(this.users.values()).find(
-          (user) => user.username === username,
-        );
-      }
+  async updateUserHighScore(userId: number, newScore: number): Promise<void> {
+    await this.db
+      .update(users)
+      .set({ highScore: newScore })
+      .where(
+        and(
+          eq(users.id, userId),
+          or(isNull(users.highScore), lt(users.highScore, newScore)),
+        ),
+      );
+  }
 
-      async createUser(insertUser: InsertUser): Promise<User> {
-        const id = this.currentUserId++;
-        const user: User = { ...insertUser, id, highScore: 0 }; 
-        this.users.set(id, user);
-        return user;
-      }
+  async reset(): Promise<void> {
+    await this.db.delete(gameScores);
+    await this.db.delete(economySnapshots);
+    await this.db.update(users).set({ highScore: 0 });
+  }
 
-      async saveScore(scoreData: InsertGameScore): Promise<GameScore> {
-        const id = this.currentScoreId++;
-        const score: GameScore = { 
-          id, 
-          userId: scoreData.userId ?? null, // Handle potential undefined/null from input
-          score: scoreData.score, 
-          timestamp: scoreData.timestamp 
-        };
-        this.scores.set(id, score);
+  async saveEconomySnapshot(snapshot: InsertEconomySnapshot): Promise<EconomySnapshot> {
+    const payload: InsertEconomySnapshot = {
+      ...snapshot,
+      userId: snapshot.userId ?? null,
+      updatedAt: snapshot.updatedAt ?? new Date().toISOString(),
+      lastCoinEvent: snapshot.lastCoinEvent ?? null,
+    };
+    const [row] = await this.db
+      .insert(economySnapshots)
+      .values(payload)
+      .onConflictDoUpdate({
+        target: economySnapshots.profileId,
+        set: {
+          coins: payload.coins,
+          lifetimeCoins: payload.lifetimeCoins,
+          unlocks: payload.unlocks,
+          lastCoinEvent: payload.lastCoinEvent,
+          updatedAt: payload.updatedAt,
+          userId: payload.userId,
+        },
+      })
+      .returning();
+    return row;
+  }
 
-        if (scoreData.userId != null) { // Check for null or undefined explicitly
-          await this.updateUserHighScore(scoreData.userId, scoreData.score);
-        }
+  async getEconomySnapshot(profileId: string): Promise<EconomySnapshot | undefined> {
+    const [row] = await this.db
+      .select()
+      .from(economySnapshots)
+      .where(eq(economySnapshots.profileId, profileId))
+      .limit(1);
+    return row;
+  }
+}
 
-        return score;
-      }
+class MemStorage implements IStorage {
+  private users = new Map<number, User>();
+  private scores = new Map<number, GameScore>();
+  private economy = new Map<string, EconomySnapshot>();
+  private currentUserId = 1;
+  private currentScoreId = 1;
+  private currentEconomyId = 1;
 
-      async getTopScores(limit: number = 10): Promise<GameScore[]> { 
-        const allScores = Array.from(this.scores.values()); 
-        return allScores
-          .sort((a, b) => b.score - a.score)
-          .slice(0, limit);
-      }
+  async getUser(id: number): Promise<User | undefined> {
+    return this.users.get(id);
+  }
 
-      async getUserScores(userId: number): Promise<GameScore[]> {
-        return Array.from(this.scores.values())
-          .filter(score => score.userId === userId)
-          .sort((a, b) => b.score - a.score);
-      }
+  async getUserByUsername(username: string): Promise<User | undefined> {
+    return Array.from(this.users.values()).find(
+      (user) => user.username === username,
+    );
+  }
 
-      async updateUserHighScore(userId: number, newScore: number): Promise<void> {
-        const user = this.users.get(userId);
-        if (user && newScore > (user.highScore ?? 0)) { // Safe comparison for highScore
-          const updatedUser: User = { ...user, highScore: newScore };
-          this.users.set(userId, updatedUser);
-        }
-      }
+  async createUser(insertUser: InsertUser): Promise<User> {
+    const id = this.currentUserId++;
+    const user: User = { ...insertUser, id, highScore: 0 };
+    this.users.set(id, user);
+    return user;
+  }
+
+  async saveScore(scoreData: InsertGameScore): Promise<GameScore> {
+    const id = this.currentScoreId++;
+    const score: GameScore = {
+      id,
+      userId: scoreData.userId ?? null,
+      score: scoreData.score,
+      timestamp: scoreData.timestamp,
+    };
+    this.scores.set(id, score);
+
+    if (scoreData.userId != null) {
+      await this.updateUserHighScore(scoreData.userId, scoreData.score);
     }
 
-    export const storage = new MemStorage();
+    return score;
+  }
+
+  async getTopScores(limit = 10): Promise<GameScore[]> {
+    return Array.from(this.scores.values())
+      .sort((a, b) => b.score - a.score)
+      .slice(0, limit);
+  }
+
+  async getUserScores(userId: number): Promise<GameScore[]> {
+    return Array.from(this.scores.values())
+      .filter((score) => score.userId === userId)
+      .sort((a, b) => b.score - a.score);
+  }
+
+  async updateUserHighScore(userId: number, newScore: number): Promise<void> {
+    const user = this.users.get(userId);
+    if (user && newScore > (user.highScore ?? 0)) {
+      const updatedUser: User = { ...user, highScore: newScore };
+      this.users.set(userId, updatedUser);
+    }
+  }
+
+  async reset(): Promise<void> {
+    this.users.clear();
+    this.scores.clear();
+    this.economy.clear();
+    this.currentUserId = 1;
+    this.currentScoreId = 1;
+    this.currentEconomyId = 1;
+  }
+
+  async saveEconomySnapshot(snapshot: InsertEconomySnapshot): Promise<EconomySnapshot> {
+    const existing = this.economy.get(snapshot.profileId);
+    const entry: EconomySnapshot = {
+      id: existing?.id ?? this.currentEconomyId++,
+      profileId: snapshot.profileId,
+      userId: snapshot.userId ?? null,
+      coins: snapshot.coins,
+      lifetimeCoins: snapshot.lifetimeCoins,
+      unlocks: snapshot.unlocks,
+      lastCoinEvent: snapshot.lastCoinEvent ?? null,
+      updatedAt: snapshot.updatedAt ?? new Date().toISOString(),
+    };
+    this.economy.set(snapshot.profileId, entry);
+    return entry;
+  }
+
+  async getEconomySnapshot(profileId: string): Promise<EconomySnapshot | undefined> {
+    return this.economy.get(profileId);
+  }
+}
+
+function createStorage(): IStorage {
+  if (env.DATABASE_URL) {
+    try {
+      return new DbStorage(getDb());
+    } catch (error) {
+      log(
+        `Failed to connect to database, falling back to in-memory storage: ${(error as Error).message}`,
+        "storage",
+      );
+    }
+  } else {
+    log(
+      "DATABASE_URL not set, using in-memory storage. Scores will reset on restart.",
+      "storage",
+    );
+  }
+
+  return new MemStorage();
+}
+
+export const storage = createStorage();

@@ -1,8 +1,8 @@
 // Constants for physics calculations
-export const GRAVITY = 0.008; // Further reduced for even slower/smoother jumping
-export const JUMP_FORCE = 0.3; // Decreased for more controlled jumping with lower height
-export const PLAYER_SPEED = 0.06; // Increased for better movement across larger arena
-export const CPU_SPEED = 0.05; // Increased to match player in larger arena
+export const GRAVITY = 0.5; // Gravity acceleration per second
+export const JUMP_FORCE = 18; // Jump velocity (units per second)
+export const PLAYER_SPEED = 8; // Movement speed (units per second) - multiplied by delta in runtime
+export const CPU_SPEED = 7; // CPU movement speed (units per second)
 export const DRAG = 0.92; // Increased drag for smoother movement
 export const FLOOR_Y = 0;
 export const ARENA_WIDTH = 30; // Further increased for an even larger play area

@@ -1,4 +1,5 @@
 export type MatchPhase = "menu" | "fighting" | "round_end" | "match_end";
+export type MatchMode = "single" | "local" | "online";
 
 export interface FighterSnapshot {
   health: number;
@@ -36,6 +37,22 @@ export interface RuntimeFramePayload<TControl extends string> {
   player: FighterSnapshot;
   cpu: FighterSnapshot;
   gamePhase: MatchPhase;
+}
+
+export interface OnlineInputFrame<TControl extends string> {
+  frame: number;
+  inputs: RuntimeKeyboardState<TControl>;
+}
+
+export interface OnlineMatchSnapshot<TControl extends string> {
+  frame: number;
+  playerState: FighterSnapshot;
+  opponentState: FighterSnapshot;
+  inputs: {
+    player: OnlineInputFrame<TControl>;
+    opponent: OnlineInputFrame<TControl>;
+  };
+  phase: MatchPhase;
 }
 
 export interface RuntimeAudioActions {
@@ -108,3 +125,20 @@ export interface MatchTelemetryEntry {
     defenderAction: string;
   };
 }
+
+export interface OnlineMatchDescriptor {
+  id: string;
+  createdAt: string;
+  hostProfileId: string;
+  guestProfileId?: string;
+  seed: number;
+  mode: MatchMode;
+  maxPlayers: number;
+}
+
+export type OnlineMatchMessage<TControl extends string> =
+  | { type: "join"; matchId: string; profileId: string }
+  | { type: "state"; snapshot: OnlineMatchSnapshot<TControl> }
+  | { type: "inputs"; frame: number; inputs: RuntimeKeyboardState<TControl> }
+  | { type: "resync"; snapshot: OnlineMatchSnapshot<TControl> }
+  | { type: "leave"; reason?: string };

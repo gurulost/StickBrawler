@@ -30,6 +30,10 @@ type ControlsState = {
   toggleSilhouetteDebug: () => void;
   inkQuality: InkQualitySetting;
   cycleInkQuality: () => void;
+  networkMode: "offline" | "online";
+  setNetworkMode: (mode: "offline" | "online") => void;
+  onlineLatency: number;
+  setOnlineLatency: (latency: number) => void;
 }
 
 export type InkQualitySetting = "cinematic" | "balanced" | "performance";
@@ -48,4 +52,8 @@ export const useControls = create<ControlsState>((set) => ({
       const nextIndex = (order.indexOf(state.inkQuality) + 1) % order.length;
       return { inkQuality: order[nextIndex] };
     }),
+  networkMode: "offline",
+  setNetworkMode: (mode) => set({ networkMode: mode }),
+  onlineLatency: 0,
+  setOnlineLatency: (latency) => set({ onlineLatency: latency }),
 }));

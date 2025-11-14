@@ -6,7 +6,7 @@ import { useCustomization } from './useCustomization';
 import type { CoinAwardPayload } from './useCustomization';
 
 export type GamePhase = 'menu' | 'lobby' | 'fighting' | 'round_end' | 'match_end';
-export type MatchMode = "single" | "local";
+export type MatchMode = "single" | "local" | "online";
 export type Character = 'stick_hero' | 'stick_villain';
 
 export interface CharacterState {
@@ -133,9 +133,9 @@ const DEFAULT_ROUND_TIME = 60; // 60 seconds per round
 const createDefaultSlots = (mode: MatchMode): SlotState => ({
   player1: { type: "human", ready: false, label: "Player 1" },
   player2: {
-    type: mode === "local" ? "human" : "cpu",
-    ready: mode !== "local",
-    label: mode === "local" ? "Player 2" : "CPU",
+    type: mode === "single" ? "cpu" : "human",
+    ready: mode === "single",
+    label: mode === "single" ? "CPU" : mode === "local" ? "Player 2" : "Remote",
   },
 });
 
@@ -949,7 +949,7 @@ export const useFighting = create<FightingState>((set, get) => ({
         },
       };
     }
-    const nextMode = type === "human" ? "local" : "single";
+    const nextMode: MatchMode = type === "human" ? (state.matchMode === "online" ? "online" : "local") : "single";
     return {
       matchMode: nextMode,
       slots: {
@@ -957,7 +957,7 @@ export const useFighting = create<FightingState>((set, get) => ({
         player2: {
           type,
           ready: type === "cpu",
-          label: type === "human" ? "Player 2" : "CPU",
+          label: type === "human" ? (nextMode === "online" ? "Remote" : "Player 2") : "CPU",
         },
       },
     };

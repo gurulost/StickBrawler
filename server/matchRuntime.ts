@@ -2,6 +2,8 @@ import { MatchRuntime, createEmptyInputs, type DualInputState } from "../client/
 import type { CharacterState, GamePhase } from "../client/src/lib/stores/useFighting";
 import type { HitTelemetry } from "../client/src/game/combatTelemetry";
 
+export { MatchRuntime } from "../client/src/game/matchRuntime";
+
 const DEFAULT_HEALTH = 100;
 const DEFAULT_GUARD = 80;
 const DEFAULT_STAMINA = 100;

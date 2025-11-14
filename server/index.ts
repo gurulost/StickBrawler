@@ -8,6 +8,7 @@ import { registerAuthRoutes } from "./auth-routes";
 import { configurePassport } from "./auth";
 import { setupVite, serveStatic, log } from "./vite";
 import { env } from "./env";
+import { OnlineSocketServer } from "./online/socketServer";
 
 const app = express();
 app.set("trust proxy", 1);
@@ -100,4 +101,13 @@ app.use((req, res, next) => {
   }, () => {
     log(`serving on port ${port}`);
   });
+
+  // Online multiplayer WebSocket server (feature-flagged)
+  if (env.ENABLE_ONLINE_MULTIPLAYER) {
+    const socketServer = new OnlineSocketServer<string>(env.ONLINE_WS_PORT);
+    socketServer.start();
+    log(`online multiplayer websocket server started on port ${env.ONLINE_WS_PORT}`, "websocket");
+  } else {
+    log(`online multiplayer disabled (set ENABLE_ONLINE_MULTIPLAYER=true to enable)`, "websocket");
+  }
 })();

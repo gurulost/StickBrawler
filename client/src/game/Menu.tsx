@@ -1,311 +1,52 @@
-import { useState, useEffect, useRef } from "react";
-import { useFighting } from "../lib/stores/useFighting";
+import { useEffect, useState, type ReactNode } from "react";
+import { useFighting, MatchMode } from "../lib/stores/useFighting";
 import { useAudio } from "../lib/stores/useAudio";
 import { useAuth } from "../lib/stores/useAuth";
 import { FighterCustomizer } from "../components/ui/fighter-customizer";
 import { Leaderboard } from "../components/ui/leaderboard";
 import { AuthModal } from "../components/ui/auth-modal";
+import { LandingHero } from "../components/landing/LandingHero";
+import { FeatureGrid } from "../components/landing/FeatureGrid";
 
-// Animated particles for background effect
-const Particle = ({ delay = 0 }: { delay?: number }) => {
-  // Use refs to avoid style property conflicts during re-renders
-  const size = useRef(Math.random() * 3 + 1);
-  const duration = useRef(Math.random() * 10 + 15);
-  const initialX = useRef(Math.random() * 100);
-  const initialY = useRef(Math.random() * 100 + 20);
-  
-  return (
-    <div 
-      className="absolute rounded-full bg-white opacity-70 z-0"
-      style={{
-        width: `${size.current}px`,
-        height: `${size.current}px`,
-        left: `${initialX.current}%`,
-        top: `${initialY.current}%`,
-        boxShadow: `0 0 ${size.current * 2}px ${size.current}px rgba(255, 255, 255, 0.3)`,
-        animationName: 'floatParticle',
-        animationDuration: `${duration.current}s`,
-        animationTimingFunction: 'linear',
-        animationIterationCount: 'infinite',
-        animationDelay: `${delay}s`
-      }}
-    />
-  );
-};
+type Panel = "main" | "customization" | "leaderboard" | "controls";
 
-// Animated stick figure component
-const StickFigure = ({ 
-  color, 
-  position, 
-  animationDelay = 0,
-  isAttacking = false,
-  isDefending = false,
-  isJumping = false,
-  fadeIn = false
-}: { 
-  color: string;
-  position: 'left' | 'right';
-  animationDelay?: number; 
-  isAttacking?: boolean;
-  isDefending?: boolean;
-  isJumping?: boolean;
-  fadeIn?: boolean;
-}) => {
-  const positionStyle = position === 'left' 
-    ? { left: '1.5rem' } 
-    : { right: '1.5rem' };
-  
-  // We'll use inline styles for animation properties to avoid conflicts
-  const getAnimationStyle = () => {
-    let animationName = 'idle';
-    
-    if (isJumping) {
-      animationName = 'jump';
-    } else if (isAttacking) {
-      animationName = 'attack';
-    }
-    
-    return {
-      animationName,
-      animationDuration: isJumping ? '1.5s' : isAttacking ? '2s' : '4s',
-      animationTimingFunction: 'ease-in-out',
-      animationIterationCount: 'infinite',
-      animationDirection: 'alternate',
-      animationDelay: `${animationDelay}s`
-    };
-  };
-  
-  const scaleStyle = position === 'right' ? { transform: 'scaleX(-1)' } : {};
-  
-  // For fade-in animation, we'll use a class instead of inline style to avoid conflicts
-  const fadeInClass = fadeIn ? 'animate-fadeIn' : '';
-  
-  return (
-    <div 
-      className={`absolute top-4 ${fadeInClass}`}
-      style={{ 
-        ...positionStyle, 
-        ...getAnimationStyle()
-      }}
-    >
-      <div className="relative" style={scaleStyle}>
-        {/* Head */}
-        <div className={`w-6 h-6 ${color === 'blue' ? 'bg-blue-500' : 'bg-red-500'} rounded-full shadow-lg ${isDefending ? 'ring-2 ring-yellow-300' : ''}`}></div>
-        
-        {/* Body */}
-        <div className={`w-2 h-28 ${color === 'blue' ? 'bg-blue-500' : 'bg-red-500'} mx-auto shadow-md`}></div>
-        
-        {/* Arms */}
-        <div className="flex justify-center">
-          <div className={`w-2 h-16 ${color === 'blue' ? 'bg-blue-500' : 'bg-red-500'} origin-top shadow-md transition-all duration-200`} 
-               style={{ transform: `rotate(${isAttacking ? '-90deg' : '-45deg'})` }}></div>
-          <div className={`w-2 h-16 ${color === 'blue' ? 'bg-blue-500' : 'bg-red-500'} origin-top shadow-md transition-all duration-200`}
-               style={{ transform: `rotate(${isDefending ? '0deg' : '45deg'})` }}></div>
-        </div>
-        
-        {/* Legs - All in one container to avoid separate animated elements */}
-        <div className="flex justify-center mt-2">
-          <div className={`w-2 h-20 ${color === 'blue' ? 'bg-blue-500' : 'bg-red-500'} origin-top shadow-md transition-all duration-200`}
-               style={{ transform: `rotate(${isJumping ? '-30deg' : '-15deg'})` }}></div>
-          <div className={`w-2 h-20 ${color === 'blue' ? 'bg-blue-500' : 'bg-red-500'} origin-top shadow-md transition-all duration-200`}
-               style={{ transform: `rotate(${isJumping ? '30deg' : '15deg'})` }}></div>
-        </div>
-        
-        {/* Visual effects */}
-        {isAttacking && (
-          <div className="absolute -right-5 top-8 text-yellow-300 text-2xl" 
-               style={{ animation: 'ping 1s cubic-bezier(0, 0, 0.2, 1) infinite' }}>
-            💥
-          </div>
-        )}
-        
-        {isDefending && (
-          <div className="absolute -right-2 top-16 w-8 h-8 border-4 border-yellow-300 rounded-full opacity-70"
-               style={{ animation: 'pulse 1s infinite alternate' }}></div>
-        )}
-      </div>
-    </div>
-  );
-};
-
-// Main menu component
 const Menu = () => {
   const { startGame, matchMode, setMatchMode } = useFighting();
   const { playBackgroundMusic, toggleMute, isMuted, setMasterVolume, masterVolume } = useAudio();
   const { user, status, logout } = useAuth();
-  
-  // UI state management
-  const [isAnimating, setIsAnimating] = useState(false);
-  const [showCustomizer, setShowCustomizer] = useState(false);
-  const [showAdvancedControls, setShowAdvancedControls] = useState(false);
-  const [showAuthModal, setShowAuthModal] = useState(false);
-  const [menuSection, setMenuSection] = useState<'main' | 'controls' | 'customization' | 'leaderboard'>('main');
+  const [activePanel, setActivePanel] = useState<Panel>("main");
   const [controllerConnected, setControllerConnected] = useState(false);
-  
-  // Animation states
-  const [titleEffect, setTitleEffect] = useState(0);
-  const [particles, setParticles] = useState<number[]>([]);
-  const [leftFighterState, setLeftFighterState] = useState({
-    isAttacking: false,
-    isDefending: false,
-    isJumping: false
-  });
-  const [rightFighterState, setRightFighterState] = useState({
-    isAttacking: false,
-    isDefending: false,
-    isJumping: false
-  });
-  
-  // Refs for animation
-  const titleRef = useRef<HTMLHeadingElement>(null);
-  const containerRef = useRef<HTMLDivElement>(null);
-  
-  // Generate particles for background
-  useEffect(() => {
-    const particleCount = 30;
-    const newParticles = Array.from({ length: particleCount }, (_, i) => i);
-    setParticles(newParticles);
-  }, []);
+  const [showAuthModal, setShowAuthModal] = useState(false);
 
   useEffect(() => {
-    if (typeof window === "undefined" || typeof navigator === "undefined") return;
-    const refreshGamepadState = () => {
+    const timer = setTimeout(() => {
+      playBackgroundMusic();
+    }, 400);
+    return () => clearTimeout(timer);
+  }, [playBackgroundMusic]);
+
+  useEffect(() => {
+    const refreshPads = () => {
       const pads = navigator.getGamepads ? navigator.getGamepads() : [];
       setControllerConnected(pads.some((pad) => pad && pad.connected));
     };
-    window.addEventListener("gamepadconnected", refreshGamepadState);
-    window.addEventListener("gamepaddisconnected", refreshGamepadState);
-    refreshGamepadState();
+    window.addEventListener("gamepadconnected", refreshPads);
+    window.addEventListener("gamepaddisconnected", refreshPads);
+    refreshPads();
     return () => {
-      window.removeEventListener("gamepadconnected", refreshGamepadState);
-      window.removeEventListener("gamepaddisconnected", refreshGamepadState);
+      window.removeEventListener("gamepadconnected", refreshPads);
+      window.removeEventListener("gamepaddisconnected", refreshPads);
     };
   }, []);
-  
-  // Animated title effect
-  useEffect(() => {
-    const interval = setInterval(() => {
-      setTitleEffect(prev => (prev + 1) % 3);
-    }, 3000);
-    
-    return () => clearInterval(interval);
-  }, []);
-  
-  // Animate stick figures
-  useEffect(() => {
-    // Random animation timing for fighters
-    const animateLeftFighter = () => {
-      const action = Math.floor(Math.random() * 4);
-      
-      // Reset all states
-      setLeftFighterState({
-        isAttacking: false,
-        isDefending: false,
-        isJumping: false
-      });
-      
-      // Set new state based on random action
-      switch(action) {
-        case 0: // Attack
-          setLeftFighterState(prev => ({ ...prev, isAttacking: true }));
-          break;
-        case 1: // Defend
-          setLeftFighterState(prev => ({ ...prev, isDefending: true }));
-          break;
-        case 2: // Jump
-          setLeftFighterState(prev => ({ ...prev, isJumping: true }));
-          break;
-        // default is idle
-      }
-      
-      // Schedule next animation
-      setTimeout(animateLeftFighter, Math.random() * 3000 + 2000);
-    };
-    
-    const animateRightFighter = () => {
-      const action = Math.floor(Math.random() * 4);
-      
-      // Reset all states
-      setRightFighterState({
-        isAttacking: false,
-        isDefending: false,
-        isJumping: false
-      });
-      
-      // Set new state based on random action
-      switch(action) {
-        case 0: // Attack
-          setRightFighterState(prev => ({ ...prev, isAttacking: true }));
-          break;
-        case 1: // Defend
-          setRightFighterState(prev => ({ ...prev, isDefending: true }));
-          break;
-        case 2: // Jump
-          setRightFighterState(prev => ({ ...prev, isJumping: true }));
-          break;
-        // default is idle
-      }
-      
-      // Schedule next animation
-      setTimeout(animateRightFighter, Math.random() * 3000 + 2000);
-    };
-    
-    // Start animation loops
-    const leftTimer = setTimeout(animateLeftFighter, 2000);
-    const rightTimer = setTimeout(animateRightFighter, 3500);
-    
-    return () => {
-      clearTimeout(leftTimer);
-      clearTimeout(rightTimer);
-    };
-  }, []);
-  
-  // Start background music when component mounts
-  useEffect(() => {
-    // Short delay to ensure audio is loaded
-    const timer = setTimeout(() => {
-      playBackgroundMusic();
-    }, 800);
-    
-    return () => {
-      clearTimeout(timer);
-    };
-  }, [playBackgroundMusic]);
 
-  // Handle game start with animation
   const handleStartGame = () => {
-    setIsAnimating(true);
-    setTimeout(() => {
-      startGame(matchMode);
-    }, 700);
+    startGame(matchMode);
   };
-  
-  // Handle volume change
-  const handleVolumeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const newVolume = parseFloat(e.target.value);
-    setMasterVolume(newVolume);
+
+  const handleVolumeChange = (value: number) => {
+    setMasterVolume(value);
   };
-  
-  // Navigation helpers
-  const showMainMenu = () => {
-    setMenuSection('main');
-    setShowCustomizer(false);
-    setShowAdvancedControls(false);
-  };
-  
-  const showControlsMenu = () => {
-    setMenuSection('controls');
-  };
-  
-  const showCustomizationMenu = () => {
-    setMenuSection('customization');
-    setShowCustomizer(true);
-  };
-  
-  const showLeaderboardMenu = () => {
-    setMenuSection('leaderboard');
-  };
-  
+
   const handleLogout = async () => {
     try {
       await logout();
@@ -313,400 +54,229 @@ const Menu = () => {
       console.error("Logout failed:", error);
     }
   };
-  
-  // Title animation variations based on effect state
-  const getTitleClass = () => {
-    switch(titleEffect) {
-      case 0:
-        return 'text-yellow-300 drop-shadow-[0_0_15px_rgba(234,179,8,0.8)]';
-      case 1:
-        return 'text-blue-300 drop-shadow-[0_0_15px_rgba(59,130,246,0.8)]';
-      case 2:
-        return 'text-red-300 drop-shadow-[0_0_15px_rgba(239,68,68,0.8)]';
+
+  const renderPanel = () => {
+    switch (activePanel) {
+      case "customization":
+        return (
+          <section className="rounded-3xl border border-white/10 bg-black/40 p-6 backdrop-blur">
+            <header className="mb-6 flex flex-wrap items-center justify-between gap-4">
+              <div>
+                <p className="text-xs uppercase tracking-[0.4em] text-indigo-200">Ink Customizer</p>
+                <h2 className="text-2xl font-bold text-white">Craft your silhouette</h2>
+              </div>
+              <button
+                onClick={() => setActivePanel("main")}
+                className="rounded-full border border-white/20 px-4 py-2 text-xs font-semibold uppercase tracking-wide text-white/80 hover:text-white"
+              >
+                Back to Hero
+              </button>
+            </header>
+            <FighterCustomizer />
+          </section>
+        );
+      case "leaderboard":
+        return (
+          <section className="rounded-3xl border border-white/10 bg-black/40 p-6 backdrop-blur">
+            <header className="mb-6 flex flex-wrap items-center justify-between gap-4">
+              <div>
+                <p className="text-xs uppercase tracking-[0.4em] text-indigo-200">Scores</p>
+                <h2 className="text-2xl font-bold text-white">World leaderboard</h2>
+              </div>
+              <button
+                onClick={() => setActivePanel("main")}
+                className="rounded-full border border-white/20 px-4 py-2 text-xs font-semibold uppercase tracking-wide text-white/80 hover:text-white"
+              >
+                Back to Hero
+              </button>
+            </header>
+            <Leaderboard />
+          </section>
+        );
+      case "controls":
+        return (
+          <section className="rounded-3xl border border-white/10 bg-black/40 p-6 backdrop-blur">
+            <header className="mb-6 flex flex-wrap items-center justify-between gap-4">
+              <div>
+                <p className="text-xs uppercase tracking-[0.4em] text-indigo-200">Moveset</p>
+                <h2 className="text-2xl font-bold text-white">Control layout</h2>
+              </div>
+              <button
+                onClick={() => setActivePanel("main")}
+                className="rounded-full border border-white/20 px-4 py-2 text-xs font-semibold uppercase tracking-wide text-white/80 hover:text-white"
+              >
+                Back to Hero
+              </button>
+            </header>
+            <div className="grid gap-6 lg:grid-cols-[2fr_1fr]">
+              <div className="rounded-2xl border border-white/10 bg-gradient-to-br from-slate-900/80 to-slate-950/80 p-6">
+                <h3 className="text-lg font-semibold text-white">Keyboard</h3>
+                <div className="mt-4 grid gap-4 md:grid-cols-2">
+                  <ControlCard title="Movement">
+                    <KeyRow keys={["W", "A", "S", "D"]} description="Move / strafe" />
+                    <KeyRow keys={["Space"]} description="Jump" />
+                    <KeyRow keys={["Shift"]} description="Dodge" />
+                  </ControlCard>
+                  <ControlCard title="Combat">
+                    <KeyRow keys={["J"]} description="Light attack" />
+                    <KeyRow keys={["K"]} description="Heavy attack" />
+                    <KeyRow keys={["L"]} description="Guard" />
+                    <KeyRow keys={["E"]} description="Air attack" />
+                  </ControlCard>
+                  <ControlCard title="Tech">
+                    <KeyRow keys={["G"]} description="Grab" />
+                    <KeyRow keys={["T"]} description="Taunt" />
+                  </ControlCard>
+                  <ControlCard title="Ink Tools">
+                    <p className="text-sm text-white/70">Use HUD buttons to toggle Silhouette Overlay & cycle Ink Quality.</p>
+                  </ControlCard>
+                </div>
+              </div>
+              <div className="rounded-2xl border border-white/10 bg-gradient-to-br from-purple-900/40 to-indigo-900/40 p-6">
+                <h3 className="text-lg font-semibold text-white">Controller</h3>
+                <p className="text-sm text-white/70">Press any button to join Player 2.</p>
+                <div className="mt-5 space-y-3">
+                  <KeyRow keys={["A / Cross"]} description="Light" compact />
+                  <KeyRow keys={["B / Circle"]} description="Heavy" compact />
+                  <KeyRow keys={["X / Square"]} description="Guard" compact />
+                  <KeyRow keys={["Y / Triangle"]} description="Special" compact />
+                  <KeyRow keys={["LB"]} description="Dodge" compact />
+                  <KeyRow keys={["RB"]} description="Grab" compact />
+                </div>
+              </div>
+            </div>
+          </section>
+        );
       default:
-        return 'text-white';
+        return (
+          <>
+            <LandingHero
+              onPlay={handleStartGame}
+              onCustomize={() => setActivePanel("customization")}
+              onLeaderboard={() => setActivePanel("leaderboard")}
+              onControls={() => setActivePanel("controls")}
+              matchMode={matchMode}
+              setMatchMode={(mode: MatchMode) => setMatchMode(mode)}
+              controllerConnected={controllerConnected}
+              isMuted={isMuted}
+              toggleMute={toggleMute}
+              masterVolume={masterVolume}
+              onVolumeChange={handleVolumeChange}
+            />
+            <FeatureGrid />
+          </>
+        );
     }
   };
-  
+
   return (
-    <div 
-      ref={containerRef}
-      className={`w-full h-full flex flex-col items-center justify-center bg-gradient-to-b from-gray-900 via-indigo-900 to-purple-900 transition-opacity duration-700 overflow-hidden ${isAnimating ? 'opacity-0' : 'opacity-100'}`}
-    >
-      {/* Auth status - top right */}
-      <div className="absolute top-4 right-4 z-20">
-        {status === "authenticated" && user ? (
-          <div className="flex items-center gap-3 bg-black bg-opacity-70 px-4 py-2 rounded-full border border-indigo-700">
-            <span className="text-white font-semibold">👤 {user.username}</span>
-            <button
-              onClick={handleLogout}
-              className="text-xs bg-red-600 hover:bg-red-700 text-white px-3 py-1 rounded-full transition-colors"
-            >
-              Logout
-            </button>
+    <div className="relative min-h-screen overflow-y-auto bg-slate-950 text-white">
+      <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,_rgba(79,70,229,0.25),_transparent_45%)]" />
+      <div className="absolute inset-0 opacity-40 mix-blend-screen" style={{ backgroundImage: "url('/textures/ink-noise.png')" }} />
+      <div className="relative z-10 mx-auto flex max-w-6xl flex-col gap-10 px-4 py-8">
+        <header className="flex flex-wrap items-center justify-between gap-4">
+          <div>
+            <p className="text-xs uppercase tracking-[0.6em] text-indigo-200">StickBrawler</p>
+            <h1 className="text-2xl font-bold text-white">Ink-fueled arena</h1>
           </div>
-        ) : (
-          <button
-            onClick={() => setShowAuthModal(true)}
-            className="bg-gradient-to-r from-green-600 to-green-800 hover:from-green-700 hover:to-green-900 text-white font-bold px-6 py-2 rounded-full transition-all shadow-lg"
-          >
-            Login / Register
-          </button>
-        )}
-      </div>
-      
-      {/* Particle background */}
-      <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        {particles.map((_, index) => (
-          <Particle key={index} delay={index * 0.2} />
-        ))}
-      </div>
-      
-      {/* Content container */}
-      <div className="text-center px-4 max-w-6xl mx-auto z-10 relative">
-        {/* Title with glow animation */}
-        <h1 
-          ref={titleRef}
-          className={`text-8xl font-bold mb-10 transition-all duration-1000 tracking-wider ${getTitleClass()}`}
-        >
-          STICK FIGHTER
-        </h1>
-        
-        {/* Dynamic subtitle that changes with title color */}
-        <h2 className="text-2xl font-light mb-12 text-gray-300 tracking-wide">
-          MASTER THE ART OF STICK COMBAT
-        </h2>
-        
-        {/* Interactive fighting scene */}
-        <div className="relative w-96 h-96 mx-auto mb-10">
-          {/* Interactive background elements - Ground/Platform */}
-          <div className="absolute inset-x-0 bottom-10 h-1 bg-gradient-to-r from-transparent via-gray-400 to-transparent opacity-80 rounded-full shadow-md"></div>
-          <div className="absolute inset-x-10 bottom-9 h-4 bg-gradient-to-b from-indigo-900/30 to-transparent blur-sm rounded-full"></div>
-          
-          {/* Fighting characters with dynamic animations */}
-          <StickFigure 
-            color="blue" 
-            position="left" 
-            isAttacking={leftFighterState.isAttacking}
-            isDefending={leftFighterState.isDefending}
-            isJumping={leftFighterState.isJumping}
-            fadeIn={true}
-          />
-          
-          <StickFigure 
-            color="red" 
-            position="right" 
-            animationDelay={0.5}
-            isAttacking={rightFighterState.isAttacking}
-            isDefending={rightFighterState.isDefending}
-            isJumping={rightFighterState.isJumping}
-            fadeIn={true}
-          />
-          
-          {/* Visual fighting effects */}
-          <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 text-5xl text-yellow-300 animate-pulse opacity-70">
-            {leftFighterState.isAttacking && rightFighterState.isDefending && "⚔️"}
-            {rightFighterState.isAttacking && leftFighterState.isDefending && "⚔️"}
-            {leftFighterState.isAttacking && rightFighterState.isAttacking && "💥"}
-            {leftFighterState.isJumping && rightFighterState.isJumping && "✨"}
-          </div>
-        </div>
-
-        {/* Main menu section */}
-        {menuSection === 'main' && (
-          <div className="space-y-8 animate-fadeIn">
-            <button 
-              className="bg-gradient-to-r from-yellow-500 to-orange-600 text-white font-bold py-5 px-20 rounded-full text-3xl transition-all hover:scale-105 hover:shadow-xl transform hover:-translate-y-1 focus:outline-none focus:ring-2 focus:ring-yellow-400"
-              onClick={handleStartGame}
-            >
-              PLAY GAME
-            </button>
-            <div className="flex flex-col items-center gap-4 text-white">
-              <span className="uppercase tracking-wide text-sm text-gray-300">Mode Selection</span>
-            <div className="flex flex-wrap justify-center gap-3">
+          <nav className="flex flex-wrap gap-2">
+            <NavButton active={activePanel === "main"} onClick={() => setActivePanel("main")} label="Hero" />
+            <NavButton
+              active={activePanel === "customization"}
+              onClick={() => setActivePanel("customization")}
+              label="Customize"
+            />
+            <NavButton
+              active={activePanel === "leaderboard"}
+              onClick={() => setActivePanel("leaderboard")}
+              label="Leaderboard"
+            />
+            <NavButton
+              active={activePanel === "controls"}
+              onClick={() => setActivePanel("controls")}
+              label="Controls"
+            />
+          </nav>
+          <div className="flex items-center gap-3">
+            {status === "authenticated" && user ? (
+              <>
+                <span className="text-sm text-white/70">Signed in as {user.username}</span>
                 <button
-                  className={`px-6 py-2 rounded-full border transition-all ${
-                    matchMode === "single"
-                      ? "bg-indigo-600 border-indigo-400 shadow-lg"
-                      : "bg-black bg-opacity-40 border-gray-700 hover:border-indigo-500"
-                  }`}
-                  onClick={() => setMatchMode("single")}
+                  onClick={handleLogout}
+                  className="rounded-full border border-white/30 px-4 py-2 text-xs font-semibold uppercase tracking-wide text-white/80 hover:text-white"
                 >
-                  Solo vs CPU
+                  Logout
                 </button>
-                <button
-                  className={`px-6 py-2 rounded-full border transition-all ${
-                    matchMode === "local"
-                      ? "bg-pink-600 border-pink-400 shadow-lg"
-                      : "bg-black bg-opacity-40 border-gray-700 hover:border-pink-500"
-                  }`}
-                  onClick={() => setMatchMode("local")}
-                >
-                  Local Multiplayer
-                </button>
-              </div>
-              <p className="text-sm text-gray-300 max-w-lg text-center">
-                {matchMode === "single"
-                  ? "Battle against the adaptive CPU warrior."
-                  : "Player 1 uses WASD + J/K/L, Player 2 uses IJKL + U/O/P. Share one keyboard and clash locally."}
-              </p>
-              <p className="text-xs text-gray-400 text-center">
-                {controllerConnected
-                  ? "Controller detected: Player 2 can use it instantly."
-                  : "Connect a controller to let Player 2 join instantly."}
-              </p>
-            </div>
-            
-            <div className="flex flex-wrap justify-center gap-5 mt-8">
-              <button 
-                className="bg-gradient-to-r from-purple-600 to-purple-800 text-white font-bold py-3 px-8 rounded-full transition-all hover:shadow-lg transform hover:scale-105"
-                onClick={showCustomizationMenu}
-              >
-                CUSTOMIZE FIGHTERS
-              </button>
-              
-              <button 
-                className="bg-gradient-to-r from-blue-600 to-blue-800 text-white font-bold py-3 px-8 rounded-full transition-all hover:shadow-lg transform hover:scale-105"
-                onClick={showControlsMenu}
-              >
-                GAME CONTROLS
-              </button>
-              
-              <button 
-                className="bg-gradient-to-r from-green-600 to-green-800 text-white font-bold py-3 px-8 rounded-full transition-all hover:shadow-lg transform hover:scale-105"
-                onClick={showLeaderboardMenu}
-              >
-                LEADERBOARD
-              </button>
-              
-              {/* Audio controls in a styled container */}
-              <div className="flex items-center justify-center gap-4 bg-black bg-opacity-50 p-3 px-6 rounded-full mx-auto mt-5 border border-gray-700">
-                <button 
-                  onClick={toggleMute}
-                  className="p-2 rounded-full hover:bg-gray-700 transition-colors text-xl"
-                >
-                  {isMuted ? "🔇" : "🔊"}
-                </button>
-                
-                <input
-                  type="range"
-                  min="0"
-                  max="1"
-                  step="0.01"
-                  value={masterVolume}
-                  onChange={handleVolumeChange}
-                  className="w-32 accent-yellow-500"
-                />
-              </div>
-            </div>
-            
-            {/* Game highlight features */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-12 text-center">
-              <div className="bg-black bg-opacity-40 p-5 rounded-xl border border-indigo-900 transform hover:scale-105 transition-transform">
-                <div className="text-yellow-400 text-3xl mb-2">🥋</div>
-                <h3 className="text-white text-xl font-bold mb-2">Dynamic Combat</h3>
-                <p className="text-gray-300 text-sm">Master a variety of moves including punches, kicks, special attacks, and counters</p>
-              </div>
-              
-              <div className="bg-black bg-opacity-40 p-5 rounded-xl border border-indigo-900 transform hover:scale-105 transition-transform">
-                <div className="text-yellow-400 text-3xl mb-2">🏆</div>
-                <h3 className="text-white text-xl font-bold mb-2">Challenge CPU</h3>
-                <p className="text-gray-300 text-sm">Test your skills against adaptive AI opponents with unique fighting styles</p>
-              </div>
-              
-              <div className="bg-black bg-opacity-40 p-5 rounded-xl border border-indigo-900 transform hover:scale-105 transition-transform">
-                <div className="text-yellow-400 text-3xl mb-2">🎮</div>
-                <h3 className="text-white text-xl font-bold mb-2">Easy Controls</h3>
-                <p className="text-gray-300 text-sm">Simple keyboard controls make it easy to jump in and start playing immediately</p>
-              </div>
-            </div>
-          </div>
-        )}
-        
-        {/* Controls section */}
-        {menuSection === 'controls' && (
-          <div className="animate-fadeIn">
-            <h2 className="text-3xl font-bold text-white mb-6">Game Controls</h2>
-            
-            <div className="flex justify-center mb-6">
-              <button 
-                className={`px-5 py-2 rounded-l-lg border-r border-gray-700 ${!showAdvancedControls ? 'bg-blue-600 text-white' : 'bg-gray-800 text-gray-300'}`}
-                onClick={() => setShowAdvancedControls(false)}
-              >
-                Basic Controls
-              </button>
-              <button 
-                className={`px-5 py-2 rounded-r-lg ${showAdvancedControls ? 'bg-blue-600 text-white' : 'bg-gray-800 text-gray-300'}`}
-                onClick={() => setShowAdvancedControls(true)}
-              >
-                Advanced Controls
-              </button>
-            </div>
-            
-            {showAdvancedControls ? (
-              // Advanced controls display with categories
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-4xl mx-auto text-left bg-black bg-opacity-60 p-8 rounded-xl border border-indigo-800 shadow-2xl">
-                <div>
-                  <h3 className="text-xl font-semibold text-blue-300 mb-3 border-b border-blue-900 pb-2">Movement</h3>
-                  <div className="grid grid-cols-2 gap-2">
-                    <div className="text-gray-300 flex items-center gap-2">
-                      <span className="bg-gray-700 px-2 py-1 rounded text-xs">↑</span> Forward:
-                    </div>
-                    <div>Up Arrow</div>
-                    <div className="text-gray-300 flex items-center gap-2">
-                      <span className="bg-gray-700 px-2 py-1 rounded text-xs">↓</span> Backward:
-                    </div>
-                    <div>Down Arrow</div>
-                    <div className="text-gray-300 flex items-center gap-2">
-                      <span className="bg-gray-700 px-2 py-1 rounded text-xs">←→</span> Strafe:
-                    </div>
-                    <div>Left/Right Arrows</div>
-                    <div className="text-gray-300 flex items-center gap-2">
-                      <span className="bg-gray-700 px-2 py-1 rounded text-xs">W</span> Jump:
-                    </div>
-                    <div>W Key</div>
-                    <div className="text-gray-300 flex items-center gap-2">
-                      <span className="bg-gray-700 px-2 py-1 rounded text-xs">W+↓</span> Drop Down:
-                    </div>
-                    <div>W + Down Arrow</div>
-                  </div>
-                </div>
-                
-                <div>
-                  <h3 className="text-xl font-semibold text-red-300 mb-3 border-b border-red-900 pb-2">Basic Combat</h3>
-                  <div className="grid grid-cols-2 gap-2">
-                    <div className="text-gray-300 flex items-center gap-2">
-                      <span className="bg-gray-700 px-2 py-1 rounded text-xs">J</span> Quick Attack:
-                    </div>
-                    <div>Light Punch</div>
-                    <div className="text-gray-300 flex items-center gap-2">
-                      <span className="bg-gray-700 px-2 py-1 rounded text-xs">K</span> Strong Attack:
-                    </div>
-                    <div>Heavy Kick</div>
-                    <div className="text-gray-300 flex items-center gap-2">
-                      <span className="bg-gray-700 px-2 py-1 rounded text-xs">L</span> Block:
-                    </div>
-                    <div>Defensive Stance</div>
-                    <div className="text-gray-300 flex items-center gap-2">
-                      <span className="bg-gray-700 px-2 py-1 rounded text-xs">Space</span> Special:
-                    </div>
-                    <div>Powerful Move</div>
-                  </div>
-                </div>
-                
-                <div>
-                  <h3 className="text-xl font-semibold text-yellow-300 mb-3 border-b border-yellow-900 pb-2">Advanced Techniques</h3>
-                  <div className="grid grid-cols-2 gap-2">
-                    <div className="text-gray-300 flex items-center gap-2">
-                      <span className="bg-gray-700 px-2 py-1 rounded text-xs">E</span> Air Attack:
-                    </div>
-                    <div>While Jumping</div>
-                    <div className="text-gray-300 flex items-center gap-2">
-                      <span className="bg-gray-700 px-2 py-1 rounded text-xs">Shift</span> Dodge:
-                    </div>
-                    <div>Evade Attacks</div>
-                    <div className="text-gray-300 flex items-center gap-2">
-                      <span className="bg-gray-700 px-2 py-1 rounded text-xs">G</span> Grab:
-                    </div>
-                    <div>Hold Opponent</div>
-                    <div className="text-gray-300 flex items-center gap-2">
-                      <span className="bg-gray-700 px-2 py-1 rounded text-xs">T</span> Taunt:
-                    </div>
-                    <div>Show Off</div>
-                  </div>
-                </div>
-                
-                <div>
-                  <h3 className="text-xl font-semibold text-green-300 mb-3 border-b border-green-900 pb-2">Pro Tips</h3>
-                  <ul className="list-disc list-inside text-sm space-y-1 text-gray-200">
-                    <li>Chain attacks together for powerful combos</li>
-                    <li>Use platforms to gain height advantage</li>
-                    <li>Time your blocks to counter-attack effectively</li>
-                    <li>Mix up ground and air attacks to confuse opponents</li>
-                    <li>Use taunts to provoke mistakes from your opponent</li>
-                    <li>Press <span className="bg-gray-700 px-1 rounded text-xs">J+K</span> quickly for a combo starter</li>
-                  </ul>
-                </div>
-              </div>
+              </>
             ) : (
-              // Basic controls display
-              <div className="grid grid-cols-2 gap-3 max-w-md mx-auto text-left bg-black bg-opacity-60 p-6 rounded-xl border border-indigo-800 shadow-xl">
-                <div className="text-gray-300 flex items-center gap-2">
-                  <span className="bg-gray-700 px-2 py-1 rounded text-sm min-w-[40px] text-center">↑↓←→</span> Move:
-                </div>
-                <div className="text-white">Arrow Keys</div>
-                
-                <div className="text-gray-300 flex items-center gap-2">
-                  <span className="bg-gray-700 px-2 py-1 rounded text-sm min-w-[40px] text-center">W</span> Jump:
-                </div>
-                <div className="text-white">W Key</div>
-                
-                <div className="text-gray-300 flex items-center gap-2">
-                  <span className="bg-gray-700 px-2 py-1 rounded text-sm min-w-[40px] text-center">J/K</span> Attack:
-                </div>
-                <div className="text-white">Punch / Kick</div>
-                
-                <div className="text-gray-300 flex items-center gap-2">
-                  <span className="bg-gray-700 px-2 py-1 rounded text-sm min-w-[40px] text-center">L</span> Block:
-                </div>
-                <div className="text-white">Defend</div>
-                
-                <div className="text-gray-300 flex items-center gap-2">
-                  <span className="bg-gray-700 px-2 py-1 rounded text-sm min-w-[40px] text-center">Space</span> Special:
-                </div>
-                <div className="text-white">Power Move</div>
-              </div>
+              <button
+                onClick={() => setShowAuthModal(true)}
+                className="rounded-full border border-white/30 px-4 py-2 text-xs font-semibold uppercase tracking-wide text-white/80 hover:text-white"
+              >
+                Sign In
+              </button>
             )}
-            
-            <button 
-              className="mt-8 bg-gradient-to-r from-gray-700 to-gray-800 text-white font-bold py-3 px-6 rounded-full transition-all hover:shadow-lg transform hover:scale-105"
-              onClick={showMainMenu}
-            >
-              Back to Main Menu
-            </button>
           </div>
-        )}
-        
-        {/* Character Customization Section */}
-        {menuSection === 'customization' && (
-          <div className="animate-fadeIn">
-            <FighterCustomizer />
-          </div>
-        )}
+        </header>
 
-        {/* Leaderboard Section */}
-        {menuSection === 'leaderboard' && (
-          <div className="animate-fadeIn max-w-2xl mx-auto">
-            <div className="mb-8">
-              <h2 className="text-4xl font-bold text-white mb-4">Global Leaderboard</h2>
-              <p className="text-gray-300">Compete for the highest score and claim your place among the champions!</p>
-            </div>
-            
-            <Leaderboard className="mb-8" />
-            
-            <button 
-              className="bg-gradient-to-r from-gray-700 to-gray-800 text-white font-bold py-3 px-6 rounded-full transition-all hover:shadow-lg transform hover:scale-105"
-              onClick={showMainMenu}
-            >
-              Back to Main Menu
-            </button>
-          </div>
-        )}
-        
-        {/* Footer with version and credits */}
-        <div className="mt-10 text-gray-400 text-sm flex justify-center items-center gap-4">
-          <span>Version 1.0</span>
-          <span className="w-1 h-1 bg-gray-500 rounded-full"></span>
-          <span>Stick Fighter © 2025</span>
-          <span className="w-1 h-1 bg-gray-500 rounded-full"></span>
-          <span>Built with React + Three.js</span>
-        </div>
+        {renderPanel()}
       </div>
-      
-      {/* Auth Modal */}
-      <AuthModal isOpen={showAuthModal} onClose={() => setShowAuthModal(false)} />
+
+      {showAuthModal && <AuthModal onClose={() => setShowAuthModal(false)} />}
     </div>
   );
 };
+
+const NavButton = ({
+  label,
+  onClick,
+  active,
+}: {
+  label: string;
+  onClick: () => void;
+  active: boolean;
+}) => (
+  <button
+    onClick={onClick}
+    className={`rounded-full px-4 py-2 text-xs font-semibold uppercase tracking-wide transition ${
+      active ? "bg-white text-slate-900" : "border border-white/20 text-white/70 hover:text-white"
+    }`}
+  >
+    {label}
+  </button>
+);
+
+const ControlCard = ({ title, children }: { title: string; children: ReactNode }) => (
+  <div className="rounded-2xl border border-white/10 bg-black/30 p-4 text-sm text-white/80">
+    <p className="mb-2 text-base font-semibold text-white">{title}</p>
+    <div className="space-y-1">{children}</div>
+  </div>
+);
+
+const KeyRow = ({
+  keys,
+  description,
+  compact = false,
+}: {
+  keys: string[];
+  description: string;
+  compact?: boolean;
+}) => (
+  <div className="flex items-center gap-3">
+    <div className="flex flex-wrap gap-1">
+      {keys.map((key) => (
+        <span
+          key={key}
+          className={`rounded-md border border-white/20 bg-white/10 px-2 py-1 text-xs font-semibold text-white ${
+            compact ? "min-w-[48px] text-center" : ""
+          }`}
+        >
+          {key}
+        </span>
+      ))}
+    </div>
+    <p className="text-xs text-white/70">{description}</p>
+  </div>
+);
 
 export default Menu;

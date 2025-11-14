@@ -10,11 +10,29 @@ import { FeatureGrid } from "../components/landing/FeatureGrid";
 
 type Panel = "main" | "customization" | "leaderboard" | "controls";
 
+const PANEL_HASH_MAP: Record<Panel, string> = {
+  main: "",
+  customization: "customize",
+  leaderboard: "leaderboard",
+  controls: "controls",
+};
+
+const hashToPanel = (hash: string): Panel => {
+  const cleanHash = hash.replace("#", "");
+  const entry = Object.entries(PANEL_HASH_MAP).find(([_, h]) => h === cleanHash);
+  return entry ? (entry[0] as Panel) : "main";
+};
+
+const panelToHash = (panel: Panel): string => {
+  const hash = PANEL_HASH_MAP[panel];
+  return hash ? `#${hash}` : "";
+};
+
 const Menu = () => {
   const { startGame, matchMode, setMatchMode } = useFighting();
   const { playBackgroundMusic, toggleMute, isMuted, setMasterVolume, masterVolume } = useAudio();
   const { user, status, logout } = useAuth();
-  const [activePanel, setActivePanel] = useState<Panel>("main");
+  const [activePanel, setActivePanel] = useState<Panel>(() => hashToPanel(window.location.hash));
   const [controllerConnected, setControllerConnected] = useState(false);
   const [showAuthModal, setShowAuthModal] = useState(false);
 
@@ -38,6 +56,28 @@ const Menu = () => {
       window.removeEventListener("gamepaddisconnected", refreshPads);
     };
   }, []);
+
+  useEffect(() => {
+    const handleHashChange = () => {
+      const newPanel = hashToPanel(window.location.hash);
+      setActivePanel(newPanel);
+    };
+
+    window.addEventListener("hashchange", handleHashChange);
+    return () => {
+      window.removeEventListener("hashchange", handleHashChange);
+    };
+  }, []);
+
+  const navigateToPanel = (panel: Panel) => {
+    setActivePanel(panel);
+    const hash = panelToHash(panel);
+    if (hash) {
+      window.location.hash = hash;
+    } else {
+      history.pushState("", document.title, window.location.pathname + window.location.search);
+    }
+  };
 
   const handleStartGame = () => {
     startGame(matchMode);
@@ -66,7 +106,7 @@ const Menu = () => {
                 <h2 className="text-2xl font-bold text-white">Craft your silhouette</h2>
               </div>
               <button
-                onClick={() => setActivePanel("main")}
+                onClick={() => navigateToPanel("main")}
                 className="rounded-full border border-white/20 px-4 py-2 text-xs font-semibold uppercase tracking-wide text-white/80 hover:text-white"
               >
                 Back to Hero
@@ -84,7 +124,7 @@ const Menu = () => {
                 <h2 className="text-2xl font-bold text-white">World leaderboard</h2>
               </div>
               <button
-                onClick={() => setActivePanel("main")}
+                onClick={() => navigateToPanel("main")}
                 className="rounded-full border border-white/20 px-4 py-2 text-xs font-semibold uppercase tracking-wide text-white/80 hover:text-white"
               >
                 Back to Hero
@@ -102,7 +142,7 @@ const Menu = () => {
                 <h2 className="text-2xl font-bold text-white">Control layout</h2>
               </div>
               <button
-                onClick={() => setActivePanel("main")}
+                onClick={() => navigateToPanel("main")}
                 className="rounded-full border border-white/20 px-4 py-2 text-xs font-semibold uppercase tracking-wide text-white/80 hover:text-white"
               >
                 Back to Hero
@@ -152,9 +192,9 @@ const Menu = () => {
           <>
             <LandingHero
               onPlay={handleStartGame}
-              onCustomize={() => setActivePanel("customization")}
-              onLeaderboard={() => setActivePanel("leaderboard")}
-              onControls={() => setActivePanel("controls")}
+              onCustomize={() => navigateToPanel("customization")}
+              onLeaderboard={() => navigateToPanel("leaderboard")}
+              onControls={() => navigateToPanel("controls")}
               matchMode={matchMode}
               setMatchMode={(mode: MatchMode) => setMatchMode(mode)}
               controllerConnected={controllerConnected}
@@ -180,20 +220,20 @@ const Menu = () => {
             <h1 className="text-2xl font-bold text-white">Ink-fueled arena</h1>
           </div>
           <nav className="flex flex-wrap gap-2">
-            <NavButton active={activePanel === "main"} onClick={() => setActivePanel("main")} label="Hero" />
+            <NavButton active={activePanel === "main"} onClick={() => navigateToPanel("main")} label="Hero" />
             <NavButton
               active={activePanel === "customization"}
-              onClick={() => setActivePanel("customization")}
+              onClick={() => navigateToPanel("customization")}
               label="Customize"
             />
             <NavButton
               active={activePanel === "leaderboard"}
-              onClick={() => setActivePanel("leaderboard")}
+              onClick={() => navigateToPanel("leaderboard")}
               label="Leaderboard"
             />
             <NavButton
               active={activePanel === "controls"}
-              onClick={() => setActivePanel("controls")}
+              onClick={() => navigateToPanel("controls")}
               label="Controls"
             />
           </nav>
@@ -222,7 +262,7 @@ const Menu = () => {
         {renderPanel()}
       </div>
 
-      {showAuthModal && <AuthModal onClose={() => setShowAuthModal(false)} />}
+      {showAuthModal && <AuthModal isOpen={showAuthModal} onClose={() => setShowAuthModal(false)} />}
     </div>
   );
 };

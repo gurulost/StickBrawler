@@ -39,6 +39,9 @@ export function LandingHero({
         loop
         muted
         playsInline
+        onError={(e) => {
+          (e.target as HTMLVideoElement).style.display = 'none';
+        }}
       />
       <div className="absolute inset-y-0 right-0 w-1/2 bg-[radial-gradient(circle_at_top,_rgba(99,102,241,0.15),_transparent_60%)]" />
       <div className="relative grid gap-10 lg:grid-cols-2">

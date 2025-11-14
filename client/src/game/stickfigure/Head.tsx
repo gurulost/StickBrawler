@@ -1,4 +1,4 @@
-import { colorThemes, figureStyles, accessories } from "../../lib/stores/useCustomization";
+import { colorThemes, figureStyles, accessories, useCustomization } from "../../lib/stores/useCustomization";
 import type { FC } from "react";
 import * as THREE from "three";
 import { useInkMaterial, useOutlineMaterial } from "./inkMaterial";
@@ -13,18 +13,22 @@ interface HeadProps {
   accessory: AccessoryValues;
   isAttacking: boolean;
   lean: number;
+  isPlayer: boolean;
 }
 
-const Head: FC<HeadProps> = ({ colors, style, accessory, isAttacking, lean }) => {
+const Head: FC<HeadProps> = ({ colors, style, accessory, isAttacking, lean, isPlayer }) => {
+  const { getPlayerInkParams, getCPUInkParams } = useCustomization();
+  const inkParams = isPlayer ? getPlayerInkParams() : getCPUInkParams();
+  
   const inkMaterial = useInkMaterial({
     baseColor: colors.primary,
-    rimColor: colors.glow ?? colors.secondary,
-    shadeBands: 3,
-    glow: isAttacking ? 0.25 : 0.05,
+    rimColor: inkParams.rimColor,
+    shadeBands: inkParams.shadeBands,
+    glow: isAttacking ? inkParams.glow + 0.15 : inkParams.glow,
   });
-  const outlineMaterial = useOutlineMaterial();
+  const outlineMaterial = useOutlineMaterial(inkParams.outlineColor);
   const headScale = style.headSize;
-  const outlineScale = 1 + (style.outlineWidth ?? 0.04);
+  const outlineScale = 1 + inkParams.lineWidth;
 
   return (
     <>

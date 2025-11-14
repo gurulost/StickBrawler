@@ -308,8 +308,9 @@ const StickFigure = ({
         accessory={characterAccessory}
         isAttacking={isAttacking}
         lean={lean}
+        isPlayer={isPlayer}
       />
-      <Torso colors={characterColors} style={characterStyle} lean={lean} />
+      <Torso colors={characterColors} style={characterStyle} lean={lean} isPlayer={isPlayer} />
       <Limbs
         colors={characterColors}
         style={characterStyle}
@@ -322,6 +323,7 @@ const StickFigure = ({
         time={timeRef.current}
         speedRatio={speedRatio}
         plantedFoot={plantedFoot}
+        isPlayer={isPlayer}
       />
 
       {/* In-scene landing dust */}

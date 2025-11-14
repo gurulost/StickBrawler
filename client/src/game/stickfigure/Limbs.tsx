@@ -1,4 +1,4 @@
-import { colorThemes, figureStyles } from "../../lib/stores/useCustomization";
+import { colorThemes, figureStyles, useCustomization } from "../../lib/stores/useCustomization";
 import type { FC } from "react";
 import { useMemo, useEffect } from "react";
 import { useInkMaterial, useOutlineMaterial } from "./inkMaterial";
@@ -19,6 +19,7 @@ interface LimbsProps {
   time: number;
   speedRatio: number;
   plantedFoot: "left" | "right" | null;
+  isPlayer: boolean;
 }
 
 const smooth = (from: number, to: number, factor: number) => from + (to - from) * factor;
@@ -186,15 +187,19 @@ const Limbs: FC<LimbsProps> = ({
   time,
   speedRatio,
   plantedFoot,
+  isPlayer,
 }) => {
+  const { getPlayerInkParams, getCPUInkParams } = useCustomization();
+  const inkParams = isPlayer ? getPlayerInkParams() : getCPUInkParams();
+  
   const limbMaterial = useInkMaterial({
     baseColor: colors.secondary ?? colors.primary,
-    rimColor: colors.glow ?? colors.tertiary ?? colors.primary,
-    shadeBands: 4,
-    glow: isAttacking ? 0.2 : 0.03,
+    rimColor: inkParams.rimColor,
+    shadeBands: inkParams.shadeBands,
+    glow: isAttacking ? inkParams.glow + 0.12 : inkParams.glow,
   });
-  const outlineMaterial = useOutlineMaterial();
-  const outlineScale = 1 + (style.outlineWidth ?? 0.04);
+  const outlineMaterial = useOutlineMaterial(inkParams.outlineColor);
+  const outlineScale = 1 + inkParams.lineWidth;
   const armConfig = style.silhouette?.arms ?? {
     length: 0.7,
     base: 1,

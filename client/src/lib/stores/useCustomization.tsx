@@ -278,7 +278,12 @@ export const accessories = {
     },
     effect: 'sparkles',
     emissive: true,
-    animated: true
+    animated: true,
+    rimColor: '#9966ff',
+    shadeBands: 4,
+    lineWidth: 0.05,
+    outlineColor: '#220066',
+    glow: 0.3
   },
   cyber_visor: {
     name: 'Cyber Visor',
@@ -289,7 +294,12 @@ export const accessories = {
     },
     effect: 'scan_lines',
     emissive: true,
-    animated: true
+    animated: true,
+    rimColor: '#00ffff',
+    shadeBands: 2,
+    lineWidth: 0.03,
+    outlineColor: '#003333',
+    glow: 0.4
   },
   energy_cape: {
     name: 'Energy Cape',
@@ -301,7 +311,12 @@ export const accessories = {
     },
     effect: 'flowing_energy',
     emissive: true,
-    animated: true
+    animated: true,
+    rimColor: '#ff00ff',
+    shadeBands: 3,
+    lineWidth: 0.04,
+    outlineColor: '#440044',
+    glow: 0.35
   },
   flame_sword: {
     name: 'Flame Sword',
@@ -313,7 +328,12 @@ export const accessories = {
     },
     effect: 'fire_trail',
     emissive: true,
-    animated: true
+    animated: true,
+    rimColor: '#ff6600',
+    shadeBands: 3,
+    lineWidth: 0.04,
+    outlineColor: '#330000',
+    glow: 0.4
   },
   crystal_shield: {
     name: 'Crystal Shield',
@@ -325,7 +345,12 @@ export const accessories = {
     },
     effect: 'crystal_glow',
     emissive: true,
-    animated: true
+    animated: true,
+    rimColor: '#66ffff',
+    shadeBands: 4,
+    lineWidth: 0.05,
+    outlineColor: '#003366',
+    glow: 0.45
   },
   ninja_mask: {
     name: 'Ninja Mask',
@@ -336,7 +361,12 @@ export const accessories = {
     },
     effect: 'shadow_aura',
     emissive: false,
-    animated: true
+    animated: true,
+    rimColor: '#333333',
+    shadeBands: 2,
+    lineWidth: 0.06,
+    outlineColor: '#000000',
+    glow: 0.05
   },
   halo: {
     name: 'Divine Halo',
@@ -348,7 +378,12 @@ export const accessories = {
     },
     effect: 'divine_light',
     emissive: true,
-    animated: true
+    animated: true,
+    rimColor: '#ffff99',
+    shadeBands: 4,
+    lineWidth: 0.04,
+    outlineColor: '#666600',
+    glow: 0.5
   },
   demon_horns: {
     name: 'Demon Horns',
@@ -368,7 +403,12 @@ export const accessories = {
     ],
     effect: 'dark_energy',
     emissive: true,
-    animated: true
+    animated: true,
+    rimColor: '#ff3333',
+    shadeBands: 2,
+    lineWidth: 0.05,
+    outlineColor: '#660000',
+    glow: 0.35
   },
   wings: {
     name: 'Angel Wings',
@@ -388,7 +428,12 @@ export const accessories = {
     ],
     effect: 'feather_glow',
     emissive: true,
-    animated: true
+    animated: true,
+    rimColor: '#ffffff',
+    shadeBands: 4,
+    lineWidth: 0.03,
+    outlineColor: '#666666',
+    glow: 0.4
   },
   crown: {
     name: 'Royal Crown',
@@ -399,7 +444,12 @@ export const accessories = {
     },
     effect: 'royal_shimmer',
     emissive: true,
-    animated: true
+    animated: true,
+    rimColor: '#ffcc00',
+    shadeBands: 4,
+    lineWidth: 0.05,
+    outlineColor: '#664400',
+    glow: 0.45
   }
 };
 

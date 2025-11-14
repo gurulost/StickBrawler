@@ -985,39 +985,6 @@ function snapshotToControlFrame(snapshot?: ControlSnapshot): CpuControlFrame {
   return base;
 }
 
-function snapshotToControlFrame(snapshot?: ControlSnapshot): CpuControlFrame {
-  const base: CpuControlFrame = {
-    jump: false,
-    forward: false,
-    backward: false,
-    leftward: false,
-    rightward: false,
-    dropThrough: false,
-    attack1: false,
-    attack2: false,
-    special: false,
-    airAttack: false,
-    dodge: false,
-    grab: false,
-    shield: false,
-  };
-  if (!snapshot) return base;
-  base.jump = !!snapshot.jump;
-  base.forward = !!snapshot.forward;
-  base.backward = !!snapshot.backward;
-  base.leftward = !!snapshot.leftward;
-  base.rightward = !!snapshot.rightward;
-  base.attack1 = !!snapshot.attack1;
-  base.attack2 = !!snapshot.attack2;
-  base.special = !!snapshot.special;
-  base.airAttack = !!snapshot.airAttack;
-  base.dodge = !!snapshot.dodge;
-  base.grab = !!snapshot.grab;
-  base.shield = !!snapshot.shield;
-  base.dropThrough = !!snapshot.backward && !!snapshot.jump;
-  return base;
-}
-
 function deriveDirectionalInfluence(
   input: InfluenceSnapshot,
   airborne: boolean,

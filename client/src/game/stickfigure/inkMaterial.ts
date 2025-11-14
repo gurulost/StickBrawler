@@ -69,7 +69,6 @@ export function useInkMaterial({
       },
       transparent: opacity < 1,
     });
-    shader.extensions.derivatives = true;
     shader.depthWrite = true;
     shader.side = THREE.FrontSide;
     return shader;

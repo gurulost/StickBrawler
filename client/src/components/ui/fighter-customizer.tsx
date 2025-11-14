@@ -7,7 +7,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from './tabs';
 import { Badge } from './badge';
 import { Separator } from './separator';
 import { Input } from './input';
-import { useCustomization, colorThemes, figureStyles, accessories, animationStyles, inkStyles, SavedCharacter, type CoinLedgerEntry, type ColorTheme, type FigureStyle, type Accessory, type AnimationStyle, type InkStyle } from '../../lib/stores/useCustomization';
+import { useCustomization, colorThemes, figureStyles, accessories, animationStyles, inkStyles, SavedCharacter, type CoinLedgerEntry, type ColorTheme, type FigureStyle, type Accessory, type AnimationStyle, type InkStyle, type InkOverrides, type FigureStyleOverrides } from '../../lib/stores/useCustomization';
 import type { CosmeticSlot } from '../../lib/stores/useCustomization';
 import StickFigure from '../../game/StickFigure';
 import { useFighting } from '../../lib/stores/useFighting';
@@ -386,6 +386,304 @@ const InkStyleSelector = ({
   );
 };
 
+const SliderControl = ({
+  label,
+  value,
+  min,
+  max,
+  step = 0.01,
+  onChange,
+  formatValue,
+}: {
+  label: string;
+  value: number;
+  min: number;
+  max: number;
+  step?: number;
+  onChange: (value: number) => void;
+  formatValue?: (value: number) => string;
+}) => {
+  const clamped = Math.min(max, Math.max(min, Number.isFinite(value) ? value : min));
+  return (
+    <div className="space-y-1">
+      <div className="flex items-center justify-between text-xs text-gray-400">
+        <span className="text-sm text-gray-200">{label}</span>
+        <span className="font-mono text-gray-300">
+          {formatValue ? formatValue(clamped) : clamped.toFixed(2)}
+        </span>
+      </div>
+      <input
+        type="range"
+        min={min}
+        max={max}
+        step={step}
+        value={clamped}
+        onChange={(event) => onChange(parseFloat(event.target.value))}
+        className="w-full accent-blue-400"
+      />
+    </div>
+  );
+};
+
+const FigureBlendControls = ({
+  baseStyle,
+  blendTarget,
+  blendAmount,
+  styleOptions,
+  onTargetChange,
+  onBlendChange,
+}: {
+  baseStyle: FigureStyle;
+  blendTarget: FigureStyle | null;
+  blendAmount: number;
+  styleOptions: FigureStyle[];
+  onTargetChange: (style: FigureStyle | null) => void;
+  onBlendChange: (amount: number) => void;
+}) => (
+  <div className="bg-gray-900/40 border border-gray-700 rounded-xl p-4 space-y-3">
+    <div className="flex items-center justify-between">
+      <div>
+        <p className="text-sm font-semibold text-white">Preset Blending</p>
+        <p className="text-xs text-gray-400">Mix silhouettes to craft new forms</p>
+      </div>
+      <Badge className="bg-gray-700 text-gray-200 border-gray-600">
+        {blendTarget ? `${Math.round(blendAmount * 100)}% ${blendTarget}` : 'Base only'}
+      </Badge>
+    </div>
+    <div className="space-y-2">
+      <label className="text-xs uppercase tracking-wide text-gray-400">Blend Source</label>
+      <select
+        value={blendTarget ?? ''}
+        onChange={(event) => {
+          const next = event.target.value || null;
+          onTargetChange(next as FigureStyle | null);
+          if (!next) {
+            onBlendChange(0);
+          }
+        }}
+        className="w-full bg-gray-800 border border-gray-600 rounded-lg px-3 py-2 text-sm text-gray-100"
+      >
+        <option value="">Use base preset</option>
+        {styleOptions
+          .filter((style) => style !== baseStyle)
+          .map((style) => (
+            <option key={style} value={style}>
+              {style.charAt(0).toUpperCase() + style.slice(1)}
+            </option>
+          ))}
+      </select>
+    </div>
+    <SliderControl
+      label="Blend Amount"
+      value={blendTarget ? blendAmount : 0}
+      min={0}
+      max={1}
+      step={0.05}
+      formatValue={(value) => `${Math.round(value * 100)}%`}
+      onChange={(value) => onBlendChange(blendTarget ? value : 0)}
+    />
+  </div>
+);
+
+type FigureStyleShape = (typeof figureStyles)[FigureStyle];
+
+const SilhouetteOverrideControls = ({
+  label,
+  style,
+  overrides,
+  onChange,
+  onReset,
+}: {
+  label: string;
+  style: FigureStyleShape;
+  overrides: FigureStyleOverrides | null;
+  onChange: (patch: Partial<FigureStyleOverrides>) => void;
+  onReset: () => void;
+}) => {
+  const arms = style.silhouette?.arms;
+  const legs = style.silhouette?.legs;
+  return (
+    <div className="bg-gray-900/40 border border-gray-700 rounded-xl p-4 space-y-4">
+      <div className="flex items-center justify-between">
+        <div>
+          <p className="text-sm font-semibold text-white">{label}</p>
+          <p className="text-xs text-gray-400">Directly sculpt the silhouette</p>
+        </div>
+        <button
+          type="button"
+          className="text-xs text-blue-300 hover:text-blue-100"
+          onClick={onReset}
+        >
+          Reset
+        </button>
+      </div>
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <SliderControl
+          label="Head Size"
+          value={overrides?.headSize ?? style.headSize}
+          min={0.18}
+          max={0.45}
+          step={0.01}
+          onChange={(value) => onChange({ headSize: value })}
+        />
+        <SliderControl
+          label="Body Length"
+          value={overrides?.bodyLength ?? style.bodyLength}
+          min={0.5}
+          max={1}
+          step={0.01}
+          onChange={(value) => onChange({ bodyLength: value })}
+        />
+        <SliderControl
+          label="Limb Thickness"
+          value={overrides?.limbThickness ?? style.limbThickness}
+          min={0.04}
+          max={0.16}
+          step={0.005}
+          onChange={(value) => onChange({ limbThickness: value })}
+        />
+        <SliderControl
+          label="Shoulder Width"
+          value={overrides?.shoulderWidth ?? style.shoulderWidth}
+          min={0.25}
+          max={0.7}
+          step={0.01}
+          onChange={(value) => onChange({ shoulderWidth: value })}
+        />
+        <SliderControl
+          label="Outline Width"
+          value={overrides?.outlineWidth ?? style.outlineWidth ?? 0.04}
+          min={0.01}
+          max={0.12}
+          step={0.005}
+          onChange={(value) => onChange({ outlineWidth: value })}
+        />
+        <SliderControl
+          label="Glow Intensity"
+          value={overrides?.glowIntensity ?? style.glowIntensity ?? 0.2}
+          min={0}
+          max={1}
+          step={0.05}
+          onChange={(value) => onChange({ glowIntensity: value })}
+        />
+      </div>
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <SliderControl
+          label="Arm Length"
+          value={overrides?.silhouette?.arms?.length ?? arms?.length ?? 0.7}
+          min={0.55}
+          max={1.0}
+          step={0.01}
+          onChange={(value) => onChange({ silhouette: { arms: { length: value } } })}
+        />
+        <SliderControl
+          label="Leg Length"
+          value={overrides?.silhouette?.legs?.length ?? legs?.length ?? 0.85}
+          min={0.7}
+          max={1.1}
+          step={0.01}
+          onChange={(value) => onChange({ silhouette: { legs: { length: value } } })}
+        />
+        <SliderControl
+          label="Arm Curvature"
+          value={overrides?.silhouette?.arms?.curvature ?? arms?.curvature ?? 0}
+          min={-0.15}
+          max={0.15}
+          step={0.005}
+          onChange={(value) => onChange({ silhouette: { arms: { curvature: value } } })}
+        />
+        <SliderControl
+          label="Leg Curvature"
+          value={overrides?.silhouette?.legs?.curvature ?? legs?.curvature ?? 0}
+          min={-0.15}
+          max={0.15}
+          step={0.005}
+          onChange={(value) => onChange({ silhouette: { legs: { curvature: value } } })}
+        />
+      </div>
+    </div>
+  );
+};
+
+const InkOverrideControls = ({
+  label,
+  baseStyle,
+  overrides,
+  onChange,
+  onReset,
+}: {
+  label: string;
+  baseStyle: (typeof inkStyles)[InkStyle];
+  overrides: InkOverrides | null;
+  onChange: (patch: Partial<InkOverrides>) => void;
+  onReset: () => void;
+}) => {
+  const rimColor = overrides?.rimColor ?? baseStyle.rimColor;
+  const outlineColor = overrides?.outlineColor ?? baseStyle.outlineColor;
+  return (
+    <div className="bg-gray-900/40 border border-gray-700 rounded-xl p-4 space-y-4">
+      <div className="flex items-center justify-between">
+        <div>
+          <p className="text-sm font-semibold text-white">{label}</p>
+          <p className="text-xs text-gray-400">Fine-tune ink shader response</p>
+        </div>
+        <button
+          type="button"
+          className="text-xs text-blue-300 hover:text-blue-100"
+          onClick={onReset}
+        >
+          Reset
+        </button>
+      </div>
+      <div className="grid grid-cols-2 gap-3">
+        <label className="text-xs text-gray-400 flex flex-col gap-1">
+          <span className="text-sm text-gray-200">Rim Color</span>
+          <input
+            type="color"
+            value={rimColor}
+            onChange={(event) => onChange({ rimColor: event.target.value })}
+            className="w-full h-10 rounded border border-gray-600 bg-gray-800"
+          />
+        </label>
+        <label className="text-xs text-gray-400 flex flex-col gap-1">
+          <span className="text-sm text-gray-200">Outline Color</span>
+          <input
+            type="color"
+            value={outlineColor}
+            onChange={(event) => onChange({ outlineColor: event.target.value })}
+            className="w-full h-10 rounded border border-gray-600 bg-gray-800"
+          />
+        </label>
+      </div>
+      <SliderControl
+        label="Line Width"
+        value={overrides?.lineWidth ?? baseStyle.lineWidth}
+        min={0.005}
+        max={0.12}
+        step={0.0025}
+        onChange={(value) => onChange({ lineWidth: value })}
+      />
+      <SliderControl
+        label="Shade Bands"
+        value={overrides?.shadeBands ?? baseStyle.shadeBands}
+        min={1}
+        max={5}
+        step={1}
+        formatValue={(value) => `${Math.round(value)} bands`}
+        onChange={(value) => onChange({ shadeBands: Math.round(value) })}
+      />
+      <SliderControl
+        label="Glow Boost"
+        value={overrides?.glow ?? baseStyle.glow}
+        min={0}
+        max={0.6}
+        step={0.02}
+        onChange={(value) => onChange({ glow: value })}
+      />
+    </div>
+  );
+};
+
 // Enhanced accessory selector with visual effects
 const AccessorySelector = ({ 
   label, 
@@ -678,14 +976,54 @@ export function FighterCustomizer() {
   const [characterName, setCharacterName] = useState('');
   const [economyNotice, setEconomyNotice] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
   const [presetFilter, setPresetFilter] = useState<PresetFilter>('all');
+  const [sharePreview, setSharePreview] = useState('');
+  const [importBuffer, setImportBuffer] = useState('');
   
   const {
-    playerColorTheme, playerFigureStyle, playerAccessory, playerAccessoryColor, playerAnimationStyle, playerInkStyle,
-    cpuColorTheme, cpuFigureStyle, cpuAccessory, cpuAccessoryColor, cpuAnimationStyle, cpuInkStyle,
+    playerColorTheme,
+    playerFigureStyle,
+    playerBlendTargetStyle,
+    playerBlendAmount,
+    playerStyleOverrides,
+    playerAccessory,
+    playerAccessoryColor,
+    playerAnimationStyle,
+    playerInkStyle,
+    playerInkOverrides,
+    cpuColorTheme,
+    cpuFigureStyle,
+    cpuBlendTargetStyle,
+    cpuBlendAmount,
+    cpuStyleOverrides,
+    cpuAccessory,
+    cpuAccessoryColor,
+    cpuAnimationStyle,
+    cpuInkStyle,
+    cpuInkOverrides,
     savedCharacters,
-    setPlayerColorTheme, setPlayerFigureStyle, setPlayerAccessory, setPlayerAnimationStyle, setPlayerInkStyle,
-    setCPUColorTheme, setCPUFigureStyle, setCPUAccessory, setCPUAnimationStyle, setCPUInkStyle,
-    saveCharacter, loadCharacter, deleteCharacter,
+    setPlayerColorTheme,
+    setPlayerFigureStyle,
+    setPlayerBlendTargetStyle,
+    setPlayerBlendAmount,
+    updatePlayerStyleOverrides,
+    resetPlayerStyleOverrides,
+    setPlayerAccessory,
+    setPlayerAnimationStyle,
+    setPlayerInkStyle,
+    setPlayerInkOverrides,
+    setCPUColorTheme,
+    setCPUFigureStyle,
+    setCPUBlendTargetStyle,
+    setCPUBlendAmount,
+    updateCPUStyleOverrides,
+    resetCPUStyleOverrides,
+    setCPUAccessory,
+    setCPUAnimationStyle,
+    setCPUInkStyle,
+    setCPUInkOverrides,
+    saveCharacter,
+    loadCharacter,
+    deleteCharacter,
     resetCustomizations,
     coins,
     purchaseCosmetic,
@@ -697,6 +1035,8 @@ export function FighterCustomizer() {
     unlockedFigureStyles,
     unlockedAccessories,
     unlockedAnimationStyles,
+    getPlayerStyle,
+    getCPUStyle,
   } = useCustomization();
 
   const describeCosmetic = (slot: CosmeticSlot, id: string) => {
@@ -806,8 +1146,16 @@ export function FighterCustomizer() {
   const copyPlayerToCpu = () => {
     setCPUColorTheme(playerColorTheme);
     setCPUFigureStyle(playerFigureStyle);
+    setCPUBlendTargetStyle(playerBlendTargetStyle);
+    setCPUBlendAmount(playerBlendAmount);
+    resetCPUStyleOverrides();
+    if (playerStyleOverrides) {
+      updateCPUStyleOverrides(playerStyleOverrides);
+    }
     setCPUAccessory(playerAccessory, playerAccessoryColor);
     setCPUAnimationStyle(playerAnimationStyle);
+    setCPUInkStyle(playerInkStyle);
+    setCPUInkOverrides(playerInkOverrides);
     setEconomyNotice({
       type: 'success',
       message: 'Copied player style to CPU.',
@@ -817,8 +1165,16 @@ export function FighterCustomizer() {
   const copyCpuToPlayer = () => {
     setPlayerColorTheme(cpuColorTheme);
     setPlayerFigureStyle(cpuFigureStyle);
+    setPlayerBlendTargetStyle(cpuBlendTargetStyle);
+    setPlayerBlendAmount(cpuBlendAmount);
+    resetPlayerStyleOverrides();
+    if (cpuStyleOverrides) {
+      updatePlayerStyleOverrides(cpuStyleOverrides);
+    }
     setPlayerAccessory(cpuAccessory, cpuAccessoryColor);
     setPlayerAnimationStyle(cpuAnimationStyle);
+    setPlayerInkStyle(cpuInkStyle);
+    setPlayerInkOverrides(cpuInkOverrides);
     setEconomyNotice({
       type: 'success',
       message: 'Copied CPU style to player.',
@@ -827,6 +1183,90 @@ export function FighterCustomizer() {
 
   const handleRandomizeActive = () => {
     randomizeFighter(activeTab === 'player' ? 'player' : 'cpu');
+  };
+
+  const buildSnapshot = (target: 'player' | 'cpu'): SavedCharacter => {
+    const isPlayer = target === 'player';
+    return {
+      id: `${target}_share_${Date.now()}`,
+      name: `${isPlayer ? 'Player' : 'CPU'} Fighter`,
+      colorTheme: isPlayer ? playerColorTheme : cpuColorTheme,
+      figureStyle: isPlayer ? playerFigureStyle : cpuFigureStyle,
+      figureBlendTarget: isPlayer ? playerBlendTargetStyle : cpuBlendTargetStyle,
+      figureBlendAmount: isPlayer ? playerBlendAmount : cpuBlendAmount,
+      figureStyleOverrides: isPlayer ? playerStyleOverrides : cpuStyleOverrides,
+      accessory: isPlayer ? playerAccessory : cpuAccessory,
+      accessoryColor: isPlayer ? playerAccessoryColor : cpuAccessoryColor,
+      animationStyle: isPlayer ? playerAnimationStyle : cpuAnimationStyle,
+      inkStyle: isPlayer ? playerInkStyle : cpuInkStyle,
+      inkOverrides: isPlayer ? playerInkOverrides : cpuInkOverrides,
+      createdAt: new Date().toISOString(),
+    };
+  };
+
+  const handleCopyConfig = async (target: 'player' | 'cpu') => {
+    const json = JSON.stringify(buildSnapshot(target), null, 2);
+    setSharePreview(json);
+    try {
+      if (typeof navigator !== 'undefined' && navigator?.clipboard?.writeText) {
+        await navigator.clipboard.writeText(json);
+        setEconomyNotice({
+          type: 'success',
+          message: `Copied ${target === 'player' ? 'player' : 'CPU'} fighter JSON.`,
+        });
+      } else {
+        throw new Error('Clipboard not available');
+      }
+    } catch (error) {
+      console.error('Clipboard error:', error);
+      setEconomyNotice({
+        type: 'error',
+        message: 'Clipboard unavailable. Copy from the preview text instead.',
+      });
+    }
+  };
+
+  const handleImportConfig = (target: 'player' | 'cpu') => {
+    if (!importBuffer.trim()) {
+      setEconomyNotice({
+        type: 'error',
+        message: 'Paste fighter JSON before importing.',
+      });
+      return;
+    }
+    try {
+      const parsed = JSON.parse(importBuffer);
+      if (!parsed.colorTheme || !parsed.figureStyle) {
+        throw new Error('Missing required fields');
+      }
+      const payload: SavedCharacter = {
+        id: parsed.id ?? `import_${Date.now()}`,
+        name: parsed.name ?? 'Imported Fighter',
+        colorTheme: parsed.colorTheme,
+        figureStyle: parsed.figureStyle,
+        figureBlendTarget: parsed.figureBlendTarget ?? null,
+        figureBlendAmount: parsed.figureBlendAmount ?? 0,
+        figureStyleOverrides: parsed.figureStyleOverrides ?? null,
+        accessory: parsed.accessory ?? 'none',
+        accessoryColor: parsed.accessoryColor ?? '#ffffff',
+        animationStyle: parsed.animationStyle ?? 'normal',
+        inkStyle: parsed.inkStyle ?? 'classic',
+        inkOverrides: parsed.inkOverrides ?? null,
+        createdAt: parsed.createdAt ?? new Date().toISOString(),
+      };
+      loadCharacter(payload, target === 'player');
+      setImportBuffer('');
+      setEconomyNotice({
+        type: 'success',
+        message: `Imported ${target === 'player' ? 'player' : 'CPU'} fighter.`,
+      });
+    } catch (error) {
+      console.error('Import error:', error);
+      setEconomyNotice({
+        type: 'error',
+        message: 'Invalid fighter JSON payload.',
+      });
+    }
   };
 
   const filteredPresets = useMemo(() => {
@@ -858,6 +1298,61 @@ export function FighterCustomizer() {
     { id: 'epic', label: 'Epic' },
     { id: 'legendary', label: 'Legendary' },
   ];
+  const figureStyleKeys = useMemo(() => Object.keys(figureStyles) as FigureStyle[], []);
+  const livePlayerStyle = getPlayerStyle();
+  const liveCPUStyle = getCPUStyle();
+  const isPlayerTab = activeTab === 'player';
+  const activeStyle = isPlayerTab ? livePlayerStyle : liveCPUStyle;
+  const activeStyleOverrides = isPlayerTab ? playerStyleOverrides : cpuStyleOverrides;
+  const activeInkOverrides = isPlayerTab ? playerInkOverrides : cpuInkOverrides;
+  const activeInkStyleId = isPlayerTab ? playerInkStyle : cpuInkStyle;
+  const activeInkBase = inkStyles[activeInkStyleId] ?? inkStyles.classic;
+  const activeBlendTarget = isPlayerTab ? playerBlendTargetStyle : cpuBlendTargetStyle;
+  const activeBlendAmount = isPlayerTab ? playerBlendAmount : cpuBlendAmount;
+  const handleStyleOverrideChange = (patch: Partial<FigureStyleOverrides>) => {
+    if (isPlayerTab) {
+      updatePlayerStyleOverrides(patch);
+    } else {
+      updateCPUStyleOverrides(patch);
+    }
+  };
+  const handleResetStyleOverrides = () => {
+    if (isPlayerTab) {
+      resetPlayerStyleOverrides();
+    } else {
+      resetCPUStyleOverrides();
+    }
+  };
+  const handleInkOverrideChange = (patch: Partial<InkOverrides>) => {
+    if (isPlayerTab) {
+      setPlayerInkOverrides({ ...(playerInkOverrides ?? {}), ...patch });
+    } else {
+      setCPUInkOverrides({ ...(cpuInkOverrides ?? {}), ...patch });
+    }
+  };
+  const handleResetInkOverrides = () => {
+    if (isPlayerTab) {
+      setPlayerInkOverrides(null);
+    } else {
+      setCPUInkOverrides(null);
+    }
+  };
+  const handleBlendTargetChange = (style: FigureStyle | null) => {
+    if (isPlayerTab) {
+      setPlayerBlendTargetStyle(style);
+      if (!style) setPlayerBlendAmount(0);
+    } else {
+      setCPUBlendTargetStyle(style);
+      if (!style) setCPUBlendAmount(0);
+    }
+  };
+  const handleBlendAmountChange = (amount: number) => {
+    if (isPlayerTab) {
+      setPlayerBlendAmount(amount);
+    } else {
+      setCPUBlendAmount(amount);
+    }
+  };
 
   useEffect(() => {
     if (!economyNotice) return;
@@ -886,13 +1381,21 @@ export function FighterCustomizer() {
       if (targetTab === 'player') {
         setPlayerColorTheme(preset.colorTheme);
         setPlayerFigureStyle(preset.figureStyle);
+        setPlayerBlendTargetStyle(null);
+        setPlayerBlendAmount(0);
+        resetPlayerStyleOverrides();
         setPlayerAccessory(preset.accessory, preset.accessoryColor);
         setPlayerAnimationStyle(preset.animationStyle);
+        setPlayerInkOverrides(null);
       } else {
         setCPUColorTheme(preset.colorTheme);
         setCPUFigureStyle(preset.figureStyle);
+        setCPUBlendTargetStyle(null);
+        setCPUBlendAmount(0);
+        resetCPUStyleOverrides();
         setCPUAccessory(preset.accessory, preset.accessoryColor);
         setCPUAnimationStyle(preset.animationStyle);
+        setCPUInkOverrides(null);
       }
     } catch (error) {
       console.error('Error loading preset:', error);
@@ -1281,6 +1784,84 @@ export function FighterCustomizer() {
                       }
                     }}
                   />
+                </div>
+
+                <Separator className="my-6 bg-gray-600" />
+
+                <div className="space-y-4">
+                  <h3 className="text-lg font-semibold text-white">Advanced Silhouette & Ink</h3>
+                  <FigureBlendControls
+                    baseStyle={activeTab === 'player' ? playerFigureStyle : cpuFigureStyle}
+                    blendTarget={activeBlendTarget}
+                    blendAmount={activeBlendTarget ? activeBlendAmount : 0}
+                    styleOptions={figureStyleKeys}
+                    onTargetChange={handleBlendTargetChange}
+                    onBlendChange={handleBlendAmountChange}
+                  />
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                    <SilhouetteOverrideControls
+                      label="Silhouette Lab"
+                      style={activeStyle}
+                      overrides={activeStyleOverrides}
+                      onChange={handleStyleOverrideChange}
+                      onReset={handleResetStyleOverrides}
+                    />
+                    <InkOverrideControls
+                      label="Ink Overrides"
+                      baseStyle={activeInkBase}
+                      overrides={activeInkOverrides}
+                      onChange={handleInkOverrideChange}
+                      onReset={handleResetInkOverrides}
+                    />
+                  </div>
+                </div>
+
+                <Separator className="my-6 bg-gray-600" />
+
+                <div className="space-y-3">
+                  <h3 className="text-lg font-semibold text-white flex items-center gap-2">
+                    <Copy className="w-4 h-4" />
+                    Share & Import
+                  </h3>
+                  <div className="flex flex-col gap-2">
+                    <div className="flex flex-col md:flex-row gap-2">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={() => handleCopyConfig(isPlayerTab ? 'player' : 'cpu')}
+                        className="border-blue-500 text-blue-200 hover:bg-blue-900/30"
+                      >
+                        <Copy className="w-4 h-4 mr-2" />
+                        Copy {isPlayerTab ? 'Player' : 'CPU'} JSON
+                      </Button>
+                      <div className="flex gap-2 flex-1">
+                        <Input
+                          value={importBuffer}
+                          onChange={(event) => setImportBuffer(event.target.value)}
+                          placeholder="Paste fighter JSON to import"
+                          className="bg-gray-800 border-gray-600 text-gray-100 flex-1"
+                        />
+                        <Button
+                          type="button"
+                          onClick={() => handleImportConfig(isPlayerTab ? 'player' : 'cpu')}
+                          className="bg-green-600 hover:bg-green-700"
+                        >
+                          Import
+                        </Button>
+                      </div>
+                    </div>
+                    {sharePreview && (
+                      <textarea
+                        readOnly
+                        value={sharePreview}
+                        className="w-full h-36 bg-gray-950 border border-gray-700 rounded-lg p-3 text-xs font-mono text-gray-200"
+                      />
+                    )}
+                    <p className="text-xs text-gray-400">
+                      Exports capture blend, silhouette, accessory, and ink settings. Imports apply to whichever tab
+                      (Player or CPU) is active.
+                    </p>
+                  </div>
                 </div>
 
                 <Separator className="my-6 bg-gray-600" />

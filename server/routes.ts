@@ -3,7 +3,6 @@ import { createServer, type Server } from "http";
 import { z } from "zod";
 import { storage } from "./storage";
 import { hitTelemetrySchema, storeTelemetry, summarizeTelemetry, peekTelemetryBuffer } from "./telemetry";
-
 const scoreSubmissionSchema = z.object({
   userId: z
     .number({ coerce: true })
@@ -37,6 +36,64 @@ const economyUnlockSchema = z.object({
   animationStyles: z.array(z.string()).default([]),
 });
 
+const silhouetteLimbOverrideSchema = z
+  .object({
+    length: z.number().optional(),
+    base: z.number().optional(),
+    mid: z.number().optional(),
+    tip: z.number().optional(),
+    curvature: z.number().optional(),
+  })
+  .partial();
+
+const figureStyleOverrideSchema = z
+  .object({
+    headSize: z.number().optional(),
+    bodyLength: z.number().optional(),
+    limbThickness: z.number().optional(),
+    shoulderWidth: z.number().optional(),
+    outlineWidth: z.number().optional(),
+    bodyScale: z.number().optional(),
+    glowIntensity: z.number().optional(),
+    particleCount: z.number().optional(),
+    silhouette: z
+      .object({
+        arms: silhouetteLimbOverrideSchema.optional(),
+        legs: silhouetteLimbOverrideSchema.optional(),
+      })
+      .optional(),
+  })
+  .partial();
+
+const inkOverrideSchema = z
+  .object({
+    rimColor: z.string().optional(),
+    shadeBands: z.number().optional(),
+    lineWidth: z.number().optional(),
+    glow: z.number().optional(),
+    outlineColor: z.string().optional(),
+  })
+  .partial();
+
+const fighterLoadoutSchema = z.object({
+  colorTheme: z.string(),
+  figureStyle: z.string(),
+  figureBlendTargetStyle: z.string().optional().nullable(),
+  figureBlendAmount: z.number().min(0).max(1).optional(),
+  figureStyleOverrides: figureStyleOverrideSchema.optional().nullable(),
+  accessory: z.string(),
+  accessoryColor: z.string(),
+  animationStyle: z.string(),
+  inkStyle: z.string(),
+  inkOverrides: inkOverrideSchema.optional().nullable(),
+});
+
+const loadoutEnvelopeSchema = z.object({
+  player: fighterLoadoutSchema,
+  opponent: fighterLoadoutSchema,
+  hash: z.string().min(4),
+});
+
 const economyPayloadSchema = z.object({
   profileId: z.string().min(6).max(64),
   userId: z
@@ -48,6 +105,7 @@ const economyPayloadSchema = z.object({
   lifetimeCoins: z.number().int().min(0),
   unlocks: economyUnlockSchema,
   lastCoinEvent: coinLedgerEntrySchema.optional(),
+  loadouts: loadoutEnvelopeSchema.optional(),
 });
 
 type AsyncHandler = (
@@ -132,6 +190,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         lifetimeCoins: parsed.data.lifetimeCoins,
         unlocks: parsed.data.unlocks,
         lastCoinEvent: parsed.data.lastCoinEvent ?? null,
+        loadouts: parsed.data.loadouts ?? null,
         updatedAt: new Date().toISOString(),
       });
 

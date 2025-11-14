@@ -56,7 +56,16 @@ export function useInkMaterial({
   glow = 0,
 }: InkParams) {
   const lowGraphicsMode = useControls((state) => state.lowGraphicsMode);
+  const inkQuality = useControls((state) => state.inkQuality);
   const lightKey = lightDirection.join(",");
+  const qualitySettings = {
+    cinematic: { shadeMultiplier: 1, glowMultiplier: 1 },
+    balanced: { shadeMultiplier: 0.85, glowMultiplier: 0.85 },
+    performance: { shadeMultiplier: 0.6, glowMultiplier: 0.55 },
+  } as const;
+  const quality = qualitySettings[inkQuality] ?? qualitySettings.cinematic;
+  const effectiveShadeBands = Math.max(1, Math.round(shadeBands * quality.shadeMultiplier));
+  const effectiveGlow = glow * quality.glowMultiplier;
   
   const material = useMemo(() => {
     if (lowGraphicsMode) {
@@ -74,8 +83,8 @@ export function useInkMaterial({
         uBaseColor: { value: new THREE.Color(baseColor) },
         uRimColor: { value: new THREE.Color(rimColor) },
         uLightDir: { value: new THREE.Vector3().fromArray(lightDirection).normalize() },
-        uShadeBands: { value: shadeBands },
-        uGlow: { value: glow },
+        uShadeBands: { value: effectiveShadeBands },
+        uGlow: { value: effectiveGlow },
         uOpacity: { value: opacity },
       },
       transparent: opacity < 1,
@@ -83,7 +92,7 @@ export function useInkMaterial({
     shader.depthWrite = true;
     shader.side = THREE.FrontSide;
     return shader;
-  }, [baseColor, rimColor, shadeBands, lightKey, opacity, lowGraphicsMode]);
+  }, [baseColor, rimColor, effectiveShadeBands, effectiveGlow, lightKey, lowGraphicsMode]);
 
   useEffect(() => {
     return () => {
@@ -93,9 +102,28 @@ export function useInkMaterial({
 
   useEffect(() => {
     if (material instanceof THREE.ShaderMaterial) {
-      material.uniforms.uGlow.value = glow;
+      material.uniforms.uGlow.value = effectiveGlow;
     }
-  }, [material, glow]);
+  }, [material, effectiveGlow]);
+
+  useEffect(() => {
+    if (material instanceof THREE.ShaderMaterial) {
+      material.uniforms.uShadeBands.value = effectiveShadeBands;
+      material.needsUpdate = true;
+    }
+  }, [material, effectiveShadeBands]);
+
+  useEffect(() => {
+    if (material instanceof THREE.ShaderMaterial) {
+      material.uniforms.uOpacity.value = opacity;
+      material.transparent = opacity < 1;
+      material.needsUpdate = true;
+    } else if (material instanceof THREE.MeshToonMaterial) {
+      material.opacity = opacity;
+      material.transparent = opacity < 1;
+      material.needsUpdate = true;
+    }
+  }, [material, opacity]);
 
   useEffect(() => {
     if (material instanceof THREE.ShaderMaterial) {

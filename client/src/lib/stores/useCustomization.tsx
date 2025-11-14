@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
+import { composeLoadoutHash, type FighterLoadoutSnapshot, type FigureStyleOverrideSnapshot as SharedFigureStyleOverrideSnapshot, type InkOverrideSnapshot as SharedInkOverrideSnapshot, type LoadoutSyncEnvelope } from '@shared/customization';
 
 // Define enhanced color themes with special effects
 export const colorThemes = {
@@ -560,13 +561,7 @@ export const inkStyles = {
 
 export type InkStyle = keyof typeof inkStyles;
 
-export interface InkOverrides {
-  rimColor?: string;
-  shadeBands?: number;
-  lineWidth?: number;
-  glow?: number;
-  outlineColor?: string;
-}
+export type InkOverrides = SharedInkOverrideSnapshot;
 
 export interface InkParams {
   rimColor: string;
@@ -595,6 +590,216 @@ export type ColorTheme = keyof typeof colorThemes;
 export type FigureStyle = keyof typeof figureStyles;
 export type Accessory = keyof typeof accessories;
 export type AnimationStyle = keyof typeof animationStyles;
+
+type FigureStyleDefinition = (typeof figureStyles)[FigureStyle];
+
+interface LimbProfile {
+  length: number;
+  base?: number;
+  mid?: number;
+  tip?: number;
+  curvature?: number;
+}
+
+interface SilhouetteProfile {
+  arms: LimbProfile;
+  legs: LimbProfile;
+}
+
+const DEFAULT_ARM_PROFILE: LimbProfile = {
+  length: 0.7,
+  base: 1,
+  mid: 0.85,
+  tip: 0.6,
+  curvature: 0,
+};
+
+const DEFAULT_LEG_PROFILE: LimbProfile = {
+  length: 0.85,
+  base: 1.15,
+  mid: 0.95,
+  tip: 0.65,
+  curvature: 0,
+};
+
+const clamp01 = (value: number) => Math.min(1, Math.max(0, value));
+const lerp = (from: number, to: number, t: number) => from + (to - from) * t;
+
+const cloneLimbProfile = (profile?: LimbProfile, fallback: LimbProfile = DEFAULT_ARM_PROFILE): LimbProfile => ({
+  length: profile?.length ?? fallback.length,
+  base: profile?.base ?? fallback.base,
+  mid: profile?.mid ?? fallback.mid,
+  tip: profile?.tip ?? fallback.tip,
+  curvature: profile?.curvature ?? fallback.curvature,
+});
+
+const blendLimbProfile = (base: LimbProfile, target: LimbProfile, t: number): LimbProfile => ({
+  length: lerp(base.length, target.length, t),
+  base: lerp(base.base ?? 1, target.base ?? 1, t),
+  mid: lerp(base.mid ?? base.base ?? 1, target.mid ?? target.base ?? 1, t),
+  tip: lerp(base.tip ?? base.mid ?? 1, target.tip ?? target.mid ?? 1, t),
+  curvature: lerp(base.curvature ?? 0, target.curvature ?? 0, t),
+});
+
+const cloneFigureStyle = (style: FigureStyleDefinition): FigureStyleDefinition & { silhouette: SilhouetteProfile } => ({
+  ...style,
+  silhouette: {
+    arms: cloneLimbProfile(style.silhouette?.arms, DEFAULT_ARM_PROFILE),
+    legs: cloneLimbProfile(style.silhouette?.legs, DEFAULT_LEG_PROFILE),
+  },
+});
+
+const NUMERIC_BLEND_KEYS: Array<keyof FigureStyleDefinition> = [
+  "headSize",
+  "bodyLength",
+  "limbThickness",
+  "shoulderWidth",
+  "outlineWidth",
+  "bodyScale",
+  "glowIntensity",
+  "animationMultiplier",
+  "particleCount",
+];
+
+export type FigureStyleOverrides = SharedFigureStyleOverrideSnapshot;
+
+const blendStyleValues = (
+  style: FigureStyleDefinition & { silhouette: SilhouetteProfile },
+  target: FigureStyleDefinition | undefined,
+  amount: number,
+) => {
+  const t = clamp01(amount);
+  if (!target || t <= 0) return style;
+  for (const key of NUMERIC_BLEND_KEYS) {
+    const baseValue = style[key];
+    const targetValue = target[key];
+    if (typeof baseValue === "number" && typeof targetValue === "number") {
+      (style as Record<string, number>)[key as string] = lerp(baseValue, targetValue, t);
+    }
+  }
+  if (target.silhouette) {
+    style.silhouette.arms = blendLimbProfile(
+      style.silhouette.arms,
+      cloneLimbProfile(target.silhouette.arms, DEFAULT_ARM_PROFILE),
+      t,
+    );
+    style.silhouette.legs = blendLimbProfile(
+      style.silhouette.legs,
+      cloneLimbProfile(target.silhouette.legs, DEFAULT_LEG_PROFILE),
+      t,
+    );
+  }
+  return style;
+};
+
+const applyOverridesToStyle = (
+  style: FigureStyleDefinition & { silhouette: SilhouetteProfile },
+  overrides?: FigureStyleOverrides | null,
+) => {
+  if (!overrides) return style;
+  const assign = <K extends keyof FigureStyleOverrides>(key: K) => {
+    const value = overrides[key];
+    if (typeof value === "number") {
+      (style as Record<string, number>)[key as string] = value;
+    }
+  };
+  assign("headSize");
+  assign("bodyLength");
+  assign("limbThickness");
+  assign("shoulderWidth");
+  assign("outlineWidth");
+  assign("bodyScale");
+  assign("glowIntensity");
+  assign("particleCount");
+  if (overrides.silhouette?.arms) {
+    style.silhouette.arms = { ...style.silhouette.arms, ...overrides.silhouette.arms };
+  }
+  if (overrides.silhouette?.legs) {
+    style.silhouette.legs = { ...style.silhouette.legs, ...overrides.silhouette.legs };
+  }
+  return style;
+};
+
+const mergeStyleOverrides = (
+  current: FigureStyleOverrides | null,
+  patch?: Partial<FigureStyleOverrides> | null,
+): FigureStyleOverrides | null => {
+  if (!patch) return current;
+  let changed = false;
+  const next: FigureStyleOverrides = { ...(current ?? {}) };
+  const assign = <K extends keyof FigureStyleOverrides>(key: K) => {
+    if (patch[key] !== undefined) {
+      next[key] = patch[key] as number;
+      changed = true;
+    }
+  };
+  assign("headSize");
+  assign("bodyLength");
+  assign("limbThickness");
+  assign("shoulderWidth");
+  assign("outlineWidth");
+  assign("bodyScale");
+  assign("glowIntensity");
+  assign("particleCount");
+  if (patch.silhouette) {
+    if (patch.silhouette.arms) {
+      next.silhouette = next.silhouette ?? {};
+      next.silhouette.arms = {
+        ...(next.silhouette.arms ?? {}),
+        ...patch.silhouette.arms,
+      };
+      changed = true;
+    }
+    if (patch.silhouette.legs) {
+      next.silhouette = next.silhouette ?? {};
+      next.silhouette.legs = {
+        ...(next.silhouette.legs ?? {}),
+        ...patch.silhouette.legs,
+      };
+      changed = true;
+    }
+  }
+  return changed ? next : current;
+};
+
+const deriveFigureStyle = (
+  primary: FigureStyle,
+  blendTarget: FigureStyle | null,
+  blendAmount: number,
+  overrides?: FigureStyleOverrides | null,
+): FigureStyleDefinition => {
+  const base = cloneFigureStyle(figureStyles[primary]);
+  if (blendTarget && blendTarget !== primary) {
+    blendStyleValues(base, figureStyles[blendTarget], blendAmount);
+  }
+  return applyOverridesToStyle(base, overrides);
+};
+
+type LoadoutSource = {
+  colorTheme: ColorTheme;
+  figureStyle: FigureStyle;
+  blendTargetStyle: FigureStyle | null;
+  blendAmount: number;
+  styleOverrides: FigureStyleOverrides | null;
+  accessory: Accessory;
+  accessoryColor: string;
+  animationStyle: AnimationStyle;
+  inkStyle: InkStyle;
+  inkOverrides: InkOverrides | null;
+};
+
+const createLoadoutSnapshot = (source: LoadoutSource): FighterLoadoutSnapshot => ({
+  colorTheme: source.colorTheme,
+  figureStyle: source.figureStyle,
+  figureBlendTargetStyle: source.blendTargetStyle ?? null,
+  figureBlendAmount: source.blendAmount,
+  figureStyleOverrides: source.styleOverrides ?? null,
+  accessory: source.accessory,
+  accessoryColor: source.accessoryColor,
+  animationStyle: source.animationStyle,
+  inkStyle: source.inkStyle,
+  inkOverrides: source.inkOverrides ?? null,
+});
 
 export const colorThemeCosts: Record<ColorTheme, number> = {
   blue: 0,
@@ -790,12 +995,16 @@ export interface EconomySyncPayload {
   lifetimeCoins: number;
   unlocks: EconomyUnlockSnapshot;
   lastCoinEvent?: CoinLedgerEntry;
+  loadouts?: LoadoutSyncEnvelope | null;
 }
 
 // Interface for all customization options
 export interface CustomizationOptions {
   playerColorTheme: ColorTheme;
   playerFigureStyle: FigureStyle;
+  playerBlendTargetStyle: FigureStyle | null;
+  playerBlendAmount: number;
+  playerStyleOverrides: FigureStyleOverrides | null;
   playerAccessory: Accessory;
   playerAccessoryColor: string;
   playerAnimationStyle: string;
@@ -804,6 +1013,9 @@ export interface CustomizationOptions {
   
   cpuColorTheme: ColorTheme;
   cpuFigureStyle: FigureStyle;
+  cpuBlendTargetStyle: FigureStyle | null;
+  cpuBlendAmount: number;
+  cpuStyleOverrides: FigureStyleOverrides | null;
   cpuAccessory: Accessory;
   cpuAccessoryColor: string;
   cpuAnimationStyle: string;
@@ -822,6 +1034,9 @@ export interface SavedCharacter {
   animationStyle: string;
   inkStyle: InkStyle;
   inkOverrides?: InkOverrides | null;
+  figureBlendTarget?: FigureStyle | null;
+  figureBlendAmount?: number;
+  figureStyleOverrides?: FigureStyleOverrides | null;
   createdAt: string;
   thumbnail?: string;
 }
@@ -841,6 +1056,8 @@ interface CustomizationState extends CustomizationOptions {
   economySyncError?: string;
   favoritePresetIds: string[];
   collectionsTourSeen: boolean;
+  lastSyncedLoadoutHash?: string;
+  lastSyncedLoadouts?: LoadoutSyncEnvelope | null;
   
   // Saved characters
   savedCharacters: SavedCharacter[];
@@ -848,6 +1065,10 @@ interface CustomizationState extends CustomizationOptions {
   // Actions to update customization options
   setPlayerColorTheme: (theme: ColorTheme) => void;
   setPlayerFigureStyle: (style: FigureStyle) => void;
+  setPlayerBlendTargetStyle: (style: FigureStyle | null) => void;
+  setPlayerBlendAmount: (amount: number) => void;
+  updatePlayerStyleOverrides: (overrides: Partial<FigureStyleOverrides>) => void;
+  resetPlayerStyleOverrides: () => void;
   setPlayerAccessory: (accessory: Accessory, color?: string) => void;
   setPlayerAnimationStyle: (style: string) => void;
   setPlayerInkStyle: (style: InkStyle) => void;
@@ -855,6 +1076,10 @@ interface CustomizationState extends CustomizationOptions {
   
   setCPUColorTheme: (theme: ColorTheme) => void;
   setCPUFigureStyle: (style: FigureStyle) => void;
+  setCPUBlendTargetStyle: (style: FigureStyle | null) => void;
+  setCPUBlendAmount: (amount: number) => void;
+  updateCPUStyleOverrides: (overrides: Partial<FigureStyleOverrides>) => void;
+  resetCPUStyleOverrides: () => void;
   setCPUAccessory: (accessory: Accessory, color?: string) => void;
   setCPUAnimationStyle: (style: string) => void;
   setCPUInkStyle: (style: InkStyle) => void;
@@ -871,11 +1096,13 @@ interface CustomizationState extends CustomizationOptions {
   getPlayerStyle: () => typeof figureStyles[FigureStyle];
   getPlayerAccessory: () => any;
   getPlayerInkParams: () => InkParams;
+  getPlayerLoadout: () => FighterLoadoutSnapshot;
   
   getCPUColors: () => typeof colorThemes[ColorTheme];
   getCPUStyle: () => typeof figureStyles[FigureStyle];
   getCPUAccessory: () => any;
   getCPUInkParams: () => InkParams;
+  getCPULoadout: () => FighterLoadoutSnapshot;
   
   // Reset customizations
   resetCustomizations: () => void;
@@ -890,7 +1117,7 @@ interface CustomizationState extends CustomizationOptions {
   getEconomySnapshot: () => EconomySyncPayload;
   hydrateEconomySnapshot: (payload: EconomySyncPayload & { updatedAt?: string }) => void;
   setEconomySyncError: (message?: string) => void;
-  markEconomySyncComplete: () => void;
+  markEconomySyncComplete: (loadouts?: LoadoutSyncEnvelope) => void;
   togglePresetFavorite: (presetId: string) => void;
   markCollectionsTourSeen: () => void;
 }
@@ -909,6 +1136,9 @@ interface PresetSnapshot {
 const DEFAULT_CUSTOMIZATION: CustomizationOptions = {
   playerColorTheme: 'blue',
   playerFigureStyle: 'normal',
+  playerBlendTargetStyle: null,
+  playerBlendAmount: 0,
+  playerStyleOverrides: null,
   playerAccessory: 'none',
   playerAccessoryColor: '#ffffff',
   playerAnimationStyle: 'normal',
@@ -917,6 +1147,9 @@ const DEFAULT_CUSTOMIZATION: CustomizationOptions = {
   
   cpuColorTheme: 'red',
   cpuFigureStyle: 'normal',
+   cpuBlendTargetStyle: null,
+   cpuBlendAmount: 0,
+   cpuStyleOverrides: null,
   cpuAccessory: 'none',
   cpuAccessoryColor: '#ffffff',
   cpuAnimationStyle: 'normal',
@@ -939,6 +1172,8 @@ export const useCustomization = create<CustomizationState>()(
       economySyncError: undefined,
       favoritePresetIds: [],
       collectionsTourSeen: false,
+      lastSyncedLoadoutHash: undefined,
+      lastSyncedLoadouts: null,
       unlockedColorThemes: [...DEFAULT_UNLOCKED_COLOR_THEMES],
       unlockedFigureStyles: [...DEFAULT_UNLOCKED_FIGURE_STYLES],
       unlockedAccessories: [...DEFAULT_UNLOCKED_ACCESSORIES],
@@ -948,6 +1183,13 @@ export const useCustomization = create<CustomizationState>()(
       // Actions for player customization
       setPlayerColorTheme: (theme) => set({ playerColorTheme: theme }),
       setPlayerFigureStyle: (style) => set({ playerFigureStyle: style }),
+      setPlayerBlendTargetStyle: (style) => set({ playerBlendTargetStyle: style }),
+      setPlayerBlendAmount: (amount) => set({ playerBlendAmount: clamp01(amount ?? 0) }),
+      updatePlayerStyleOverrides: (overrides) =>
+        set((state) => ({
+          playerStyleOverrides: mergeStyleOverrides(state.playerStyleOverrides, overrides) ?? state.playerStyleOverrides ?? null,
+        })),
+      resetPlayerStyleOverrides: () => set({ playerStyleOverrides: null }),
       setPlayerAccessory: (accessory, color = '#ffffff') => set({ 
         playerAccessory: accessory,
         playerAccessoryColor: color 
@@ -959,6 +1201,13 @@ export const useCustomization = create<CustomizationState>()(
       // Actions for CPU customization
       setCPUColorTheme: (theme) => set({ cpuColorTheme: theme }),
       setCPUFigureStyle: (style) => set({ cpuFigureStyle: style }),
+      setCPUBlendTargetStyle: (style) => set({ cpuBlendTargetStyle: style }),
+      setCPUBlendAmount: (amount) => set({ cpuBlendAmount: clamp01(amount ?? 0) }),
+      updateCPUStyleOverrides: (overrides) =>
+        set((state) => ({
+          cpuStyleOverrides: mergeStyleOverrides(state.cpuStyleOverrides, overrides) ?? state.cpuStyleOverrides ?? null,
+        })),
+      resetCPUStyleOverrides: () => set({ cpuStyleOverrides: null }),
       setCPUAccessory: (accessory, color = '#ffffff') => set({ 
         cpuAccessory: accessory,
         cpuAccessoryColor: color 
@@ -975,6 +1224,9 @@ export const useCustomization = create<CustomizationState>()(
           name,
           colorTheme: isPlayer ? state.playerColorTheme : state.cpuColorTheme,
           figureStyle: isPlayer ? state.playerFigureStyle : state.cpuFigureStyle,
+          figureBlendTarget: isPlayer ? state.playerBlendTargetStyle : state.cpuBlendTargetStyle,
+          figureBlendAmount: isPlayer ? state.playerBlendAmount : state.cpuBlendAmount,
+          figureStyleOverrides: isPlayer ? state.playerStyleOverrides : state.cpuStyleOverrides,
           accessory: isPlayer ? state.playerAccessory : state.cpuAccessory,
           accessoryColor: isPlayer ? state.playerAccessoryColor : state.cpuAccessoryColor,
           animationStyle: isPlayer ? state.playerAnimationStyle : state.cpuAnimationStyle,
@@ -993,6 +1245,9 @@ export const useCustomization = create<CustomizationState>()(
           set({
             playerColorTheme: character.colorTheme,
             playerFigureStyle: character.figureStyle,
+            playerBlendTargetStyle: character.figureBlendTarget ?? null,
+            playerBlendAmount: clamp01(character.figureBlendAmount ?? 0),
+            playerStyleOverrides: character.figureStyleOverrides ?? null,
             playerAccessory: character.accessory,
             playerAccessoryColor: character.accessoryColor,
             playerAnimationStyle: character.animationStyle,
@@ -1003,6 +1258,9 @@ export const useCustomization = create<CustomizationState>()(
           set({
             cpuColorTheme: character.colorTheme,
             cpuFigureStyle: character.figureStyle,
+            cpuBlendTargetStyle: character.figureBlendTarget ?? null,
+            cpuBlendAmount: clamp01(character.figureBlendAmount ?? 0),
+            cpuStyleOverrides: character.figureStyleOverrides ?? null,
             cpuAccessory: character.accessory,
             cpuAccessoryColor: character.accessoryColor,
             cpuAnimationStyle: character.animationStyle,
@@ -1025,7 +1283,12 @@ export const useCustomization = create<CustomizationState>()(
       },
       getPlayerStyle: () => {
         const state = get();
-        return figureStyles[state.playerFigureStyle];
+        return deriveFigureStyle(
+          state.playerFigureStyle,
+          state.playerBlendTargetStyle,
+          state.playerBlendAmount,
+          state.playerStyleOverrides,
+        );
       },
       getPlayerAccessory: () => {
         const state = get();
@@ -1038,6 +1301,21 @@ export const useCustomization = create<CustomizationState>()(
         const state = get();
         return mergeInkParams(state.playerInkStyle, state.playerInkOverrides);
       },
+      getPlayerLoadout: () => {
+        const state = get();
+        return createLoadoutSnapshot({
+          colorTheme: state.playerColorTheme,
+          figureStyle: state.playerFigureStyle,
+          blendTargetStyle: state.playerBlendTargetStyle,
+          blendAmount: state.playerBlendAmount,
+          styleOverrides: state.playerStyleOverrides,
+          accessory: state.playerAccessory,
+          accessoryColor: state.playerAccessoryColor,
+          animationStyle: state.playerAnimationStyle,
+          inkStyle: state.playerInkStyle,
+          inkOverrides: state.playerInkOverrides,
+        });
+      },
       
       getCPUColors: () => {
         const state = get();
@@ -1045,7 +1323,12 @@ export const useCustomization = create<CustomizationState>()(
       },
       getCPUStyle: () => {
         const state = get();
-        return figureStyles[state.cpuFigureStyle];
+        return deriveFigureStyle(
+          state.cpuFigureStyle,
+          state.cpuBlendTargetStyle,
+          state.cpuBlendAmount,
+          state.cpuStyleOverrides,
+        );
       },
       getCPUAccessory: () => {
         const state = get();
@@ -1058,9 +1341,53 @@ export const useCustomization = create<CustomizationState>()(
         const state = get();
         return mergeInkParams(state.cpuInkStyle, state.cpuInkOverrides);
       },
+      getCPULoadout: () => {
+        const state = get();
+        return createLoadoutSnapshot({
+          colorTheme: state.cpuColorTheme,
+          figureStyle: state.cpuFigureStyle,
+          blendTargetStyle: state.cpuBlendTargetStyle,
+          blendAmount: state.cpuBlendAmount,
+          styleOverrides: state.cpuStyleOverrides,
+          accessory: state.cpuAccessory,
+          accessoryColor: state.cpuAccessoryColor,
+          animationStyle: state.cpuAnimationStyle,
+          inkStyle: state.cpuInkStyle,
+          inkOverrides: state.cpuInkOverrides,
+        });
+      },
 
       getEconomySnapshot: () => {
         const state = get();
+        const playerLoadout = createLoadoutSnapshot({
+          colorTheme: state.playerColorTheme,
+          figureStyle: state.playerFigureStyle,
+          blendTargetStyle: state.playerBlendTargetStyle,
+          blendAmount: state.playerBlendAmount,
+          styleOverrides: state.playerStyleOverrides,
+          accessory: state.playerAccessory,
+          accessoryColor: state.playerAccessoryColor,
+          animationStyle: state.playerAnimationStyle,
+          inkStyle: state.playerInkStyle,
+          inkOverrides: state.playerInkOverrides,
+        });
+        const opponentLoadout = createLoadoutSnapshot({
+          colorTheme: state.cpuColorTheme,
+          figureStyle: state.cpuFigureStyle,
+          blendTargetStyle: state.cpuBlendTargetStyle,
+          blendAmount: state.cpuBlendAmount,
+          styleOverrides: state.cpuStyleOverrides,
+          accessory: state.cpuAccessory,
+          accessoryColor: state.cpuAccessoryColor,
+          animationStyle: state.cpuAnimationStyle,
+          inkStyle: state.cpuInkStyle,
+          inkOverrides: state.cpuInkOverrides,
+        });
+        const loadouts: LoadoutSyncEnvelope = {
+          player: playerLoadout,
+          opponent: opponentLoadout,
+          hash: composeLoadoutHash(playerLoadout, opponentLoadout),
+        };
         return {
           profileId: state.economyProfileId,
           coins: state.coins,
@@ -1072,6 +1399,7 @@ export const useCustomization = create<CustomizationState>()(
             animationStyles: state.unlockedAnimationStyles,
           },
           lastCoinEvent: state.lastCoinEvent,
+          loadouts,
         } satisfies EconomySyncPayload;
       },
 
@@ -1102,15 +1430,19 @@ export const useCustomization = create<CustomizationState>()(
         lastCoinEvent: payload.lastCoinEvent ?? state.lastCoinEvent,
         lastEconomySyncAt: payload.updatedAt ?? new Date().toISOString(),
         economySyncError: undefined,
+        lastSyncedLoadoutHash: payload.loadouts?.hash ?? state.lastSyncedLoadoutHash,
+        lastSyncedLoadouts: payload.loadouts ?? state.lastSyncedLoadouts ?? null,
       })),
 
       setEconomySyncError: (message) => set({
         economySyncError: message,
       }),
 
-      markEconomySyncComplete: () => set({
+      markEconomySyncComplete: (loadouts) => set({
         lastEconomySyncAt: new Date().toISOString(),
         economySyncError: undefined,
+        lastSyncedLoadoutHash: loadouts?.hash ?? get().lastSyncedLoadoutHash,
+        lastSyncedLoadouts: loadouts ?? get().lastSyncedLoadouts ?? null,
       }),
       
       // Reset to default customizations
@@ -1313,6 +1645,9 @@ export const useCustomization = create<CustomizationState>()(
           name: options.name || preset.name,
           colorTheme: preset.colorTheme,
           figureStyle: preset.figureStyle,
+          figureBlendTarget: null,
+          figureBlendAmount: 0,
+          figureStyleOverrides: null,
           accessory: preset.accessory,
           accessoryColor: preset.accessoryColor,
           animationStyle: preset.animationStyle,
@@ -1352,9 +1687,13 @@ export const useCustomization = create<CustomizationState>()(
         getPlayerColors: undefined,
         getPlayerStyle: undefined,
         getPlayerAccessory: undefined,
+        getPlayerInkParams: undefined,
+        getPlayerLoadout: undefined,
         getCPUColors: undefined,
         getCPUStyle: undefined,
         getCPUAccessory: undefined,
+        getCPUInkParams: undefined,
+        getCPULoadout: undefined,
         getEconomySnapshot: undefined,
         earnCoins: undefined,
         spendCoins: undefined,

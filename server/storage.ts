@@ -132,6 +132,7 @@ class DbStorage implements IStorage {
       userId: snapshot.userId ?? null,
       updatedAt: snapshot.updatedAt ?? new Date().toISOString(),
       lastCoinEvent: snapshot.lastCoinEvent ?? null,
+      loadouts: snapshot.loadouts ?? null,
     };
     const [row] = await this.db
       .insert(economySnapshots)
@@ -145,6 +146,7 @@ class DbStorage implements IStorage {
           lastCoinEvent: payload.lastCoinEvent,
           updatedAt: payload.updatedAt,
           userId: payload.userId,
+          loadouts: payload.loadouts,
         },
       })
       .returning();
@@ -243,6 +245,7 @@ class MemStorage implements IStorage {
       unlocks: snapshot.unlocks,
       lastCoinEvent: snapshot.lastCoinEvent ?? null,
       updatedAt: snapshot.updatedAt ?? new Date().toISOString(),
+      loadouts: snapshot.loadouts ?? null,
     };
     this.economy.set(snapshot.profileId, entry);
     return entry;

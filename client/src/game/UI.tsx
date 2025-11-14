@@ -33,7 +33,16 @@ const UI = () => {
   } = useFighting();
   
   const { toggleMute, isMuted, playSuccess, setMasterVolume, masterVolume } = useAudio();
-  const { debugMode, toggleDebugMode, lowGraphicsMode, toggleLowGraphicsMode } = useControls();
+  const {
+    debugMode,
+    toggleDebugMode,
+    lowGraphicsMode,
+    toggleLowGraphicsMode,
+    showSilhouetteDebug,
+    toggleSilhouetteDebug,
+    inkQuality,
+    cycleInkQuality,
+  } = useControls();
   const { coins, lastCoinEvent } = useCustomization();
   const landingBurst = useEffects((state) => state.landingBurst);
   const impactFlash = useEffects((state) => state.impactFlash);
@@ -183,8 +192,8 @@ const UI = () => {
   
   return (
     <div className="absolute top-0 left-0 w-full h-full pointer-events-none">
-      {gamePhase === 'fighting' && (
-        <div className="absolute top-4 left-4 pointer-events-auto flex gap-2">
+      <div className="absolute top-4 left-4 pointer-events-auto flex gap-2 flex-wrap">
+        {gamePhase === 'fighting' && (
           <button
             onClick={() => togglePause()}
             className={`px-4 py-2 rounded-full text-sm font-semibold transition ${
@@ -193,8 +202,24 @@ const UI = () => {
           >
             {paused ? "Resume" : "Pause"}
           </button>
-        </div>
-      )}
+        )}
+        <button
+          onClick={toggleSilhouetteDebug}
+          className={`px-3 py-2 rounded-full text-xs font-semibold transition ${
+            showSilhouetteDebug ? "bg-indigo-500/80 text-white" : "bg-black/40 text-indigo-100 hover:bg-black/60"
+          }`}
+          title="Toggle spline/outline debug overlay"
+        >
+          {showSilhouetteDebug ? "Spline Debug" : "Spline Off"}
+        </button>
+        <button
+          onClick={cycleInkQuality}
+          className="px-3 py-2 rounded-full text-xs font-semibold bg-white/15 text-white hover:bg-white/25"
+          title="Cycle ink material quality/perf profile"
+        >
+          Ink: {inkQuality === "cinematic" ? "Cine" : inkQuality === "balanced" ? "Balanced" : "Perf"}
+        </button>
+      </div>
       {impactFlash > 0 && (
         <div
           className="absolute inset-0 bg-white pointer-events-none"

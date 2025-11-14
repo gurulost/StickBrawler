@@ -1,6 +1,7 @@
 import { pgTable, text, serial, integer, boolean, jsonb } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
+import type { LoadoutSyncEnvelope } from "./customization";
 
 export const users = pgTable("users", {
   id: serial("id").primaryKey(),
@@ -41,6 +42,9 @@ export const economySnapshots = pgTable("economy_snapshots", {
         }
       | null
     >()
+    .default(null),
+  loadouts: jsonb("loadouts")
+    .$type<LoadoutSyncEnvelope | null>()
     .default(null),
   updatedAt: text("updated_at").notNull(),
 });

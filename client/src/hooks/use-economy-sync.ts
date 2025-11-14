@@ -1,127 +1,33 @@
 import { useEffect, useMemo } from "react";
 import { useCustomization } from "../lib/stores/useCustomization";
-import { composeLoadoutHash, type FighterLoadoutSnapshot, type LoadoutSyncEnvelope } from "@shared/customization";
+import { composeLoadoutHash, type LoadoutSyncEnvelope } from "@shared/customization";
 
 const SYNC_DEBOUNCE_MS = 1500;
 
 export function useEconomySync() {
-  const profileId = useCustomization((state) => state.economyProfileId);
-  const coins = useCustomization((state) => state.coins);
-  const lifetimeCoins = useCustomization((state) => state.lifetimeCoinsEarned);
-  const playerColorTheme = useCustomization((state) => state.playerColorTheme);
-  const playerFigureStyle = useCustomization((state) => state.playerFigureStyle);
-  const playerBlendTargetStyle = useCustomization((state) => state.playerBlendTargetStyle);
-  const playerBlendAmount = useCustomization((state) => state.playerBlendAmount);
-  const playerStyleOverrides = useCustomization((state) => state.playerStyleOverrides);
-  const playerAccessory = useCustomization((state) => state.playerAccessory);
-  const playerAccessoryColor = useCustomization((state) => state.playerAccessoryColor);
-  const playerAnimationStyle = useCustomization((state) => state.playerAnimationStyle);
-  const playerInkStyle = useCustomization((state) => state.playerInkStyle);
-  const playerInkOverrides = useCustomization((state) => state.playerInkOverrides);
-  const cpuColorTheme = useCustomization((state) => state.cpuColorTheme);
-  const cpuFigureStyle = useCustomization((state) => state.cpuFigureStyle);
-  const cpuBlendTargetStyle = useCustomization((state) => state.cpuBlendTargetStyle);
-  const cpuBlendAmount = useCustomization((state) => state.cpuBlendAmount);
-  const cpuStyleOverrides = useCustomization((state) => state.cpuStyleOverrides);
-  const cpuAccessory = useCustomization((state) => state.cpuAccessory);
-  const cpuAccessoryColor = useCustomization((state) => state.cpuAccessoryColor);
-  const cpuAnimationStyle = useCustomization((state) => state.cpuAnimationStyle);
-  const cpuInkStyle = useCustomization((state) => state.cpuInkStyle);
-  const cpuInkOverrides = useCustomization((state) => state.cpuInkOverrides);
-  const colorThemes = useCustomization((state) => state.unlockedColorThemes);
-  const figureStyles = useCustomization((state) => state.unlockedFigureStyles);
-  const accessories = useCustomization((state) => state.unlockedAccessories);
-  const animationStyles = useCustomization((state) => state.unlockedAnimationStyles);
-  const lastCoinEvent = useCustomization((state) => state.lastCoinEvent);
+  // Get stable function references from store
+  const getEconomySnapshot = useCustomization((state) => state.getEconomySnapshot);
+  const getPlayerLoadout = useCustomization((state) => state.getPlayerLoadout);
+  const getCPULoadout = useCustomization((state) => state.getCPULoadout);
   const hydrateEconomySnapshot = useCustomization((state) => state.hydrateEconomySnapshot);
   const setEconomySyncError = useCustomization((state) => state.setEconomySyncError);
   const markEconomySyncComplete = useCustomization((state) => state.markEconomySyncComplete);
   
-  const playerLoadout = useMemo<FighterLoadoutSnapshot>(
-    () => ({
-      colorTheme: playerColorTheme,
-      figureStyle: playerFigureStyle,
-      figureBlendTargetStyle: playerBlendTargetStyle ?? null,
-      figureBlendAmount: playerBlendAmount,
-      figureStyleOverrides: playerStyleOverrides ?? null,
-      accessory: playerAccessory,
-      accessoryColor: playerAccessoryColor,
-      animationStyle: playerAnimationStyle,
-      inkStyle: playerInkStyle,
-      inkOverrides: playerInkOverrides ?? null,
-    }),
-    [
-      playerColorTheme,
-      playerFigureStyle,
-      playerBlendTargetStyle,
-      playerBlendAmount,
-      playerStyleOverrides,
-      playerAccessory,
-      playerAccessoryColor,
-      playerAnimationStyle,
-      playerInkStyle,
-      playerInkOverrides,
-    ],
-  );
-  const cpuLoadout = useMemo<FighterLoadoutSnapshot>(
-    () => ({
-      colorTheme: cpuColorTheme,
-      figureStyle: cpuFigureStyle,
-      figureBlendTargetStyle: cpuBlendTargetStyle ?? null,
-      figureBlendAmount: cpuBlendAmount,
-      figureStyleOverrides: cpuStyleOverrides ?? null,
-      accessory: cpuAccessory,
-      accessoryColor: cpuAccessoryColor,
-      animationStyle: cpuAnimationStyle,
-      inkStyle: cpuInkStyle,
-      inkOverrides: cpuInkOverrides ?? null,
-    }),
-    [
-      cpuColorTheme,
-      cpuFigureStyle,
-      cpuBlendTargetStyle,
-      cpuBlendAmount,
-      cpuStyleOverrides,
-      cpuAccessory,
-      cpuAccessoryColor,
-      cpuAnimationStyle,
-      cpuInkStyle,
-      cpuInkOverrides,
-    ],
-  );
-  const loadoutEnvelope = useMemo<LoadoutSyncEnvelope>(
-    () => ({
-      player: playerLoadout,
-      opponent: cpuLoadout,
-      hash: composeLoadoutHash(playerLoadout, cpuLoadout),
-    }),
-    [playerLoadout, cpuLoadout],
-  );
+  // Get snapshot data - this returns a stable object
+  const snapshot = getEconomySnapshot();
   
-  const snapshot = useMemo(() => ({
-    profileId,
-    coins,
-    lifetimeCoins,
-    unlocks: {
-      colorThemes,
-      figureStyles,
-      accessories,
-      animationStyles,
-    },
-    lastCoinEvent,
-    loadouts: loadoutEnvelope,
-  }), [
-    profileId,
-    coins,
-    lifetimeCoins,
-    colorThemes,
-    figureStyles,
-    accessories,
-    animationStyles,
-    lastCoinEvent,
-    loadoutEnvelope,
-  ]);
+  // Build loadout envelope for sync
+  const loadoutEnvelope = useMemo<LoadoutSyncEnvelope>(() => {
+    const player = getPlayerLoadout();
+    const cpu = getCPULoadout();
+    return {
+      player,
+      opponent: cpu,
+      hash: composeLoadoutHash(player, cpu),
+    };
+  }, [getPlayerLoadout, getCPULoadout]);
 
+  // Initial fetch effect
   useEffect(() => {
     const controller = new AbortController();
     (async () => {
@@ -164,6 +70,7 @@ export function useEconomySync() {
     };
   }, [snapshot.profileId, hydrateEconomySnapshot, setEconomySyncError, markEconomySyncComplete]);
 
+  // Serialize for change detection
   const serialized = useMemo(
     () =>
       JSON.stringify({
@@ -176,15 +83,13 @@ export function useEconomySync() {
     [
       snapshot.coins,
       snapshot.lifetimeCoins,
-      snapshot.unlocks.accessories,
-      snapshot.unlocks.animationStyles,
-      snapshot.unlocks.colorThemes,
-      snapshot.unlocks.figureStyles,
+      snapshot.unlocks,
       snapshot.lastCoinEvent?.timestamp,
       loadoutEnvelope.hash,
     ],
   );
 
+  // Sync effect
   useEffect(() => {
     const controller = new AbortController();
     const timeout = window.setTimeout(() => {

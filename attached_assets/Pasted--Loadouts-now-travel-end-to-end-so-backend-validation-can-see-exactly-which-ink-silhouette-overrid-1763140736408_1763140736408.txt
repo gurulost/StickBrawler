@@ -1,0 +1,24 @@
+ - Loadouts now travel end-to-end so backend validation can see exactly which ink/silhouette overrides were
+    active. client/src/lib/stores/useCustomization.tsx:791-1450 builds canonical loadout snapshots, hashes them,
+    exposes getPlayer/CPULoadout, and includes the envelope in getEconomySnapshot/hydrate flows; client/src/
+    hooks/use-economy-sync.ts:9-222 serializes/deserializes those envelopes during sync and records the hash on
+    success. The shared contract and persistence layers were updated in shared/customization.ts:1-78, shared/
+    schema.ts:20-77, server/routes.ts:39-199, and server/storage.ts:124-253 so PUT/GET handlers and storage both
+    accept the new loadouts JSON.
+  - Fighter customization tooling is much richer. client/src/components/ui/fighter-customizer.tsx:260-1864 now
+    includes preset blending controls, silhouette sliders, ink override pickers, and JSON share/import helpers so
+    artists can iterate without code. The same ink quality/override signals are surfaced in runtime via client/
+    src/lib/stores/useControls.tsx:18-34 and client/src/game/UI.tsx:40-219, letting you toggle spline debug
+    overlays and cycle ink quality directly in-match.
+  - Combat visuals respect those new toggles. client/src/game/stickFigure.tsx:73-820 generates spline debug
+    lines for arms/legs, throttles trails/dust/brush strokes based on the ink quality profile, and renders the
+    new lines only when the overlay is active; the billboard materials now adapt shade/glow bands to the quality
+    setting in client/src/game/stickfigure/inkMaterial.ts:1-118.
+  - Project documentation is up to date with the new state in stylized_plan.md:1-12, and the backend/front-end
+    schemas stay aligned by way of the new shared customization module.
+
+  Next steps: 1) run npm run check && npm test plus your DB migration tooling so the new loadouts column/hashes
+  are verified upstream, 2) capture/QA the spline overlay + ink-quality buttons to ensure UX polish, and 3)
+  coordinate a database migration for the new economy_snapshots.loadouts JSON so prod data matches the schema.
+
+    

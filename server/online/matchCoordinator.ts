@@ -23,6 +23,19 @@ type MatchState<TControl extends string> = {
 export class MatchCoordinator<TControl extends string> {
   private matches = new Map<string, MatchState<TControl>>();
 
+  getActiveMatchCount(): number {
+    return this.matches.size;
+  }
+
+  getActivePlayerCount(): number {
+    let count = 0;
+    this.matches.forEach((state) => {
+      if (state.connections.host) count++;
+      if (state.connections.guest) count++;
+    });
+    return count;
+  }
+
   createMatch(hostProfileId: string, seed: number): OnlineMatchDescriptor {
     const matchId = randomUUID();
     const descriptor: OnlineMatchDescriptor = {

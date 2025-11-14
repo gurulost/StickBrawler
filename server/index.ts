@@ -103,11 +103,29 @@ app.use((req, res, next) => {
   });
 
   // Online multiplayer WebSocket server (feature-flagged)
+  let onlineSocketServer: OnlineSocketServer<string> | null = null;
   if (env.ENABLE_ONLINE_MULTIPLAYER) {
-    const socketServer = new OnlineSocketServer<string>(env.ONLINE_WS_PORT);
-    socketServer.start();
+    onlineSocketServer = new OnlineSocketServer<string>(env.ONLINE_WS_PORT);
+    onlineSocketServer.start();
     log(`online multiplayer websocket server started on port ${env.ONLINE_WS_PORT}`, "websocket");
   } else {
     log(`online multiplayer disabled (set ENABLE_ONLINE_MULTIPLAYER=true to enable)`, "websocket");
   }
+
+  // Health check endpoint for online multiplayer
+  app.get("/api/online/health", (_req, res) => {
+    if (onlineSocketServer) {
+      res.json(onlineSocketServer.getMetrics());
+    } else {
+      res.json({
+        websocketEnabled: false,
+        websocketPort: env.ONLINE_WS_PORT,
+        status: "stopped",
+        activeMatches: 0,
+        activePlayers: 0,
+        connectedSockets: 0,
+        uptimeMs: 0,
+      });
+    }
+  });
 })();

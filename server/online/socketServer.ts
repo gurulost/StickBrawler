@@ -9,6 +9,17 @@ type SocketMeta = {
   matchId?: string;
 };
 
+export interface OnlineServerMetrics {
+  websocketEnabled: boolean;
+  websocketPort: number;
+  status: "running" | "stopped";
+  activeMatches: number;
+  activePlayers: number;
+  connectedSockets: number;
+  uptimeMs: number;
+  lastHeartbeatAt?: number;
+}
+
 export class OnlineSocketServer<TControl extends string> {
   private wss: WebSocketServer | null = null;
   private coordinator = new MatchCoordinator<TControl>();
@@ -16,6 +27,8 @@ export class OnlineSocketServer<TControl extends string> {
   private heartbeatInterval: NodeJS.Timeout | null = null;
   private readonly HEARTBEAT_INTERVAL_MS = 30000; // 30 seconds
   private readonly HEARTBEAT_TIMEOUT_MS = 35000; // 35 seconds
+  private startTime: number = 0;
+  private lastHeartbeatAt: number = 0;
 
   constructor(private port: number) {}
 
@@ -23,7 +36,21 @@ export class OnlineSocketServer<TControl extends string> {
     this.wss = new WebSocketServer({ port: this.port });
     this.wss.on("connection", (socket) => this.handleConnection(socket));
     this.startHeartbeat();
+    this.startTime = Date.now();
     console.log(`[OnlineSocketServer] WebSocket server started on port ${this.port}`);
+  }
+
+  getMetrics(): OnlineServerMetrics {
+    return {
+      websocketEnabled: true,
+      websocketPort: this.port,
+      status: this.wss ? "running" : "stopped",
+      activeMatches: this.coordinator.getActiveMatchCount(),
+      activePlayers: this.coordinator.getActivePlayerCount(),
+      connectedSockets: this.sockets.size,
+      uptimeMs: this.startTime > 0 ? Date.now() - this.startTime : 0,
+      lastHeartbeatAt: this.lastHeartbeatAt || undefined,
+    };
   }
 
   private handleConnection(socket: WebSocket) {
@@ -58,6 +85,8 @@ export class OnlineSocketServer<TControl extends string> {
   private startHeartbeat() {
     this.heartbeatInterval = setInterval(() => {
       if (!this.wss) return;
+      
+      this.lastHeartbeatAt = Date.now();
       
       this.wss.clients.forEach((socket) => {
         const ws = socket as any;

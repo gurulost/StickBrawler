@@ -482,6 +482,114 @@ export const animationStyles = {
   }
 };
 
+// Ink style presets for procedural rendering
+export const inkStyles = {
+  classic: {
+    name: 'Classic Toon',
+    description: 'Balanced cel-shading with clean outlines',
+    rimColor: '#ffffff',
+    shadeBands: 3,
+    lineWidth: 0.04,
+    glow: 0,
+    outlineColor: '#050505',
+  },
+  bold: {
+    name: 'Bold Lines',
+    description: 'Thick outlines with strong contrast',
+    rimColor: '#cccccc',
+    shadeBands: 2,
+    lineWidth: 0.08,
+    glow: 0,
+    outlineColor: '#000000',
+  },
+  soft: {
+    name: 'Soft Shading',
+    description: 'Smooth gradients with subtle highlights',
+    rimColor: '#f0f0f0',
+    shadeBands: 5,
+    lineWidth: 0.02,
+    glow: 0.05,
+    outlineColor: '#202020',
+  },
+  neon: {
+    name: 'Neon Glow',
+    description: 'Bright glow with vibrant rim lighting',
+    rimColor: '#00ffff',
+    shadeBands: 3,
+    lineWidth: 0.05,
+    glow: 0.25,
+    outlineColor: '#001a1a',
+  },
+  sketchy: {
+    name: 'Sketchy',
+    description: 'Hand-drawn aesthetic with rough lines',
+    rimColor: '#dddddd',
+    shadeBands: 2,
+    lineWidth: 0.06,
+    glow: 0,
+    outlineColor: '#1a1a1a',
+  },
+  minimal: {
+    name: 'Minimal',
+    description: 'Clean and simple with thin outlines',
+    rimColor: '#ffffff',
+    shadeBands: 2,
+    lineWidth: 0.01,
+    glow: 0,
+    outlineColor: '#404040',
+  },
+  comic: {
+    name: 'Comic Book',
+    description: 'High contrast with thick black outlines',
+    rimColor: '#e0e0e0',
+    shadeBands: 2,
+    lineWidth: 0.09,
+    glow: 0,
+    outlineColor: '#000000',
+  },
+  ethereal: {
+    name: 'Ethereal',
+    description: 'Soft glow with many shade bands',
+    rimColor: '#c8e6ff',
+    shadeBands: 5,
+    lineWidth: 0.03,
+    glow: 0.15,
+    outlineColor: '#0a0a14',
+  },
+};
+
+export type InkStyle = keyof typeof inkStyles;
+
+export interface InkOverrides {
+  rimColor?: string;
+  shadeBands?: number;
+  lineWidth?: number;
+  glow?: number;
+  outlineColor?: string;
+}
+
+export interface InkParams {
+  rimColor: string;
+  shadeBands: number;
+  lineWidth: number;
+  glow: number;
+  outlineColor: string;
+}
+
+export const mergeInkParams = (
+  baseStyle: InkStyle,
+  overrides?: InkOverrides | null
+): InkParams => {
+  const base = inkStyles[baseStyle];
+  return {
+    rimColor: overrides?.rimColor ?? base.rimColor,
+    shadeBands: overrides?.shadeBands ?? base.shadeBands,
+    lineWidth: overrides?.lineWidth ?? base.lineWidth,
+    glow: overrides?.glow ?? base.glow,
+    outlineColor: overrides?.outlineColor ?? base.outlineColor,
+  };
+};
+
 // Type definitions & economy data
 export type ColorTheme = keyof typeof colorThemes;
 export type FigureStyle = keyof typeof figureStyles;
@@ -691,12 +799,16 @@ export interface CustomizationOptions {
   playerAccessory: Accessory;
   playerAccessoryColor: string;
   playerAnimationStyle: string;
+  playerInkStyle: InkStyle;
+  playerInkOverrides: InkOverrides | null;
   
   cpuColorTheme: ColorTheme;
   cpuFigureStyle: FigureStyle;
   cpuAccessory: Accessory;
   cpuAccessoryColor: string;
   cpuAnimationStyle: string;
+  cpuInkStyle: InkStyle;
+  cpuInkOverrides: InkOverrides | null;
 }
 
 // Saved character profile interface
@@ -708,6 +820,8 @@ export interface SavedCharacter {
   accessory: Accessory;
   accessoryColor: string;
   animationStyle: string;
+  inkStyle: InkStyle;
+  inkOverrides?: InkOverrides | null;
   createdAt: string;
   thumbnail?: string;
 }
@@ -736,11 +850,15 @@ interface CustomizationState extends CustomizationOptions {
   setPlayerFigureStyle: (style: FigureStyle) => void;
   setPlayerAccessory: (accessory: Accessory, color?: string) => void;
   setPlayerAnimationStyle: (style: string) => void;
+  setPlayerInkStyle: (style: InkStyle) => void;
+  setPlayerInkOverrides: (overrides: InkOverrides | null) => void;
   
   setCPUColorTheme: (theme: ColorTheme) => void;
   setCPUFigureStyle: (style: FigureStyle) => void;
   setCPUAccessory: (accessory: Accessory, color?: string) => void;
   setCPUAnimationStyle: (style: string) => void;
+  setCPUInkStyle: (style: InkStyle) => void;
+  setCPUInkOverrides: (overrides: InkOverrides | null) => void;
   
   // Character saving and loading
   saveCharacter: (name: string, isPlayer: boolean) => void;
@@ -752,10 +870,12 @@ interface CustomizationState extends CustomizationOptions {
   getPlayerColors: () => typeof colorThemes[ColorTheme];
   getPlayerStyle: () => typeof figureStyles[FigureStyle];
   getPlayerAccessory: () => any;
+  getPlayerInkParams: () => InkParams;
   
   getCPUColors: () => typeof colorThemes[ColorTheme];
   getCPUStyle: () => typeof figureStyles[FigureStyle];
   getCPUAccessory: () => any;
+  getCPUInkParams: () => InkParams;
   
   // Reset customizations
   resetCustomizations: () => void;
@@ -791,12 +911,16 @@ const DEFAULT_CUSTOMIZATION: CustomizationOptions = {
   playerAccessory: 'none',
   playerAccessoryColor: '#ffffff',
   playerAnimationStyle: 'normal',
+  playerInkStyle: 'classic',
+  playerInkOverrides: null,
   
   cpuColorTheme: 'red',
   cpuFigureStyle: 'normal',
   cpuAccessory: 'none',
   cpuAccessoryColor: '#ffffff',
-  cpuAnimationStyle: 'normal'
+  cpuAnimationStyle: 'normal',
+  cpuInkStyle: 'classic',
+  cpuInkOverrides: null,
 };
 
 // Create the Zustand store with persistence
@@ -828,6 +952,8 @@ export const useCustomization = create<CustomizationState>()(
         playerAccessoryColor: color 
       }),
       setPlayerAnimationStyle: (style) => set({ playerAnimationStyle: style }),
+      setPlayerInkStyle: (style) => set({ playerInkStyle: style }),
+      setPlayerInkOverrides: (overrides) => set({ playerInkOverrides: overrides }),
       
       // Actions for CPU customization
       setCPUColorTheme: (theme) => set({ cpuColorTheme: theme }),
@@ -837,6 +963,8 @@ export const useCustomization = create<CustomizationState>()(
         cpuAccessoryColor: color 
       }),
       setCPUAnimationStyle: (style) => set({ cpuAnimationStyle: style }),
+      setCPUInkStyle: (style) => set({ cpuInkStyle: style }),
+      setCPUInkOverrides: (overrides) => set({ cpuInkOverrides: overrides }),
       
       // Character saving and loading
       saveCharacter: (name, isPlayer) => {
@@ -849,6 +977,8 @@ export const useCustomization = create<CustomizationState>()(
           accessory: isPlayer ? state.playerAccessory : state.cpuAccessory,
           accessoryColor: isPlayer ? state.playerAccessoryColor : state.cpuAccessoryColor,
           animationStyle: isPlayer ? state.playerAnimationStyle : state.cpuAnimationStyle,
+          inkStyle: isPlayer ? state.playerInkStyle : state.cpuInkStyle,
+          inkOverrides: isPlayer ? state.playerInkOverrides : state.cpuInkOverrides,
           createdAt: new Date().toISOString()
         };
         
@@ -864,7 +994,9 @@ export const useCustomization = create<CustomizationState>()(
             playerFigureStyle: character.figureStyle,
             playerAccessory: character.accessory,
             playerAccessoryColor: character.accessoryColor,
-            playerAnimationStyle: character.animationStyle
+            playerAnimationStyle: character.animationStyle,
+            playerInkStyle: character.inkStyle ?? 'classic',
+            playerInkOverrides: character.inkOverrides ?? null
           });
         } else {
           set({
@@ -872,7 +1004,9 @@ export const useCustomization = create<CustomizationState>()(
             cpuFigureStyle: character.figureStyle,
             cpuAccessory: character.accessory,
             cpuAccessoryColor: character.accessoryColor,
-            cpuAnimationStyle: character.animationStyle
+            cpuAnimationStyle: character.animationStyle,
+            cpuInkStyle: character.inkStyle ?? 'classic',
+            cpuInkOverrides: character.inkOverrides ?? null
           });
         }
       },
@@ -899,6 +1033,10 @@ export const useCustomization = create<CustomizationState>()(
           color: state.playerAccessoryColor
         };
       },
+      getPlayerInkParams: () => {
+        const state = get();
+        return mergeInkParams(state.playerInkStyle, state.playerInkOverrides);
+      },
       
       getCPUColors: () => {
         const state = get();
@@ -914,6 +1052,10 @@ export const useCustomization = create<CustomizationState>()(
           ...accessories[state.cpuAccessory],
           color: state.cpuAccessoryColor
         };
+      },
+      getCPUInkParams: () => {
+        const state = get();
+        return mergeInkParams(state.cpuInkStyle, state.cpuInkOverrides);
       },
 
       getEconomySnapshot: () => {

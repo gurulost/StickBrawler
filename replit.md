@@ -120,3 +120,15 @@ Preferred communication style: Simple, everyday language.
 - Zod for runtime schema validation on API boundaries
 - drizzle-zod for generating Zod schemas from Drizzle table definitions
 - Shared TypeScript types between client and server via `shared/` directory
+
+**Ink Customization System**
+- Procedural "ink-drawn" aesthetic with 8 curated shader presets (classic, bold, sketch, glow, neon, manga, watercolor, charcoal)
+- Unified toon shader pipeline via `useInkMaterial` hook (client/src/game/stickfigure/inkMaterial.ts)
+- Per-fighter customization: rimColor, shadeBands, lineWidth, glow, outlineColor
+- Accessory ink inheritance: global ink params with per-accessory override support
+- Low-graphics fallback: `lowGraphicsMode` toggle in `useControls` forces MeshToonMaterial for performance
+- Deterministic rendering: Ink shading driven by state, visual animations use Math.random() for variety
+- Persistence: `SavedCharacter` includes `inkStyle` and `inkOverrides` fields for load/save workflow
+- UI Components: `InkStyleSelector` with visual preview cards showing style characteristics
+- Performance: Shader compilation cached per light direction, materials memoized
+- Known limitations: Debug toggles for outline widths/control points not yet implemented (future work)

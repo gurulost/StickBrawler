@@ -1,0 +1,25 @@
+Look carefully over all of this again and do an audit of where we're at and let's fully impliment this to the absolute best and highest quality and standard, as instructed here: • We’re transforming StickBrawler’s fighters from basic silhouettes into living, ink-drawn characters. The vision
+  is a procedural “hand-drawn” look—think sketchbook fighters animated frame-by-frame—without importing rigged
+  models. Everything is generated in code, so we get:
+
+  - A unified art direction – custom toon shader + inverted-hull outlines (useInkMaterial) give every mesh
+    stepped shading, rim glow, and ink-like edges.
+  - Procedural silhouettes – limbs are Catmull-Rom splines with taper/curvature parameters; figureStyles now
+    define head size, outline width, and per-limb geometry, so each style (bruiser, assassin, etc.) feels
+    distinctive.
+  - Customization-first pipeline – Since all geometry and shading is parameterized, we can expose these knobs
+    in the UI. Players can pick shapes, outlines, and accessories, and the engine produces a unique fighter
+    deterministically (no external assets, perfect for multiplayer parity).
+  - Ink accessories/effects – The next phase is ensuring hats, swords, wings, capes, and VFX use the same toon
+    shaders and outline widths. Accessory definitions in useCustomization.tsx will carry color/rim/glow data
+    consumed by the ink shader, so swapping gear instantly changes the look without reauthoring meshes.
+
+  Why: This unlocks deep personalization (per-style silhouettes, ink strokes, glowing accessories) while
+  preserving deterministic gameplay. No asset downloads, no rig compatibility issues—everything is consistent,
+  customizable, and multiplayer-safe.
+
+  How: We’ll finish wiring accessories to the ink shader, add fallback materials for low-spec devices, and expand
+  the customization UI so players actually control these new parameters. After QA (performance, determinism,
+  pause/lobby flow), the result is a fighting game where every player can paint their own combat icon,
+  procedurally, while keeping the game’s netcode happy.
+

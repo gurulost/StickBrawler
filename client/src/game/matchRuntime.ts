@@ -1,4 +1,4 @@
-import { GameEngine, createInitialState, type GameCommand, type SystemContext } from "@engine/index";
+import { GameEngine, createInitialState, type GameCommand, type SystemContext } from "../../../engine/index";
 import { CpuBrain, CpuStyle, type CpuControlFrame } from "./cpuBrain";
 import {
   applyGravity,
@@ -27,7 +27,7 @@ import {
   type DirectionalInfluence,
 } from "./combatBridge";
 import type { CharacterState, GamePhase, MatchMode } from "../lib/stores/useFighting";
-import type { Controls } from "../lib/stores/useControls";
+import { Controls } from "../lib/stores/useControls";
 import { recordTelemetry, drainTelemetry, type HitTelemetry } from "./combatTelemetry";
 
 type FightingActions = Pick<

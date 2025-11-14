@@ -7,8 +7,9 @@ import { Leaderboard } from "../components/ui/leaderboard";
 import { AuthModal } from "../components/ui/auth-modal";
 import { LandingHero } from "../components/landing/LandingHero";
 import { FeatureGrid } from "../components/landing/FeatureGrid";
+import { OnlineMultiplayer } from "../components/online/OnlineMultiplayer";
 
-type Panel = "main" | "customization" | "leaderboard" | "controls";
+type Panel = "main" | "customization" | "leaderboard" | "controls" | "online";
 
 const Menu = () => {
   const { startGame, matchMode, setMatchMode } = useFighting();
@@ -42,6 +43,13 @@ const Menu = () => {
 
   const handleStartGame = () => {
     startGame(matchMode);
+  };
+
+  const handleStartOnlineMatch = (matchId: string) => {
+    console.log("Starting online match:", matchId);
+    // TODO: Wire up online match logic with matchId
+    // For now, start a regular match
+    startGame();
   };
 
   const handleVolumeChange = (value: number) => {
@@ -93,6 +101,20 @@ const Menu = () => {
             </header>
             <Leaderboard />
           </section>
+        );
+      case "online":
+        return (
+          <>
+            <div className="mb-4">
+              <button
+                onClick={() => setActivePanel("main")}
+                className="rounded-full border border-white/20 px-4 py-2 text-xs font-semibold uppercase tracking-wide text-white/80 hover:text-white"
+              >
+                ← Back to Menu
+              </button>
+            </div>
+            <OnlineMultiplayer onStartMatch={handleStartOnlineMatch} />
+          </>
         );
       case "controls":
         return (
@@ -182,6 +204,11 @@ const Menu = () => {
           </div>
           <nav className="flex flex-wrap gap-2">
             <NavButton active={activePanel === "main"} onClick={() => setActivePanel("main")} label="Hero" />
+            <NavButton
+              active={activePanel === "online"}
+              onClick={() => setActivePanel("online")}
+              label="Online"
+            />
             <NavButton
               active={activePanel === "customization"}
               onClick={() => setActivePanel("customization")}

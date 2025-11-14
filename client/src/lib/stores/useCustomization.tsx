@@ -902,6 +902,7 @@ interface PresetSnapshot {
   accessory: Accessory;
   accessoryColor: string;
   animationStyle: AnimationStyle;
+  inkStyle?: InkStyle;
 }
 
 // Default customization settings
@@ -1315,6 +1316,7 @@ export const useCustomization = create<CustomizationState>()(
           accessory: preset.accessory,
           accessoryColor: preset.accessoryColor,
           animationStyle: preset.animationStyle,
+          inkStyle: preset.inkStyle || 'classic',
           createdAt: new Date().toISOString(),
         };
         

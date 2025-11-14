@@ -82,7 +82,10 @@ const CharacterPreview = ({
     comboCount: 0,
     comboTimer: 0,
     lastMoveType: '',
-    velocity: [0, 0, 0] as [number, number, number]
+    velocity: [0, 0, 0] as [number, number, number],
+    guardMeter: 100,
+    staminaMeter: 100,
+    specialMeter: 0
   };
 
   const colors = isPlayer ? getPlayerColors() : getCPUColors();
@@ -705,7 +708,8 @@ export function FighterCustomizer() {
       case 'accessory':
         return accessories[id as keyof typeof accessories]?.name ?? id;
       case 'animationStyle':
-        return animationStyles[id as keyof typeof animationStyles]?.name ?? id;
+        const animStyle = animationStyles[id as keyof typeof animationStyles];
+        return (animStyle && typeof animStyle === 'object' && 'name' in animStyle) ? String(animStyle.name) : id;
       default:
         return id;
     }

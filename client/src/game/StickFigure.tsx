@@ -13,6 +13,7 @@ import {
 } from "./Physics";
 import { useAudio } from "../lib/stores/useAudio";
 import { useCustomization } from "../lib/stores/useCustomization";
+import { useEffects } from "../lib/stores/useEffects";
 import type { PlayerInputSnapshot } from "../hooks/use-player-controls";
 
 import { Head, Torso, Limbs } from "./stickfigure";
@@ -86,6 +87,7 @@ const StickFigure = ({
   const phaseTimer = useRef(0); // Added by 'main'
 
   const { playHit } = useAudio();
+  const { triggerLandingBurst } = useEffects();
   
   const {
     getPlayerColors,

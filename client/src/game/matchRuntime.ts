@@ -31,56 +31,54 @@ import { Controls } from "../lib/stores/useControls";
 import { recordTelemetry, drainTelemetry, type HitTelemetry } from "./combatTelemetry";
 import { DeterministicRandom } from "./prng";
 
-type FightingActions = Pick<
-  ReturnType<typeof import("../lib/stores/useFighting").useFighting>,
-  | "movePlayer"
-  | "moveCPU"
-  | "updatePlayerVelocity"
-  | "updateCPUVelocity"
-  | "setPlayerDirection"
-  | "setCPUDirection"
-  | "setPlayerJumping"
-  | "setCPUJumping"
-  | "setPlayerAttacking"
-  | "setCPUAttacking"
-  | "setPlayerBlocking"
-  | "setCPUBlocking"
-  | "setPlayerDodging"
-  | "setPlayerGrabbing"
-  | "setPlayerTaunting"
-  | "setPlayerAirAttacking"
-  | "resetPlayerAirJumps"
-  | "usePlayerAirJump"
-  | "setCPUDodging"
-  | "setCPUGrabbing"
-  | "setCPUAirAttacking"
-  | "resetCPUAirJumps"
-  | "useCPUAirJump"
-  | "damagePlayer"
-  | "damageCPU"
-  | "updateRoundTime"
-  | "updatePlayerCooldowns"
-  | "updateCPUCooldowns"
-  | "updatePlayerMeters"
-  | "updateCPUMeters"
-  | "updatePlayerGuardBreak"
-  | "updateCPUGuardBreak"
->;
+interface FightingActions {
+  movePlayer: (x: number, y: number, z: number) => void;
+  moveCPU: (x: number, y: number, z: number) => void;
+  updatePlayerVelocity: (vx: number, vy: number, vz: number) => void;
+  updateCPUVelocity: (vx: number, vy: number, vz: number) => void;
+  setPlayerDirection: (direction: 1 | -1) => void;
+  setCPUDirection: (direction: 1 | -1) => void;
+  setPlayerJumping: (jumping: boolean) => void;
+  setCPUJumping: (jumping: boolean) => void;
+  setPlayerAttacking: (attacking: boolean) => void;
+  setCPUAttacking: (attacking: boolean) => void;
+  setPlayerBlocking: (blocking: boolean) => void;
+  setCPUBlocking: (blocking: boolean) => void;
+  setPlayerDodging: (dodging: boolean) => void;
+  setPlayerGrabbing: (grabbing: boolean) => void;
+  setPlayerTaunting: (taunting: boolean) => void;
+  setPlayerAirAttacking: (airAttacking: boolean) => void;
+  resetPlayerAirJumps: () => void;
+  usePlayerAirJump?: () => void;
+  setCPUDodging: (dodging: boolean) => void;
+  setCPUGrabbing: (grabbing: boolean) => void;
+  setCPUAirAttacking: (airAttacking: boolean) => void;
+  resetCPUAirJumps: () => void;
+  useCPUAirJump?: () => void;
+  damagePlayer: (amount: number) => void;
+  damageCPU: (amount: number) => void;
+  updateRoundTime: (time: number) => void;
+  updatePlayerCooldowns: (delta: number) => void;
+  updateCPUCooldowns: (delta: number) => void;
+  updatePlayerMeters: (meters: Partial<{ guard: number; stamina: number; special: number }>) => void;
+  updateCPUMeters: (meters: Partial<{ guard: number; stamina: number; special: number }>) => void;
+  updatePlayerGuardBreak: () => void;
+  updateCPUGuardBreak: () => void;
+}
 
-type AudioActions = Pick<
-  ReturnType<typeof import("../lib/stores/useAudio").useAudio>,
-  | "playHit"
-  | "playPunch"
-  | "playKick"
-  | "playSpecial"
-  | "playBlock"
-  | "playJump"
-  | "playLand"
-  | "playDodge"
-  | "playGrab"
-  | "playThrow"
-  | "playTaunt"
->;
+interface AudioActions {
+  playHit: (intensity?: number) => void;
+  playPunch: () => void;
+  playKick: () => void;
+  playSpecial: () => void;
+  playBlock: () => void;
+  playJump: () => void;
+  playLand: () => void;
+  playDodge: () => void;
+  playGrab: () => void;
+  playThrow: () => void;
+  playTaunt: () => void;
+}
 
 interface MatchRuntimeDeps {
   fighting: FightingActions;

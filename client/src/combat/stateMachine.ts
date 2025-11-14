@@ -113,7 +113,7 @@ export class CombatStateMachine {
 
     if (updatedFrame >= move.totalFrames) {
       nextState.moveId = undefined;
-      nextState.moveFrame = undefined;
+      nextState.moveFrame = 0;
       nextState.action = move.aerialOnly ? "fall" : "landing";
     }
 

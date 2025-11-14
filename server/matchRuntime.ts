@@ -37,7 +37,7 @@ function createDefaultCharacterState(position: [number, number, number], directi
 }
 
 const noopAudio = {
-  playHit: () => {},
+  playHit: (_intensity?: number) => {},
   playPunch: () => {},
   playKick: () => {},
   playSpecial: () => {},
@@ -105,12 +105,16 @@ export class ServerMatchRuntime {
     return copy;
   }
 
-  snapshot() {
+  getState() {
     return {
-      player: this.player,
-      cpu: this.cpu,
-      phase: this.gamePhase,
+      player: { ...this.player },
+      cpu: { ...this.cpu },
+      gamePhase: this.gamePhase,
     };
+  }
+
+  snapshot() {
+    return this.getState();
   }
 
   private createFightingActions() {
@@ -127,11 +131,11 @@ export class ServerMatchRuntime {
       updateCPUVelocity: (vx: number, vy: number, vz: number) => {
         this.cpu.velocity = [vx, vy, vz];
       },
-      setPlayerDirection: (dir: 1 | -1) => {
-        this.player.direction = dir;
+      setPlayerDirection: (direction: 1 | -1) => {
+        this.player.direction = direction;
       },
-      setCPUDirection: (dir: 1 | -1) => {
-        this.cpu.direction = dir;
+      setCPUDirection: (direction: 1 | -1) => {
+        this.cpu.direction = direction;
       },
       setPlayerJumping: (jumping: boolean) => {
         this.player.isJumping = jumping;
@@ -143,7 +147,7 @@ export class ServerMatchRuntime {
         this.player.isAttacking = attacking;
       },
       setCPUAttacking: (attacking: boolean) => {
-        this.cpu.isAttacking = attacking;
+        this.player.isAttacking = attacking;
       },
       setPlayerBlocking: (blocking: boolean) => {
         this.player.isBlocking = blocking;
@@ -167,11 +171,7 @@ export class ServerMatchRuntime {
         this.player.airJumpsLeft = 2;
       },
       usePlayerAirJump: () => {
-        if (this.player.airJumpsLeft > 0) {
-          this.player.airJumpsLeft -= 1;
-          return true;
-        }
-        return false;
+        this.player.airJumpsLeft = Math.max(0, this.player.airJumpsLeft - 1);
       },
       setCPUDodging: (dodging: boolean) => {
         this.cpu.isDodging = dodging;
@@ -186,11 +186,7 @@ export class ServerMatchRuntime {
         this.cpu.airJumpsLeft = 2;
       },
       useCPUAirJump: () => {
-        if (this.cpu.airJumpsLeft > 0) {
-          this.cpu.airJumpsLeft -= 1;
-          return true;
-        }
-        return false;
+        this.cpu.airJumpsLeft = Math.max(0, this.cpu.airJumpsLeft - 1);
       },
       damagePlayer: (amount: number) => {
         this.player.health = Math.max(0, this.player.health - amount);
@@ -198,25 +194,26 @@ export class ServerMatchRuntime {
       damageCPU: (amount: number) => {
         this.cpu.health = Math.max(0, this.cpu.health - amount);
       },
-      updateRoundTime: () => {},
-      updatePlayerCooldowns: (delta: number) => {
-        this.player.attackCooldown = Math.max(0, this.player.attackCooldown - delta * 1000);
+      updateRoundTime: (_delta: number) => {
       },
-      updateCPUCooldowns: (delta: number) => {
-        this.cpu.attackCooldown = Math.max(0, this.cpu.attackCooldown - delta * 1000);
+      updatePlayerCooldowns: (_delta: number) => {
       },
-      updatePlayerMeters: (payload: { guard: number; stamina: number; special: number }) => {
-        this.player.guardMeter = payload.guard;
-        this.player.staminaMeter = payload.stamina;
-        this.player.specialMeter = payload.special;
+      updateCPUCooldowns: (_delta: number) => {
       },
-      updateCPUMeters: (payload: { guard: number; stamina: number; special: number }) => {
-        this.cpu.guardMeter = payload.guard;
-        this.cpu.staminaMeter = payload.stamina;
-        this.cpu.specialMeter = payload.special;
+      updatePlayerMeters: (payload: { guard?: number; stamina?: number; special?: number }) => {
+        if (payload.guard !== undefined) this.player.guardMeter = payload.guard;
+        if (payload.stamina !== undefined) this.player.staminaMeter = payload.stamina;
+        if (payload.special !== undefined) this.player.specialMeter = payload.special;
       },
-      updatePlayerGuardBreak: () => {},
-      updateCPUGuardBreak: () => {},
+      updateCPUMeters: (payload: { guard?: number; stamina?: number; special?: number }) => {
+        if (payload.guard !== undefined) this.cpu.guardMeter = payload.guard;
+        if (payload.stamina !== undefined) this.cpu.staminaMeter = payload.stamina;
+        if (payload.special !== undefined) this.cpu.specialMeter = payload.special;
+      },
+      updatePlayerGuardBreak: () => {
+      },
+      updateCPUGuardBreak: () => {
+      },
     };
   }
 }

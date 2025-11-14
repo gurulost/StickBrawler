@@ -144,8 +144,9 @@ let gamepadLoopId: number | null = null;
 const assignGamepadToSlot = (index: number) => {
   if (gamepadAssignments.has(index)) return;
   const preferredOrder: PlayerSlot[] = ["player2", "player1"];
+  const assignedSlots = Array.from(gamepadAssignments.values());
   for (const slot of preferredOrder) {
-    if (![...gamepadAssignments.values()].includes(slot)) {
+    if (!assignedSlots.includes(slot)) {
       gamepadAssignments.set(index, slot);
       clearSource(slot, "gamepad");
       return;

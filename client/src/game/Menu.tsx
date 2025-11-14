@@ -75,7 +75,7 @@ const Menu = () => {
           <section className="rounded-3xl border border-white/10 bg-black/40 p-6 backdrop-blur">
             <header className="mb-6 flex flex-wrap items-center justify-between gap-4">
               <div>
-                <p className="text-xs uppercase tracking-[0.4em] text-indigo-200">Ink Customizer</p>
+                <p className="text-xs uppercase tracking-[0.4em] text-emerald-200">Ink Customizer</p>
                 <h2 className="text-2xl font-bold text-white">Craft your silhouette</h2>
               </div>
               <button
@@ -93,7 +93,7 @@ const Menu = () => {
           <section className="rounded-3xl border border-white/10 bg-black/40 p-6 backdrop-blur">
             <header className="mb-6 flex flex-wrap items-center justify-between gap-4">
               <div>
-                <p className="text-xs uppercase tracking-[0.4em] text-indigo-200">Scores</p>
+                <p className="text-xs uppercase tracking-[0.4em] text-emerald-200">Scores</p>
                 <h2 className="text-2xl font-bold text-white">World leaderboard</h2>
               </div>
               <button
@@ -125,7 +125,7 @@ const Menu = () => {
           <section className="rounded-3xl border border-white/10 bg-black/40 p-6 backdrop-blur">
             <header className="mb-6 flex flex-wrap items-center justify-between gap-4">
               <div>
-                <p className="text-xs uppercase tracking-[0.4em] text-indigo-200">Moveset</p>
+                <p className="text-xs uppercase tracking-[0.4em] text-emerald-200">Moveset</p>
                 <h2 className="text-2xl font-bold text-white">Control layout</h2>
               </div>
               <button
@@ -159,7 +159,7 @@ const Menu = () => {
                   </ControlCard>
                 </div>
               </div>
-              <div className="rounded-2xl border border-white/10 bg-gradient-to-br from-purple-900/40 to-indigo-900/40 p-6">
+              <div className="rounded-2xl border border-white/10 bg-gradient-to-br from-emerald-900/40 to-teal-900/40 p-6">
                 <h3 className="text-lg font-semibold text-white">Controller</h3>
                 <p className="text-sm text-white/70">Press any button to join Player 2.</p>
                 <div className="mt-5 space-y-3">
@@ -198,12 +198,12 @@ const Menu = () => {
 
   return (
     <div className="relative min-h-screen overflow-y-auto bg-slate-950 text-white">
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,_rgba(79,70,229,0.25),_transparent_45%)]" />
+      <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,_rgba(5,150,105,0.25),_transparent_45%)]" />
       <div className="absolute inset-0 opacity-40 mix-blend-screen" style={{ backgroundImage: "url('/textures/ink-noise.png')" }} />
       <div className="relative z-10 mx-auto flex max-w-6xl flex-col gap-10 px-4 py-8">
         <header className="flex flex-wrap items-center justify-between gap-4">
           <div>
-            <p className="text-xs uppercase tracking-[0.6em] text-indigo-200">StickBrawler</p>
+            <p className="text-xs uppercase tracking-[0.6em] text-emerald-200">StickBrawler</p>
             <h1 className="text-2xl font-bold text-white">Ink-fueled arena</h1>
           </div>
           <nav className="flex flex-wrap gap-2">

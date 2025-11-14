@@ -65,7 +65,7 @@ export function LandingHero({
   return (
     <section
       ref={sectionRef}
-      className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-slate-950 via-indigo-950 to-slate-900 p-8 shadow-[0_25px_120px_rgba(45,78,255,0.25)]"
+      className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-slate-950 via-emerald-950 to-slate-900 p-8 shadow-[0_25px_120px_rgba(5,150,105,0.25)]"
     >
       <video
         className="pointer-events-none absolute inset-0 h-full w-full object-cover opacity-20"
@@ -78,10 +78,10 @@ export function LandingHero({
           (e.target as HTMLVideoElement).style.display = 'none';
         }}
       />
-      <div className="absolute inset-y-0 right-0 w-1/2 bg-[radial-gradient(circle_at_top,_rgba(99,102,241,0.15),_transparent_60%)]" />
+      <div className="absolute inset-y-0 right-0 w-1/2 bg-[radial-gradient(circle_at_top,_rgba(16,185,129,0.15),_transparent_60%)]" />
       <div className="relative grid gap-10 lg:grid-cols-2">
         <div className="space-y-6">
-          <span className="inline-flex items-center gap-2 rounded-full border border-indigo-400/40 bg-indigo-500/10 px-3 py-1 text-xs font-semibold uppercase tracking-widest text-indigo-200">
+          <span className="inline-flex items-center gap-2 rounded-full border border-emerald-400/40 bg-emerald-500/10 px-3 py-1 text-xs font-semibold uppercase tracking-widest text-emerald-200">
             New Ink Era
           </span>
           <h1 className="text-4xl font-extrabold text-white md:text-5xl lg:text-6xl">

@@ -60,7 +60,7 @@ export const OnlineMultiplayer = ({ onStartMatch }: OnlineMultiplayerProps) => {
     return (
       <div className="rounded-3xl border border-white/10 bg-black/40 p-8 backdrop-blur text-center">
         <div className="mb-6">
-          <p className="text-xs uppercase tracking-[0.4em] text-indigo-200">Online Multiplayer</p>
+          <p className="text-xs uppercase tracking-[0.4em] text-emerald-200">Online Multiplayer</p>
           <h2 className="text-2xl font-bold text-white mt-2">Sign In Required</h2>
         </div>
         <p className="text-white/70 mb-4">
@@ -68,7 +68,7 @@ export const OnlineMultiplayer = ({ onStartMatch }: OnlineMultiplayerProps) => {
         </p>
         <button
           onClick={() => window.location.reload()}
-          className="rounded-full bg-gradient-to-r from-indigo-600 to-purple-600 px-6 py-3 text-sm font-semibold text-white hover:opacity-90 transition"
+          className="rounded-full bg-gradient-to-r from-emerald-600 to-teal-600 px-6 py-3 text-sm font-semibold text-white hover:opacity-90 transition"
         >
           Sign In
         </button>
@@ -79,7 +79,7 @@ export const OnlineMultiplayer = ({ onStartMatch }: OnlineMultiplayerProps) => {
   return (
     <div className="rounded-3xl border border-white/10 bg-black/40 p-8 backdrop-blur">
       <div className="mb-8 text-center">
-        <p className="text-xs uppercase tracking-[0.4em] text-indigo-200">Online Multiplayer</p>
+        <p className="text-xs uppercase tracking-[0.4em] text-emerald-200">Online Multiplayer</p>
         <h2 className="text-3xl font-bold text-white mt-2">Battle Online</h2>
         <p className="text-white/70 mt-2">Create a match or join an existing one</p>
       </div>

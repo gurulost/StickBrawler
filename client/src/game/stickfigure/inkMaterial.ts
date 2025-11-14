@@ -1,5 +1,6 @@
 import { useMemo, useEffect } from "react";
 import * as THREE from "three";
+import { useControls } from "../../lib/stores/useControls";
 
 interface InkParams {
   baseColor: string;
@@ -54,8 +55,18 @@ export function useInkMaterial({
   opacity = 1,
   glow = 0,
 }: InkParams) {
+  const lowGraphicsMode = useControls((state) => state.lowGraphicsMode);
   const lightKey = lightDirection.join(",");
+  
   const material = useMemo(() => {
+    if (lowGraphicsMode) {
+      return new THREE.MeshToonMaterial({
+        color: baseColor,
+        transparent: opacity < 1,
+        opacity,
+      });
+    }
+    
     const shader = new THREE.ShaderMaterial({
       vertexShader,
       fragmentShader,
@@ -72,7 +83,7 @@ export function useInkMaterial({
     shader.depthWrite = true;
     shader.side = THREE.FrontSide;
     return shader;
-  }, [baseColor, rimColor, shadeBands, lightKey, opacity]);
+  }, [baseColor, rimColor, shadeBands, lightKey, opacity, lowGraphicsMode]);
 
   useEffect(() => {
     return () => {
@@ -81,15 +92,23 @@ export function useInkMaterial({
   }, [material]);
 
   useEffect(() => {
-    material.uniforms.uGlow.value = glow;
+    if (material instanceof THREE.ShaderMaterial) {
+      material.uniforms.uGlow.value = glow;
+    }
   }, [material, glow]);
 
   useEffect(() => {
-    material.uniforms.uBaseColor.value.set(baseColor);
+    if (material instanceof THREE.ShaderMaterial) {
+      material.uniforms.uBaseColor.value.set(baseColor);
+    } else if (material instanceof THREE.MeshToonMaterial) {
+      material.color.set(baseColor);
+    }
   }, [material, baseColor]);
 
   useEffect(() => {
-    material.uniforms.uRimColor.value.set(rimColor);
+    if (material instanceof THREE.ShaderMaterial) {
+      material.uniforms.uRimColor.value.set(rimColor);
+    }
   }, [material, rimColor]);
 
   return material;

@@ -33,7 +33,7 @@ const UI = () => {
   } = useFighting();
   
   const { toggleMute, isMuted, playSuccess, setMasterVolume, masterVolume } = useAudio();
-  const { debugMode, toggleDebugMode } = useControls();
+  const { debugMode, toggleDebugMode, lowGraphicsMode, toggleLowGraphicsMode } = useControls();
   const { coins, lastCoinEvent } = useCustomization();
   const landingBurst = useEffects((state) => state.landingBurst);
   const impactFlash = useEffects((state) => state.impactFlash);
@@ -388,14 +388,22 @@ const UI = () => {
         />
       </div>
       
-      {/* Debug button - only visible in development */}
+      {/* Debug and performance buttons - only visible in development */}
       {process.env.NODE_ENV === 'development' && (
-        <button 
-          onClick={toggleDebugMode}
-          className="absolute top-4 right-4 bg-pink-600 text-white px-2 py-1 rounded pointer-events-auto text-xs shadow-lg"
-        >
-          {debugMode ? "Debug: ON" : "Debug: OFF"}
-        </button>
+        <div className="absolute top-4 right-4 flex flex-col gap-2 pointer-events-auto">
+          <button 
+            onClick={toggleDebugMode}
+            className="bg-pink-600 text-white px-2 py-1 rounded text-xs shadow-lg"
+          >
+            {debugMode ? "Debug: ON" : "Debug: OFF"}
+          </button>
+          <button 
+            onClick={toggleLowGraphicsMode}
+            className="bg-purple-600 text-white px-2 py-1 rounded text-xs shadow-lg"
+          >
+            {lowGraphicsMode ? "Low Graphics: ON" : "Low Graphics: OFF"}
+          </button>
+        </div>
       )}
       
       {/* Pause menu */}

@@ -24,9 +24,13 @@ export enum Controls {
 type ControlsState = {
   debugMode: boolean;
   toggleDebugMode: () => void;
+  lowGraphicsMode: boolean;
+  toggleLowGraphicsMode: () => void;
 }
 
 export const useControls = create<ControlsState>((set) => ({
   debugMode: false,
   toggleDebugMode: () => set((state) => ({ debugMode: !state.debugMode })),
+  lowGraphicsMode: false,
+  toggleLowGraphicsMode: () => set((state) => ({ lowGraphicsMode: !state.lowGraphicsMode })),
 }));

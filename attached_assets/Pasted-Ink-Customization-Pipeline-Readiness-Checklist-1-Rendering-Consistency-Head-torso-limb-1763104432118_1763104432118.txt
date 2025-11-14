@@ -1,0 +1,35 @@
+Ink Customization Pipeline Readiness Checklist
+
+  1. Rendering Consistency
+      - Head, torso, limbs, and every accessory mesh (including multi-part ones like wings) use useInkMaterial
+        + useOutlineMaterial.
+      - Outline scaling respects each figure style’s outlineWidth.
+      - All VFX/decoration meshes that sit on the fighters (scarves, capes) render in the same toon style
+        (double-sided where needed).
+  2. Customization Data & UI
+      - figureStyles expose silhouette params (silhouette.arms/legs, outlineWidth, etc.) and the fighter
+        customizer surfaces these choices (previews or at least clear labels).
+      - Accessories in useCustomization.tsx include ink-specific fields (color, rimColor, outlineColor,
+        lineWidth, shadeBands, glow), and the UI lets players pick them.
+      - Player presets (saved characters) persist these new parameters end-to-end (load/save works).
+  3. Fallback / Performance Modes
+      - There’s a user-facing toggle (settings or auto-detect) that forces simple MeshStandard materials for low-
+        end hardware, and it’s plumbed through StickFigure.
+      - Profiling confirms the toon pipeline fits performance budgets on target hardware (documented thresholds/
+        FPS).
+  4. Determinism & Multiplayer
+      - The ink pipeline doesn’t introduce per-frame randomness; silhouettes and shading are entirely driven by
+        deterministic state (no Math.random() outside initial seeds).
+      - Multiplayer (lobby → fight → pause) works identically whether players use default or customized
+        silhouettes/accessories.
+  5. QA & Regression
+      - npm run check && npm test pass locally with the new customization fields.
+      - Visual QA covers:
+          - Each figure style + accessory combination renders without shader artifacts.
+          - Pause/resume, guard breaks, hitlag effects still behave as before.
+          - Telemetry and replays (if any) remain valid.
+  6. Docs & Debugging Aids
+      - stylized_plan.md (or similar doc) updated with instructions on how to extend silhouettes/accessories.
+      - Debug toggles exist (e.g., show control points/outline widths) to help future tuning.
+      - Screenshots/GIFs captured for internal reference showing ink look across multiple styles.
+

@@ -1,6 +1,6 @@
 // Constants for physics calculations
-export const GRAVITY = 0.5; // Gravity acceleration per second
-export const JUMP_FORCE = 18; // Jump velocity (units per second)
+export const GRAVITY = 30; // Gravity acceleration per second² (brings player down)
+export const JUMP_FORCE = 10; // Jump velocity (units per second - initial upward velocity)
 export const PLAYER_SPEED = 8; // Movement speed (units per second) - multiplied by delta in runtime
 export const CPU_SPEED = 7; // CPU movement speed (units per second)
 export const DRAG = 0.92; // Increased drag for smoother movement

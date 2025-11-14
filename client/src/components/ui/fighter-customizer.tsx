@@ -7,7 +7,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from './tabs';
 import { Badge } from './badge';
 import { Separator } from './separator';
 import { Input } from './input';
-import { useCustomization, colorThemes, figureStyles, accessories, animationStyles, SavedCharacter, type CoinLedgerEntry, type ColorTheme, type FigureStyle, type Accessory, type AnimationStyle } from '../../lib/stores/useCustomization';
+import { useCustomization, colorThemes, figureStyles, accessories, animationStyles, inkStyles, SavedCharacter, type CoinLedgerEntry, type ColorTheme, type FigureStyle, type Accessory, type AnimationStyle, type InkStyle } from '../../lib/stores/useCustomization';
 import type { CosmeticSlot } from '../../lib/stores/useCustomization';
 import StickFigure from '../../game/StickFigure';
 import { useFighting } from '../../lib/stores/useFighting';
@@ -321,6 +321,68 @@ const StyleSelector = ({
   );
 };
 
+// Ink Style Selector with visual preview
+const InkStyleSelector = ({ 
+  label, 
+  value, 
+  onChange,
+  className = "" 
+}: {
+  label: string;
+  value: InkStyle;
+  onChange: (style: InkStyle) => void;
+  className?: string;
+}) => {
+  return (
+    <div className={`space-y-3 ${className}`}>
+      <label className="text-sm font-medium text-gray-200">{label}</label>
+      <div className="grid grid-cols-1 gap-2">
+        {Object.entries(inkStyles).map(([key, style]) => {
+          const isSelected = value === key;
+          return (
+            <button
+              type="button"
+              key={key}
+              onClick={() => onChange(key as InkStyle)}
+              className={`relative p-3 rounded-lg border text-left transition-all hover:bg-gray-700 ${
+                isSelected
+                  ? 'border-blue-400 bg-blue-900/30 text-blue-200' 
+                  : 'border-gray-600 bg-gray-800 text-gray-300 hover:border-gray-500'
+              }`}
+            >
+              <div className="flex items-center gap-3">
+                <div 
+                  className="w-10 h-10 rounded flex-shrink-0 relative"
+                  style={{ 
+                    backgroundColor: '#333',
+                    border: `${Math.max(1, style.lineWidth * 20)}px solid ${style.outlineColor}`,
+                    boxShadow: style.glow > 0 ? `0 0 ${style.glow * 15}px ${style.rimColor}` : 'none'
+                  }}
+                >
+                  <div 
+                    className="absolute inset-0 rounded"
+                    style={{
+                      background: style.shadeBands <= 2 
+                        ? `linear-gradient(135deg, #555 0%, #999 100%)` 
+                        : style.shadeBands <= 3
+                        ? `linear-gradient(135deg, #444 0%, #777 50%, #aaa 100%)`
+                        : `linear-gradient(135deg, #333 0%, #555 25%, #888 50%, #bbb 75%, #ddd 100%)`,
+                    }}
+                  />
+                </div>
+                <div className="flex-1">
+                  <div className="font-medium">{style.name}</div>
+                  <div className="text-xs text-gray-400 mt-1">{style.description}</div>
+                </div>
+              </div>
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+};
+
 // Enhanced accessory selector with visual effects
 const AccessorySelector = ({ 
   label, 
@@ -615,11 +677,11 @@ export function FighterCustomizer() {
   const [presetFilter, setPresetFilter] = useState<PresetFilter>('all');
   
   const {
-    playerColorTheme, playerFigureStyle, playerAccessory, playerAccessoryColor, playerAnimationStyle,
-    cpuColorTheme, cpuFigureStyle, cpuAccessory, cpuAccessoryColor, cpuAnimationStyle,
+    playerColorTheme, playerFigureStyle, playerAccessory, playerAccessoryColor, playerAnimationStyle, playerInkStyle,
+    cpuColorTheme, cpuFigureStyle, cpuAccessory, cpuAccessoryColor, cpuAnimationStyle, cpuInkStyle,
     savedCharacters,
-    setPlayerColorTheme, setPlayerFigureStyle, setPlayerAccessory, setPlayerAnimationStyle,
-    setCPUColorTheme, setCPUFigureStyle, setCPUAccessory, setCPUAnimationStyle,
+    setPlayerColorTheme, setPlayerFigureStyle, setPlayerAccessory, setPlayerAnimationStyle, setPlayerInkStyle,
+    setCPUColorTheme, setCPUFigureStyle, setCPUAccessory, setCPUAnimationStyle, setCPUInkStyle,
     saveCharacter, loadCharacter, deleteCharacter,
     resetCustomizations,
     coins,
@@ -1197,6 +1259,23 @@ export function FighterCustomizer() {
                     isUnlocked={(styleId) => isCosmeticUnlocked('animationStyle', styleId)}
                     getCost={(styleId) => getCostForCosmetic('animationStyle', styleId)}
                     onAttemptPurchase={(styleId) => attemptPurchase('animationStyle', styleId)}
+                  />
+
+                  {/* Ink Style */}
+                  <InkStyleSelector
+                    label="Ink Shader Style"
+                    value={activeTab === 'player' ? playerInkStyle : cpuInkStyle}
+                    onChange={(style) => {
+                      try {
+                        if (activeTab === 'player') {
+                          setPlayerInkStyle(style);
+                        } else {
+                          setCPUInkStyle(style);
+                        }
+                      } catch (error) {
+                        console.error('Error setting ink style:', error);
+                      }
+                    }}
                   />
                 </div>
 

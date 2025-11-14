@@ -1,15 +1,12 @@
 ## Objective
-Transition existing stick figure components to stylized ink look & unlock customization potential.
+Transition stick figures + accessories to the ink/toon system and leverage customization presets fully.
 
-## Steps Completed
-- Toon/ink shader + outline system in `client/src/game/stickfigure/inkMaterial.ts`.
-- Head/Torso/Limbs now use ink shading; limb geometry respects silhouette presets from `figureStyles`.
-- Multiplayer lobby/pause telemetry intact.
+## Completed
+- Ink shader/outline pipeline and silhouette presets wired into limbs/head/torso.
+- Limb geometries are Catmull-Rom based with per-style parameters.
+- Lobby/pause/telemetry updates already merged.
 
-## Next Steps
-1. Convert accessories/effects to ink materials (useInkMaterial + outline) so they merge with the new look.
-2. Expand customization UI to expose silhouette presets & accessory styles, plus fallback material toggle.
-3. QA performance/determinism & add docs/screenshots.
-
-## Notes
-Actual file path for `useCustomization.tsx` needs confirmation; once accessible, hook accessory definitions into new silhouette/material parameters.
+## Next
+1. Apply ink materials to accessory meshes (in `Head.tsx`, future body accessories) and expose rim/outline params in `accessories` definitions.
+2. Provide fallback (MeshStandard) material path for performance-critical builds.
+3. QA pass (performance, determinism) and document customization controls.

@@ -39,111 +39,47 @@ const Head: FC<HeadProps> = ({ colors, style, accessory, isAttacking, lean }) =>
 
       {accessory.geometry && (
         <group position={[lean * 0.12, 1.8 + style.headSize * 0.5, 0]} rotation={[0, 0, lean * 0.25]}>
-          {(Array.isArray(accessory.geometry)
-            ? accessory.geometry
-            : [accessory.geometry]
-          ).map((geom, idx) => {
+          {(Array.isArray(accessory.geometry) ? accessory.geometry : [accessory.geometry]).map((geom: any, idx) => {
             if (!geom) return null;
-            const g: any = geom;
-            if (g.type === "cone" || g.type === "coneGeometry") {
-              return (
-                <mesh key={idx} position={g.position as [number, number, number]} rotation={g.rotation as [number, number, number]} castShadow>
-                  <coneGeometry args={g.args as any} />
-                  <meshStandardMaterial
-                    color={accessory.color}
-                    metalness={style.metalness}
-                    roughness={style.roughness}
-                  />
+            const geoBuilder = () => {
+              switch (geom.type) {
+                case "cone":
+                case "coneGeometry":
+                  return <coneGeometry args={geom.args as any} />;
+                case "torusGeometry":
+                  return <torusGeometry args={geom.args as any} />;
+                case "planeGeometry":
+                  return <planeGeometry args={geom.args as any} />;
+                case "boxGeometry":
+                  return <boxGeometry args={geom.args as any} />;
+                case "circleGeometry":
+                  return <circleGeometry args={geom.args as any} />;
+                case "sphereGeometry":
+                  return <sphereGeometry args={geom.args as any} />;
+                case "cylinderGeometry":
+                  return <cylinderGeometry args={geom.args as any} />;
+                case "octahedronGeometry":
+                  return <octahedronGeometry args={geom.args as any} />;
+                default:
+                  return <boxGeometry args={[0.1, 0.1, 0.1]} />;
+              }
+            };
+            const strokeWidth = accessory.lineWidth ?? (style.outlineWidth ?? 0.04);
+            const accessoryMaterial = useInkMaterial({
+              baseColor: accessory.color ?? colors.secondary,
+              rimColor: accessory.rimColor ?? colors.glow ?? accessory.color,
+              shadeBands: accessory.shadeBands ?? 3,
+              glow: accessory.emissive ? 0.3 : 0.05,
+            });
+            const outlineMat = useOutlineMaterial(accessory.outlineColor ?? "#080808", accessory.emissive ? 0.95 : 0.8);
+            return (
+              <group key={idx} position={geom.position as [number, number, number]} rotation={geom.rotation as [number, number, number]}>
+                <mesh castShadow material={accessoryMaterial}>{geoBuilder()}</mesh>
+                <mesh castShadow material={outlineMat} scale={[1 + strokeWidth, 1 + strokeWidth, 1 + strokeWidth]}>
+                  {geoBuilder()}
                 </mesh>
-              );
-            }
-            if (g.type === "torusGeometry") {
-              return (
-                <mesh key={idx} position={g.position as [number, number, number]} rotation={g.rotation as [number, number, number]} castShadow>
-                  <torusGeometry args={g.args as any} />
-                  <meshStandardMaterial
-                    color={accessory.color}
-                    metalness={style.metalness}
-                    roughness={style.roughness}
-                  />
-                </mesh>
-              );
-            }
-            if (g.type === "planeGeometry") {
-              return (
-                <mesh key={idx} position={g.position as [number, number, number]} rotation={g.rotation as [number, number, number]} castShadow>
-                  <planeGeometry args={g.args as any} />
-                  <meshStandardMaterial
-                    color={accessory.color}
-                    metalness={style.metalness}
-                    roughness={style.roughness}
-                    side={THREE.DoubleSide}
-                  />
-                </mesh>
-              );
-            }
-            if (g.type === "boxGeometry") {
-              return (
-                <mesh key={idx} position={g.position as [number, number, number]} rotation={g.rotation as [number, number, number]} castShadow>
-                  <boxGeometry args={g.args as any} />
-                  <meshStandardMaterial
-                    color={accessory.color}
-                    metalness={style.metalness}
-                    roughness={style.roughness}
-                  />
-                </mesh>
-              );
-            }
-            if (g.type === "circleGeometry") {
-              return (
-                <mesh key={idx} position={g.position as [number, number, number]} rotation={g.rotation as [number, number, number]} castShadow>
-                  <circleGeometry args={g.args as any} />
-                  <meshStandardMaterial
-                    color={accessory.color}
-                    metalness={style.metalness}
-                    roughness={style.roughness}
-                    side={THREE.DoubleSide}
-                  />
-                </mesh>
-              );
-            }
-            if (g.type === "sphereGeometry") {
-              return (
-                <mesh key={idx} position={g.position as [number, number, number]} rotation={g.rotation as [number, number, number]} castShadow>
-                  <sphereGeometry args={g.args as any} />
-                  <meshStandardMaterial
-                    color={accessory.color}
-                    metalness={style.metalness}
-                    roughness={style.roughness}
-                  />
-                </mesh>
-              );
-            }
-            if (g.type === "cylinderGeometry") {
-              return (
-                <mesh key={idx} position={g.position as [number, number, number]} rotation={g.rotation as [number, number, number]} castShadow>
-                  <cylinderGeometry args={g.args as any} />
-                  <meshStandardMaterial
-                    color={accessory.color}
-                    metalness={style.metalness}
-                    roughness={style.roughness}
-                  />
-                </mesh>
-              );
-            }
-            if (g.type === "octahedronGeometry") {
-              return (
-                <mesh key={idx} position={g.position as [number, number, number]} rotation={g.rotation as [number, number, number]} castShadow>
-                  <octahedronGeometry args={g.args as any} />
-                  <meshStandardMaterial
-                    color={accessory.color}
-                    metalness={style.metalness}
-                    roughness={style.roughness}
-                  />
-                </mesh>
-              );
-            }
-            return null;
+              </group>
+            );
           })}
         </group>
       )}

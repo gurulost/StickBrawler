@@ -36,6 +36,7 @@ export function useOnlineMatch<TControl extends string>({
   const heartbeatTimeoutRef = useRef<NodeJS.Timeout>();
   const intentionalCloseRef = useRef(false);
   const lastPingTimeRef = useRef(0);
+  const connectionIdRef = useRef<string | null>(null);
 
   const calculateBackoff = useCallback(() => {
     let delay = RECONNECT_CONFIG.initialDelay * Math.pow(RECONNECT_CONFIG.factor, retryCountRef.current);
@@ -89,12 +90,23 @@ export function useOnlineMatch<TControl extends string>({
         console.log("[useOnlineMatch] Connected");
         setStatus("connected");
         retryCountRef.current = 0;
+        
+        // Clear stale connectionId before joining
+        connectionIdRef.current = null;
+        
         ws.send(JSON.stringify({ type: "join", matchId, profileId }));
         startHeartbeat();
       });
 
       ws.addEventListener("message", (event) => {
         const msg: OnlineMatchMessage<TControl> = JSON.parse(event.data);
+        
+        if (msg.type === "joined") {
+          // Store connectionId for future input submissions
+          connectionIdRef.current = msg.connectionId;
+          console.log("[useOnlineMatch] Joined with connectionId:", msg.connectionId);
+          return;
+        }
         
         if (msg.type === "pong") {
           if (heartbeatTimeoutRef.current) {
@@ -120,6 +132,9 @@ export function useOnlineMatch<TControl extends string>({
         console.log("[useOnlineMatch] Connection closed", event.code, event.reason);
         clearHeartbeat();
         setStatus("disconnected");
+        
+        // Clear connectionId on disconnect to prevent using stale ID
+        connectionIdRef.current = null;
         
         // Don't reconnect if intentional close (code 1000) or max retries reached
         if (intentionalCloseRef.current || event.code === 1000) {
@@ -175,10 +190,10 @@ export function useOnlineMatch<TControl extends string>({
   }, [connect, disconnect]);
 
   const sendInputs = useCallback((frame: number, inputs: RuntimeKeyboardState<TControl>) => {
-    if (wsRef.current?.readyState === WebSocket.OPEN) {
-      wsRef.current.send(JSON.stringify({ type: "inputs", frame, inputs }));
+    if (wsRef.current?.readyState === WebSocket.OPEN && connectionIdRef.current) {
+      wsRef.current.send(JSON.stringify({ type: "inputs", frame, inputs, connectionId: connectionIdRef.current }));
     } else {
-      console.warn("[useOnlineMatch] Cannot send inputs, socket not open");
+      console.warn("[useOnlineMatch] Cannot send inputs, socket not open or no connectionId");
     }
   }, []);
 

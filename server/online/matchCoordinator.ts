@@ -156,17 +156,28 @@ export class MatchCoordinator<TControl extends string> {
     const state = this.matches.get(matchId);
     if (!state) return;
     
+    // Validate connectionId matches current active connection to prevent stale sockets from clearing slots
+    const isActiveHost = state.connections.host?.profileId === profileId && state.connections.host?.connectionId === connectionId;
+    const isActiveGuest = state.connections.guest?.profileId === profileId && state.connections.guest?.connectionId === connectionId;
+    
+    if (!isActiveHost && !isActiveGuest) {
+      // Stale connection closing - just remove from active tokens, don't touch slots
+      console.log(`[MatchCoordinator] Stale connection ${connectionId} closing for ${profileId}, ignoring`);
+      state.activeTokens.delete(connectionId);
+      return;
+    }
+    
     // Remove the connection token
     state.activeTokens.delete(connectionId);
     
     // Unregister the leaving player from the runtime
     state.runtime.unregisterPlayer(profileId);
     
-    // Clear the connection slot
-    if (state.connections.host?.profileId === profileId) {
+    // Clear the connection slot (only if it's the active connection)
+    if (isActiveHost) {
       state.connections.host = undefined;
     }
-    if (state.connections.guest?.profileId === profileId) {
+    if (isActiveGuest) {
       state.connections.guest = undefined;
     }
     

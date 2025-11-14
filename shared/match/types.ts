@@ -138,8 +138,9 @@ export interface OnlineMatchDescriptor {
 
 export type OnlineMatchMessage<TControl extends string> =
   | { type: "join"; matchId: string; profileId: string }
+  | { type: "joined"; descriptor: OnlineMatchDescriptor; connectionId: string }
   | { type: "state"; snapshot: OnlineMatchSnapshot<TControl> }
-  | { type: "inputs"; frame: number; inputs: RuntimeKeyboardState<TControl> }
+  | { type: "inputs"; frame: number; inputs: RuntimeKeyboardState<TControl>; connectionId: string }
   | { type: "resync"; snapshot: OnlineMatchSnapshot<TControl> }
   | { type: "leave"; reason?: string }
   | { type: "ping" }

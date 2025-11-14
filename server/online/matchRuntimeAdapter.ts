@@ -1,6 +1,24 @@
 import { ServerMatchRuntime } from "../matchRuntime";
 import type { OnlineMatchSnapshot, RuntimeKeyboardState, FighterSnapshot } from "@shared/match/types";
-import { createEmptyInputs, type DualInputState } from "../../client/src/game/matchRuntime";
+
+// Helper to create empty input state with all keys false (avoiding client-side import)
+function createEmptyInputState<T extends string>(): RuntimeKeyboardState<T> {
+  return {
+    jump: false,
+    forward: false,
+    backward: false,
+    leftward: false,
+    rightward: false,
+    attack1: false,
+    attack2: false,
+    shield: false,
+    special: false,
+    dodge: false,
+    airAttack: false,
+    taunt: false,
+    grab: false,
+  } as RuntimeKeyboardState<T>;
+}
 
 /**
  * MatchRuntimeServerAdapter bridges the existing ServerMatchRuntime with the online multiplayer API.
@@ -24,8 +42,8 @@ export class MatchRuntimeServerAdapter {
   constructor(seed?: number) {
     // TODO: Use seed to initialize deterministic runtime
     this.runtime = new ServerMatchRuntime();
-    this.lastPlayerInputs = this.createEmptyInputState();
-    this.lastOpponentInputs = this.createEmptyInputState();
+    this.lastPlayerInputs = createEmptyInputState<string>();
+    this.lastOpponentInputs = createEmptyInputState<string>();
   }
   
   /**
@@ -111,8 +129,8 @@ export class MatchRuntimeServerAdapter {
     this.currentFrame = 0;
     this.playerInputsQueue.clear();
     this.opponentInputsQueue.clear();
-    this.lastPlayerInputs = this.createEmptyInputState();
-    this.lastOpponentInputs = this.createEmptyInputState();
+    this.lastPlayerInputs = createEmptyInputState<string>();
+    this.lastOpponentInputs = createEmptyInputState<string>();
   }
   
   /**
@@ -129,8 +147,8 @@ export class MatchRuntimeServerAdapter {
     // Fixed delta time for deterministic simulation (60 FPS)
     const delta = 1 / 60;
     
-    // Convert RuntimeKeyboardState<string> to DualInputState
-    const dualInputs: DualInputState = {
+    // Convert RuntimeKeyboardState<string> to dual input format
+    const dualInputs = {
       player1: playerInputs as any, // TODO: Proper type conversion
       player2: opponentInputs as any,
     };
@@ -175,21 +193,4 @@ export class MatchRuntimeServerAdapter {
     };
   }
   
-  private createEmptyInputState(): RuntimeKeyboardState<string> {
-    return {
-      jump: false,
-      forward: false,
-      backward: false,
-      leftward: false,
-      rightward: false,
-      attack1: false,
-      attack2: false,
-      shield: false,
-      special: false,
-      dodge: false,
-      airAttack: false,
-      taunt: false,
-      grab: false,
-    };
-  }
 }

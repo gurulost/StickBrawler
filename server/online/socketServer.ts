@@ -54,8 +54,7 @@ export class OnlineSocketServer<TControl extends string> {
   }
 
   private handleConnection(socket: WebSocket) {
-    const connectionId = randomUUID();
-    console.log(`[OnlineSocketServer] New connection ${connectionId}`);
+    console.log("[OnlineSocketServer] New WebSocket connection established");
     
     // Track last heartbeat
     (socket as any).isAlive = true;
@@ -121,11 +120,19 @@ export class OnlineSocketServer<TControl extends string> {
         });
         if (descriptor) {
           this.sockets.set(socket, { profileId: msg.profileId, connectionId, matchId: descriptor.id });
+          // Send join acknowledgment with connectionId to client
+          socket.send(JSON.stringify({ type: "joined", descriptor, connectionId }));
           console.log(`[OnlineSocketServer] Player ${msg.profileId} joined match ${descriptor.id} with connection ${connectionId}`);
         } else {
           socket.send(JSON.stringify({ type: "leave", reason: "match_full" }));
           console.log(`[OnlineSocketServer] Player ${msg.profileId} rejected from match ${msg.matchId} (match full or hijack attempt)`);
         }
+        break;
+      }
+      case "ping": {
+        // Respond to client heartbeat
+        socket.send(JSON.stringify({ type: "pong" }));
+        this.lastHeartbeatAt = Date.now();
         break;
       }
       case "inputs": {

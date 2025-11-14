@@ -1,0 +1,40 @@
+• Here’s the highest‑leverage sequence I’d attack to get StickBrawler closer to production quality:
+
+  1. Untangle the Simulation Loop
+
+  - Break client/src/game/GameManager.tsx into focused systems: input aggregation, combat state advancement
+    (using CombatStateMachine), physics/movement, AI, telemetry, and audio triggers.
+  - Drive everything off the fixed useFrame delta (not Date.now()) and replace setTimeout‑based timers with
+    deterministic counters. This makes the loop testable and easier to port to the backend.
+
+  2. Restore the Shared Engine Module
+
+  - Bring back the missing engine/ package (or remove the imports/tests) so the server runtime (server/
+    gameRuntime.ts) and tests/engine/engine.test.ts actually work.
+  - Mirror the CombatStateMachine + hit resolver into that engine so we have a single source of truth for combat,
+    which unlocks authoritative server validation later.
+
+  3. Secure the Economy & Telemetry
+
+  - Tie /api/economy snapshots to the authenticated user and prevent arbitrary profileId spoofing; ideally derive
+    profile IDs server-side.
+  - Move coin awards server-side (based on telemetry) instead of trusting the client’s earnCoins.
+  - Persist telemetry beyond an in‑memory buffer and add signing/validation so it’s usable for anti-cheat and
+    leaderboards.
+
+  4. Harden Backend Storage
+
+  - Delete server/storage 2.ts and ensure only server/storage.ts defines the storage interface.
+  - Add tests for storage behaviors (score ordering, economy upsert) once the engine module is restored, so
+    regressions are caught automatically.
+
+  5. Combat & Physics Depth
+
+  - Expand move definitions with real hurtboxes, blockstun/hitstun behavior, DI, and knockback scaling to meet
+    the roadmap’s fidelity goals.
+  - Improve physics (capsule/platform collision, wall bounce, tech rolls, fast-fall) and unit-test the math
+    (client/src/game/Physics.ts).
+
+  Once those pillars are in place, circle back to UX polish (audio init, debug logging removal) and add CI/
+  linting so every change runs type checks + tests by default. That order shortens the path to deterministic,
+  multiplayer-ready combat while closing the biggest security/runtime gaps.

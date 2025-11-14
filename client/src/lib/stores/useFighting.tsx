@@ -404,9 +404,6 @@ export const useFighting = create<FightingState>((set, get) => ({
     // If player is dodging, reduce damage by 95%
     if (state.player.isDodging) {
       actualDamage = amount * 0.05;
-      if (useControls.getState().debugMode) {
-        console.log("DODGE! Player takes greatly reduced damage!");
-      }
     }
     
     // If CPU has a combo going, apply combo multiplier with reasonable cap
@@ -414,9 +411,6 @@ export const useFighting = create<FightingState>((set, get) => ({
       // Cap combo multiplier at 2.5x (maximum 7-8 hit combos)
       const comboMultiplier = Math.min(2.5, 1 + (state.cpu.comboCount * 0.15));
       actualDamage = actualDamage * comboMultiplier;
-      if (useControls.getState().debugMode) {
-        console.log(`CPU COMBO x${state.cpu.comboCount + 1}! Damage multiplier: ${comboMultiplier.toFixed(1)}x`);
-      }
     }
     
     const newHealth = Math.max(0, state.player.health - actualDamage);
@@ -428,16 +422,10 @@ export const useFighting = create<FightingState>((set, get) => ({
     if (state.cpu.comboTimer > 0) {
       updatedCPU.comboCount = Math.min(10, state.cpu.comboCount + 1); // Cap combo at 10 hits
       updatedCPU.comboTimer = COMBO_WINDOW; // Reset combo timer
-      if (useControls.getState().debugMode) {
-        console.log(`CPU combo hit! Combo counter increased to ${updatedCPU.comboCount}`);
-      }
     } else {
       // Start a new combo
       updatedCPU.comboCount = 1;
       updatedCPU.comboTimer = COMBO_WINDOW;
-      if (useControls.getState().debugMode) {
-        console.log("CPU starts new combo!");
-      }
     }
     
     // Reset player's combo when taking damage (combo breaker)
@@ -447,10 +435,6 @@ export const useFighting = create<FightingState>((set, get) => ({
       comboCount: 0,
       comboTimer: 0
     };
-    
-    if (state.player.comboCount > 0 && useControls.getState().debugMode) {
-      console.log("Player combo broken by taking damage!");
-    }
     
     // If health is 0, end the round
     if (newHealth === 0 && state.gamePhase === 'fighting') {
@@ -536,9 +520,6 @@ export const useFighting = create<FightingState>((set, get) => ({
     // If CPU is dodging, reduce damage by 95%
     if (state.cpu.isDodging) {
       actualDamage = amount * 0.05;
-      if (useControls.getState().debugMode) {
-        console.log("DODGE! CPU takes greatly reduced damage!");
-      }
     }
     
     // If player has a combo going, apply combo multiplier with reasonable cap
@@ -546,9 +527,6 @@ export const useFighting = create<FightingState>((set, get) => ({
       // Cap combo multiplier at 2.5x (maximum 7-8 hit combos)
       const comboMultiplier = Math.min(2.5, 1 + (state.player.comboCount * 0.15));
       actualDamage = actualDamage * comboMultiplier;
-      if (useControls.getState().debugMode) {
-        console.log(`COMBO x${state.player.comboCount + 1}! Damage multiplier: ${comboMultiplier.toFixed(1)}x`);
-      }
     }
     
     // Apply the damage
@@ -576,16 +554,10 @@ export const useFighting = create<FightingState>((set, get) => ({
     if (state.player.comboTimer > 0) {
       updatedPlayer.comboCount = Math.min(10, state.player.comboCount + 1); // Cap combo at 10 hits
       updatedPlayer.comboTimer = COMBO_WINDOW; // Reset combo timer
-      if (useControls.getState().debugMode) {
-        console.log(`Player combo hit! Combo counter increased to ${updatedPlayer.comboCount}`);
-      }
     } else {
       // Start a new combo
       updatedPlayer.comboCount = 1;
       updatedPlayer.comboTimer = COMBO_WINDOW;
-      if (useControls.getState().debugMode) {
-        console.log("Player starts new combo!");
-      }
     }
     
     // Reset CPU's combo when taking damage (combo breaker)
@@ -595,10 +567,6 @@ export const useFighting = create<FightingState>((set, get) => ({
       comboCount: 0,
       comboTimer: 0
     };
-    
-    if (state.cpu.comboCount > 0 && useControls.getState().debugMode) {
-      console.log("CPU combo broken by taking damage!");
-    }
     
     // If health is 0, end the round
     if (newHealth === 0 && state.gamePhase === 'fighting') {
@@ -622,9 +590,6 @@ export const useFighting = create<FightingState>((set, get) => ({
     let newCooldown = state.player.dodgeCooldown;
     if (isDodging && !state.player.isDodging) {
       newCooldown = 20; // Dodge has longer cooldown than attacks
-      if (useControls.getState().debugMode) {
-        console.log("Player DODGE - starting cooldown:", newCooldown);
-      }
     }
     
     return {
@@ -641,9 +606,6 @@ export const useFighting = create<FightingState>((set, get) => ({
     let newCooldown = state.player.grabCooldown;
     if (isGrabbing && !state.player.isGrabbing) {
       newCooldown = 30; // Grab has longer cooldown
-      if (useControls.getState().debugMode) {
-        console.log("Player GRAB - starting cooldown:", newCooldown);
-      }
     }
     
     return {
@@ -672,9 +634,6 @@ export const useFighting = create<FightingState>((set, get) => ({
     let newCooldown = state.player.attackCooldown;
     if (isAirAttacking && !state.player.isAirAttacking) {
       newCooldown = 15; // Air attacks have longer cooldown
-      if (useControls.getState().debugMode) {
-        console.log("Player AIR ATTACK - starting cooldown:", newCooldown);
-      }
     }
     
     return {
@@ -698,16 +657,9 @@ export const useFighting = create<FightingState>((set, get) => ({
     
     set((state) => {
       if (state.player.airJumpsLeft <= 0) {
-        // No air jumps left
-        if (useControls.getState().debugMode) {
-          console.log("Player has no air jumps left!");
-        }
         return state; // No changes to state
       }
 
-      if (useControls.getState().debugMode) {
-        console.log("Player using air jump! Jumps remaining:", state.player.airJumpsLeft - 1);
-      }
       jumpSuccess = true;
       
       return {
@@ -1068,7 +1020,6 @@ export const useFighting = create<FightingState>((set, get) => ({
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          userId: 1, // Default user for now, can be enhanced with authentication
           score: finalScore,
         }),
       });
@@ -1078,7 +1029,6 @@ export const useFighting = create<FightingState>((set, get) => ({
       }
       
       const result = await response.json();
-      console.log('Score submitted successfully:', result);
     } catch (error) {
       console.error('Error submitting score:', error);
     }

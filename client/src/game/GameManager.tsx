@@ -128,9 +128,7 @@ const GameManager = () => {
       body: JSON.stringify({ entries }),
       keepalive: true,
     }).catch((error) => {
-      if (useControls.getState().debugMode) {
-        console.warn("Failed to send telemetry", error);
-      }
+      console.error("[telemetry] Failed to send telemetry to server:", error);
     });
   }, []);
 

@@ -229,10 +229,6 @@ export class CpuBrain {
       this.action = CpuAction.CHASE;
       this.actionTimer = 25;
     }
-
-    if (useControls.getState().debugMode && Math.random() < 0.02) {
-      console.log("CPU action switched to", CpuAction[this.action], "distance:", distance.toFixed(2));
-    }
   }
 }
 

@@ -119,6 +119,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const authenticatedUserId = (req.user as any)?.id ?? null;
 
+      // Validate ownership: check if this profileId already exists and belongs to someone else
+      const existingSnapshot = await storage.getEconomySnapshot(parsed.data.profileId);
+      if (existingSnapshot && existingSnapshot.userId !== authenticatedUserId) {
+        return res.status(403).json({ error: "Cannot modify economy data that belongs to another user" });
+      }
+
       const snapshot = await storage.saveEconomySnapshot({
         profileId: parsed.data.profileId,
         userId: authenticatedUserId,
@@ -140,10 +146,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!profileId) {
         return res.status(400).json({ error: "Missing profileId in path" });
       }
+      
       const snapshot = await storage.getEconomySnapshot(profileId);
       if (!snapshot) {
         return res.status(404).json({ error: "Economy snapshot not found" });
       }
+
+      // Validate ownership: only return data if it belongs to the authenticated user
+      const authenticatedUserId = (req.user as any)?.id ?? null;
+      if (snapshot.userId !== authenticatedUserId) {
+        return res.status(403).json({ error: "Cannot access economy data that belongs to another user" });
+      }
+
       res.json(snapshot);
     }),
   );

@@ -80,7 +80,6 @@ function App() {
     // Start playing background music
     setTimeout(() => {
       playBackgroundMusic();
-      console.log("Background music started");
     }, 1000);
 
     // Show the canvas once everything is loaded

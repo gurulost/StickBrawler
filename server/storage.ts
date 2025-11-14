@@ -2,6 +2,7 @@ import {
   users,
   gameScores,
   economySnapshots,
+  hitTelemetry,
   type User,
   type InsertUser,
   type GameScore,
@@ -28,6 +29,7 @@ export interface IStorage {
   updateUserHighScore(userId: number, score: number): Promise<void>;
   saveEconomySnapshot(snapshot: InsertEconomySnapshot): Promise<EconomySnapshot>;
   getEconomySnapshot(profileId: string): Promise<EconomySnapshot | undefined>;
+  saveTelemetryBatch(entries: Array<{ slot: string; timestamp: number; comboCount: number; data: any }>): Promise<void>;
   /**
    * Testing/maintenance helper to wipe transient data.
    */
@@ -106,7 +108,22 @@ class DbStorage implements IStorage {
   async reset(): Promise<void> {
     await this.db.delete(gameScores);
     await this.db.delete(economySnapshots);
+    await this.db.delete(hitTelemetry);
     await this.db.update(users).set({ highScore: 0 });
+  }
+
+  async saveTelemetryBatch(entries: Array<{ slot: string; timestamp: number; comboCount: number; data: any }>): Promise<void> {
+    if (entries.length === 0) return;
+    
+    const values = entries.map(entry => ({
+      slot: entry.slot,
+      timestamp: entry.timestamp,
+      comboCount: entry.comboCount,
+      data: entry.data,
+      createdAt: new Date().toISOString(),
+    }));
+
+    await this.db.insert(hitTelemetry).values(values);
   }
 
   async saveEconomySnapshot(snapshot: InsertEconomySnapshot): Promise<EconomySnapshot> {
@@ -233,6 +250,10 @@ class MemStorage implements IStorage {
 
   async getEconomySnapshot(profileId: string): Promise<EconomySnapshot | undefined> {
     return this.economy.get(profileId);
+  }
+
+  async saveTelemetryBatch(_entries: Array<{ slot: string; timestamp: number; comboCount: number; data: any }>): Promise<void> {
+    // In-memory storage doesn't persist telemetry
   }
 }
 

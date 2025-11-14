@@ -45,6 +45,15 @@ export const economySnapshots = pgTable("economy_snapshots", {
   updatedAt: text("updated_at").notNull(),
 });
 
+export const hitTelemetry = pgTable("hit_telemetry", {
+  id: serial("id").primaryKey(),
+  slot: text("slot").notNull(),
+  timestamp: integer("timestamp").notNull(),
+  comboCount: integer("combo_count").notNull().default(0),
+  data: jsonb("data").notNull(),
+  createdAt: text("created_at").notNull(),
+});
+
 export const insertUserSchema = createInsertSchema(users).pick({
   username: true,
   password: true,

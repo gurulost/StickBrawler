@@ -265,7 +265,6 @@ const Menu = () => {
     // Short delay to ensure audio is loaded
     const timer = setTimeout(() => {
       playBackgroundMusic();
-      console.log("Background music started from menu");
     }, 800);
     
     return () => {

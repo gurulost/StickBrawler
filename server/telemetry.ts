@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { storage } from "./storage";
 
 export const hitTelemetrySchema = z.object({
   source: z.enum(["player", "cpu"]),
@@ -22,6 +23,7 @@ export const hitTelemetrySchema = z.object({
 
 const buffer: z.infer<typeof hitTelemetrySchema>[] = [];
 const MAX_ENTRIES = 1024;
+const FLUSH_INTERVAL_MS = 30000; // Flush to database every 30 seconds
 
 export function storeTelemetry(entries: z.infer<typeof hitTelemetrySchema>[]) {
   for (const entry of entries) {
@@ -64,3 +66,39 @@ export function summarizeTelemetry() {
   }
   return summary;
 }
+
+let consecutiveFlushFailures = 0;
+const MAX_FLUSH_RETRIES = 3;
+
+async function flushTelemetryToDatabase() {
+  const entries = drainTelemetryBuffer();
+  if (entries.length === 0) return;
+
+  try {
+    await storage.saveTelemetryBatch(
+      entries.map(entry => ({
+        slot: entry.slot,
+        timestamp: entry.timestamp,
+        comboCount: entry.comboCount,
+        data: entry,
+      }))
+    );
+    consecutiveFlushFailures = 0;
+  } catch (error) {
+    consecutiveFlushFailures++;
+    console.error(`[telemetry] Failed to flush ${entries.length} entries to database (failure ${consecutiveFlushFailures}/${MAX_FLUSH_RETRIES}):`, error);
+    
+    // Only re-add entries if we haven't exceeded retry limit
+    // This prevents infinite loops when DB is down
+    if (consecutiveFlushFailures < MAX_FLUSH_RETRIES) {
+      for (const entry of entries) {
+        storeTelemetry([entry]);
+      }
+    } else {
+      console.error(`[telemetry] Dropping ${entries.length} entries after ${MAX_FLUSH_RETRIES} consecutive failures`);
+    }
+  }
+}
+
+// Start periodic flush
+setInterval(flushTelemetryToDatabase, FLUSH_INTERVAL_MS);

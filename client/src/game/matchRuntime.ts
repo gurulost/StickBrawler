@@ -162,7 +162,7 @@ const createActionTimers = (): ActionTimers => ({
  * - This ensures replays and netcode remain synchronized while preserving visual variety
  */
 export class MatchRuntime {
-  private readonly engine = new GameEngine(createInitialState(Date.now()));
+  private readonly engine: GameEngine;
   private readonly playerMachine = new CombatStateMachine();
   private readonly cpuMachine = new CombatStateMachine();
   private playerCombatState: FighterCombatState;
@@ -183,11 +183,14 @@ export class MatchRuntime {
   constructor(private readonly deps: MatchRuntimeDeps, snapshot: { player: CharacterState; cpu: CharacterState }) {
     this.playerCombatState = toCombatState(snapshot.player);
     this.cpuCombatState = toCombatState(snapshot.cpu);
-    this.engine.registerSystem(this.handleSystem);
     
     // Create deterministic seed from match start positions
     const seed = this.createMatchSeed(snapshot);
     this.rng = new DeterministicRandom(seed);
+    
+    // Initialize engine with deterministic seed
+    this.engine = new GameEngine(createInitialState(seed));
+    this.engine.registerSystem(this.handleSystem);
   }
   
   /**
@@ -575,9 +578,6 @@ export class MatchRuntime {
       planarDistance < 1.4 &&
       this.cpuTimers.grab <= 0
     ) {
-      if (getDebugMode()) {
-        console.log("CPU attempts grab");
-      }
       fighting.setCPUGrabbing(true);
       audio.playGrab();
       this.cpuTimers.grab = GRAB_RESOLVE_DELAY;
@@ -618,13 +618,6 @@ export class MatchRuntime {
       stamina: this.cpuCombatState.staminaMeter,
       special: this.cpuCombatState.specialMeter,
     });
-
-    if (Math.random() < 0.01 && getDebugMode()) {
-      console.log("Player attack cooldown:", player.attackCooldown);
-      console.log("CPU attack cooldown:", cpu.attackCooldown);
-      const dist = Math.abs(player.position[0] - cpu.position[0]);
-      console.log("Distance between player and CPU:", dist.toFixed(2), "Attack range:", ATTACK_RANGE);
-    }
   }
 
   private updateCpuMovement(

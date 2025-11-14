@@ -115,8 +115,6 @@ export const useAudio = create<AudioState>((set, get) => ({
     if (backgroundMusic) {
       backgroundMusic.muted = newMutedState;
     }
-    
-    console.log(`Sound ${newMutedState ? 'muted' : 'unmuted'}`);
   },
   
   setMasterVolume: (volume) => {
@@ -129,8 +127,6 @@ export const useAudio = create<AudioState>((set, get) => ({
     if (backgroundMusic) {
       backgroundMusic.volume = clampedVolume * 0.3; // Background at 30% of master
     }
-    
-    console.log(`Master volume set to ${clampedVolume.toFixed(2)}`);
   },
   
   // Advanced sound playing functions with pitch variation for more natural sound
@@ -147,11 +143,7 @@ export const useAudio = create<AudioState>((set, get) => ({
       // Scale volume by master volume and intensity
       soundClone.volume = masterVolume * 0.4 * intensity;
       
-      soundClone.play().catch(error => {
-        console.log("Hit sound play prevented:", error);
-      });
-    } else if (isMuted) {
-      console.log("Hit sound skipped (muted)");
+      soundClone.play().catch(() => {});
     }
   },
   
@@ -165,9 +157,7 @@ export const useAudio = create<AudioState>((set, get) => ({
       // Punches are quick and sharp
       soundClone.playbackRate = 1.1 + (Math.random() * 0.1);
       soundClone.volume = masterVolume * 0.35;
-      soundClone.play().catch(error => {
-        console.log("Punch sound play prevented:", error);
-      });
+      soundClone.play().catch(() => {});
     }
   },
   
@@ -181,9 +171,7 @@ export const useAudio = create<AudioState>((set, get) => ({
       // Kicks are heavier with lower pitch
       soundClone.playbackRate = 0.85 + (Math.random() * 0.15);
       soundClone.volume = masterVolume * 0.5; // Slightly louder
-      soundClone.play().catch(error => {
-        console.log("Kick sound play prevented:", error);
-      });
+      soundClone.play().catch(() => {});
     }
   },
   
@@ -197,9 +185,7 @@ export const useAudio = create<AudioState>((set, get) => ({
       // Special attacks are dramatic
       soundClone.playbackRate = 0.9;
       soundClone.volume = masterVolume * 0.6; // Louder for impact
-      soundClone.play().catch(error => {
-        console.log("Special sound play prevented:", error);
-      });
+      soundClone.play().catch(() => {});
     }
   },
   
@@ -208,9 +194,7 @@ export const useAudio = create<AudioState>((set, get) => ({
     if (blockSound && !isMuted) {
       const soundClone = blockSound.cloneNode() as HTMLAudioElement;
       soundClone.volume = masterVolume * 0.4;
-      soundClone.play().catch(error => {
-        console.log("Block sound play prevented:", error);
-      });
+      soundClone.play().catch(() => {});
     }
   },
   
@@ -219,9 +203,7 @@ export const useAudio = create<AudioState>((set, get) => ({
     if (jumpSound && !isMuted) {
       const soundClone = jumpSound.cloneNode() as HTMLAudioElement;
       soundClone.volume = masterVolume * 0.3;
-      soundClone.play().catch(error => {
-        console.log("Jump sound play prevented:", error);
-      });
+      soundClone.play().catch(() => {});
     }
   },
   
@@ -230,9 +212,7 @@ export const useAudio = create<AudioState>((set, get) => ({
     if (landSound && !isMuted) {
       const soundClone = landSound.cloneNode() as HTMLAudioElement;
       soundClone.volume = masterVolume * 0.35;
-      soundClone.play().catch(error => {
-        console.log("Land sound play prevented:", error);
-      });
+      soundClone.play().catch(() => {});
     }
   },
   
@@ -241,9 +221,7 @@ export const useAudio = create<AudioState>((set, get) => ({
     if (dodgeSound && !isMuted) {
       const soundClone = dodgeSound.cloneNode() as HTMLAudioElement;
       soundClone.volume = masterVolume * 0.3;
-      soundClone.play().catch(error => {
-        console.log("Dodge sound play prevented:", error);
-      });
+      soundClone.play().catch(() => {});
     }
   },
   
@@ -252,9 +230,7 @@ export const useAudio = create<AudioState>((set, get) => ({
     if (grabSound && !isMuted) {
       const soundClone = grabSound.cloneNode() as HTMLAudioElement;
       soundClone.volume = masterVolume * 0.4;
-      soundClone.play().catch(error => {
-        console.log("Grab sound play prevented:", error);
-      });
+      soundClone.play().catch(() => {});
     }
   },
   
@@ -263,9 +239,7 @@ export const useAudio = create<AudioState>((set, get) => ({
     if (throwSound && !isMuted) {
       const soundClone = throwSound.cloneNode() as HTMLAudioElement;
       soundClone.volume = masterVolume * 0.45;
-      soundClone.play().catch(error => {
-        console.log("Throw sound play prevented:", error);
-      });
+      soundClone.play().catch(() => {});
     }
   },
   
@@ -274,9 +248,7 @@ export const useAudio = create<AudioState>((set, get) => ({
     if (tauntSound && !isMuted) {
       const soundClone = tauntSound.cloneNode() as HTMLAudioElement;
       soundClone.volume = masterVolume * 0.5;
-      soundClone.play().catch(error => {
-        console.log("Taunt sound play prevented:", error);
-      });
+      soundClone.play().catch(() => {});
     }
   },
   
@@ -286,11 +258,7 @@ export const useAudio = create<AudioState>((set, get) => ({
       // Reset to beginning of sound
       successSound.currentTime = 0;
       successSound.volume = masterVolume * 0.6; // Victory sounds are prominent
-      successSound.play().catch(error => {
-        console.log("Success sound play prevented:", error);
-      });
-    } else if (isMuted) {
-      console.log("Success sound skipped (muted)");
+      successSound.play().catch(() => {});
     }
   },
   
@@ -307,9 +275,7 @@ export const useAudio = create<AudioState>((set, get) => ({
       soundClone.playbackRate = 1.0 + (comboCount * 0.05);
       soundClone.volume = masterVolume * 0.4 * intensity;
       
-      soundClone.play().catch(error => {
-        console.log("Combo hit sound play prevented:", error);
-      });
+      soundClone.play().catch(() => {});
     }
   },
   
@@ -318,9 +284,7 @@ export const useAudio = create<AudioState>((set, get) => ({
     if (backgroundMusic && !isMuted) {
       backgroundMusic.volume = masterVolume * 0.3;
       backgroundMusic.currentTime = 0;
-      backgroundMusic.play().catch(error => {
-        console.log("Background music play prevented:", error);
-      });
+      backgroundMusic.play().catch(() => {});
     }
   }
 }));

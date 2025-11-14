@@ -130,7 +130,7 @@ const StickFigure = ({
 
 // Main menu component
 const Menu = () => {
-  const { startGame } = useFighting();
+  const { startGame, matchMode, setMatchMode } = useFighting();
   const { playBackgroundMusic, toggleMute, isMuted, setMasterVolume, masterVolume } = useAudio();
   const { user, status, logout } = useAuth();
   
@@ -140,6 +140,7 @@ const Menu = () => {
   const [showAdvancedControls, setShowAdvancedControls] = useState(false);
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [menuSection, setMenuSection] = useState<'main' | 'controls' | 'customization' | 'leaderboard'>('main');
+  const [controllerConnected, setControllerConnected] = useState(false);
   
   // Animation states
   const [titleEffect, setTitleEffect] = useState(0);
@@ -164,6 +165,21 @@ const Menu = () => {
     const particleCount = 30;
     const newParticles = Array.from({ length: particleCount }, (_, i) => i);
     setParticles(newParticles);
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === "undefined" || typeof navigator === "undefined") return;
+    const refreshGamepadState = () => {
+      const pads = navigator.getGamepads ? navigator.getGamepads() : [];
+      setControllerConnected(pads.some((pad) => pad && pad.connected));
+    };
+    window.addEventListener("gamepadconnected", refreshGamepadState);
+    window.addEventListener("gamepaddisconnected", refreshGamepadState);
+    refreshGamepadState();
+    return () => {
+      window.removeEventListener("gamepadconnected", refreshGamepadState);
+      window.removeEventListener("gamepaddisconnected", refreshGamepadState);
+    };
   }, []);
   
   // Animated title effect
@@ -261,7 +277,7 @@ const Menu = () => {
   const handleStartGame = () => {
     setIsAnimating(true);
     setTimeout(() => {
-      startGame();
+      startGame(matchMode);
     }, 700);
   };
   
@@ -406,6 +422,41 @@ const Menu = () => {
             >
               PLAY GAME
             </button>
+            <div className="flex flex-col items-center gap-4 text-white">
+              <span className="uppercase tracking-wide text-sm text-gray-300">Mode Selection</span>
+            <div className="flex flex-wrap justify-center gap-3">
+                <button
+                  className={`px-6 py-2 rounded-full border transition-all ${
+                    matchMode === "single"
+                      ? "bg-indigo-600 border-indigo-400 shadow-lg"
+                      : "bg-black bg-opacity-40 border-gray-700 hover:border-indigo-500"
+                  }`}
+                  onClick={() => setMatchMode("single")}
+                >
+                  Solo vs CPU
+                </button>
+                <button
+                  className={`px-6 py-2 rounded-full border transition-all ${
+                    matchMode === "local"
+                      ? "bg-pink-600 border-pink-400 shadow-lg"
+                      : "bg-black bg-opacity-40 border-gray-700 hover:border-pink-500"
+                  }`}
+                  onClick={() => setMatchMode("local")}
+                >
+                  Local Multiplayer
+                </button>
+              </div>
+              <p className="text-sm text-gray-300 max-w-lg text-center">
+                {matchMode === "single"
+                  ? "Battle against the adaptive CPU warrior."
+                  : "Player 1 uses WASD + J/K/L, Player 2 uses IJKL + U/O/P. Share one keyboard and clash locally."}
+              </p>
+              <p className="text-xs text-gray-400 text-center">
+                {controllerConnected
+                  ? "Controller detected: Player 2 can use it instantly."
+                  : "Connect a controller to let Player 2 join instantly."}
+              </p>
+            </div>
             
             <div className="flex flex-wrap justify-center gap-5 mt-8">
               <button 

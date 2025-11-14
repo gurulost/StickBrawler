@@ -2,6 +2,7 @@ import { z } from "zod";
 
 export const hitTelemetrySchema = z.object({
   source: z.enum(["player", "cpu"]),
+  slot: z.enum(["player1", "player2", "cpu"]),
   comboCount: z.number().int().nonnegative(),
   timestamp: z.number().nonnegative(),
   hit: z.object({
@@ -34,4 +35,32 @@ export function storeTelemetry(entries: z.infer<typeof hitTelemetrySchema>[]) {
 export function drainTelemetryBuffer() {
   const copy = buffer.splice(0, buffer.length);
   return copy;
+}
+
+export function peekTelemetryBuffer() {
+  return [...buffer];
+}
+
+export function summarizeTelemetry() {
+  const snapshot = peekTelemetryBuffer();
+  const init = () => ({
+    hits: 0,
+    totalDamage: 0,
+    maxCombo: 0,
+    lastTimestamp: 0,
+  });
+  const summary: Record<"player1" | "player2" | "cpu", ReturnType<typeof init>> = {
+    player1: init(),
+    player2: init(),
+    cpu: init(),
+  };
+  for (const entry of snapshot) {
+    const target = summary[entry.slot];
+    if (!target) continue;
+    target.hits += 1;
+    target.totalDamage += entry.hit.damage;
+    target.maxCombo = Math.max(target.maxCombo, entry.comboCount);
+    target.lastTimestamp = Math.max(target.lastTimestamp, entry.timestamp);
+  }
+  return summary;
 }

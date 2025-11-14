@@ -29,6 +29,8 @@ export const ATTACK_RANGE = 1.5; // Kept the same for consistent hit detection
 // Combo system constants
 export const COMBO_WINDOW = 800; // Time window in ms to chain attacks for combos
 export const COMBO_MULTIPLIER = 1.2; // Damage multiplier for each hit in a combo
+export const FAST_FALL_MULTIPLIER = 1.7;
+export const MAX_FALL_SPEED = 0.9;
 
 // Platform system for multi-level combat
 export interface Platform {
@@ -135,11 +137,16 @@ export function applyGravity(
   x: number = 0,
   z: number = 0,
   dropThrough: boolean = false,
+  fastFall: boolean = false,
   delta: number = 1,
   capsuleRadius: number = CAPSULE_RADIUS,
 ): [number, number] {
   // Apply gravity to the velocity scaled by delta
-  const newVelocityY = velocityY - GRAVITY * delta;
+  let newVelocityY = velocityY - GRAVITY * delta;
+  if (fastFall) {
+    newVelocityY -= GRAVITY * (FAST_FALL_MULTIPLIER - 1) * delta;
+  }
+  newVelocityY = Math.max(newVelocityY, -MAX_FALL_SPEED);
 
   // Calculate new position scaled by delta
   const newY = y + newVelocityY * delta;

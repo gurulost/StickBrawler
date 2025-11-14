@@ -139,7 +139,12 @@ export const figureStyles = {
     glowIntensity: 0.2,
     particleCount: 5,
     animationMultiplier: 1.0,
-    specialGeometry: null
+    specialGeometry: null,
+    outlineWidth: 0.04,
+    silhouette: {
+      arms: { length: 0.7, base: 1, mid: 0.85, tip: 0.6, curvature: 0.02 },
+      legs: { length: 0.85, base: 1.15, mid: 0.95, tip: 0.65, curvature: -0.015 },
+    },
   },
   bulky: {
     name: 'Heavy Bruiser',
@@ -153,7 +158,12 @@ export const figureStyles = {
     glowIntensity: 0.1,
     particleCount: 3,
     animationMultiplier: 0.8,
-    specialGeometry: 'angular'
+    specialGeometry: 'angular',
+    outlineWidth: 0.06,
+    silhouette: {
+      arms: { length: 0.65, base: 1.2, mid: 1.0, tip: 0.7, curvature: 0.005 },
+      legs: { length: 0.8, base: 1.3, mid: 1.05, tip: 0.75, curvature: -0.02 },
+    },
   },
   slim: {
     name: 'Speed Demon',
@@ -167,7 +177,12 @@ export const figureStyles = {
     glowIntensity: 0.4,
     particleCount: 8,
     animationMultiplier: 1.3,
-    specialGeometry: 'streamlined'
+    specialGeometry: 'streamlined',
+    outlineWidth: 0.035,
+    silhouette: {
+      arms: { length: 0.78, base: 0.85, mid: 0.7, tip: 0.45, curvature: 0.05 },
+      legs: { length: 0.92, base: 1.0, mid: 0.8, tip: 0.5, curvature: -0.04 },
+    },
   },
   cartoonish: {
     name: 'Bouncy Brawler',
@@ -181,7 +196,12 @@ export const figureStyles = {
     glowIntensity: 0.6,
     particleCount: 12,
     animationMultiplier: 1.2,
-    specialGeometry: 'rounded'
+    specialGeometry: 'rounded',
+    outlineWidth: 0.05,
+    silhouette: {
+      arms: { length: 0.68, base: 1.05, mid: 0.9, tip: 0.55, curvature: 0.08 },
+      legs: { length: 0.82, base: 1.2, mid: 0.95, tip: 0.6, curvature: -0.03 },
+    },
   },
   robot: {
     name: 'Cyber Warrior',
@@ -195,7 +215,12 @@ export const figureStyles = {
     glowIntensity: 0.8,
     particleCount: 6,
     animationMultiplier: 0.9,
-    specialGeometry: 'mechanical'
+    specialGeometry: 'mechanical',
+    outlineWidth: 0.045,
+    silhouette: {
+      arms: { length: 0.7, base: 1.1, mid: 0.95, tip: 0.6, curvature: 0 },
+      legs: { length: 0.84, base: 1.2, mid: 1.0, tip: 0.7, curvature: 0 },
+    },
   },
   ethereal: {
     name: 'Ghost Phantom',
@@ -209,7 +234,12 @@ export const figureStyles = {
     glowIntensity: 1.0,
     particleCount: 15,
     animationMultiplier: 1.1,
-    specialGeometry: 'translucent'
+    specialGeometry: 'translucent',
+    outlineWidth: 0.03,
+    silhouette: {
+      arms: { length: 0.82, base: 0.9, mid: 0.7, tip: 0.4, curvature: 0.07 },
+      legs: { length: 0.95, base: 1.0, mid: 0.7, tip: 0.4, curvature: -0.05 },
+    },
   },
   crystal: {
     name: 'Diamond Guardian',
@@ -223,7 +253,12 @@ export const figureStyles = {
     glowIntensity: 0.9,
     particleCount: 10,
     animationMultiplier: 1.0,
-    specialGeometry: 'crystalline'
+    specialGeometry: 'crystalline',
+    outlineWidth: 0.05,
+    silhouette: {
+      arms: { length: 0.72, base: 1.05, mid: 0.9, tip: 0.55, curvature: 0.01 },
+      legs: { length: 0.88, base: 1.15, mid: 0.95, tip: 0.6, curvature: -0.01 },
+    },
   }
 };
 

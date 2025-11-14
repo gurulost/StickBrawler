@@ -1,20 +1,19 @@
 import { useFrame } from "@react-three/fiber";
 import { useRef, useEffect, useState } from "react"; // Added useState back for lastPunch, lastKick
-import { useKeyboardControls } from "@react-three/drei";
 import { CharacterState } from "../lib/stores/useFighting";
-import { Controls, useControls } from "../lib/stores/useControls";
+import { Controls } from "../lib/stores/useControls";
 import { Group, Mesh, DoubleSide } from "three"; // Mesh, DoubleSide might not be directly used here but kept if Stickfigure/* needs it
 import * as THREE from "three";
-import { 
-  applyGravity, 
-  stayInArena, 
-  JUMP_FORCE, 
-  PLAYER_SPEED, 
-  DRAG, 
-  applyDrag 
+import {
+  stayInArena,
+  JUMP_FORCE,
+  PLAYER_SPEED,
+  DRAG,
+  applyDrag,
 } from "./Physics";
 import { useAudio } from "../lib/stores/useAudio";
 import { useCustomization } from "../lib/stores/useCustomization";
+import type { PlayerInputSnapshot } from "../hooks/use-player-controls";
 
 import { Head, Torso, Limbs } from "./stickfigure";
 interface StickFigureProps {
@@ -26,7 +25,41 @@ interface StickFigureProps {
   onJumpingChange: (isJumping: boolean) => void;
   onAttackingChange: (isAttacking: boolean) => void;
   onBlockingChange: (isBlocking: boolean) => void;
+  inputSnapshot?: PlayerInputSnapshot;
+  isHumanControlled?: boolean;
 }
+
+type DustBurst = {
+  id: number;
+  age: number;
+  offsetX: number;
+  offsetZ: number;
+  intensity: number;
+  rotation: number;
+  life: number;
+};
+
+type SpeedTrail = {
+  id: number;
+  age: number;
+  direction: number;
+  offsetZ: number;
+  length: number;
+  height: number;
+  intensity: number;
+};
+
+const readInput = (snapshot: PlayerInputSnapshot | undefined, control: Controls) =>
+  snapshot?.[control] ?? false;
+
+type AttackAnimation = "punch" | "kick" | "special" | "air_attack" | "grab" | "dodge" | "taunt" | null;
+const MOVE_TO_ANIMATION: Record<string, Exclude<AttackAnimation, null>> = {
+  lightJab: "punch",
+  guardBreak: "kick",
+  launcher: "special",
+  diveKick: "air_attack",
+  parry: "grab",
+};
 
 const StickFigure = ({
   isPlayer,
@@ -36,7 +69,9 @@ const StickFigure = ({
   onDirectionChange,
   onJumpingChange,
   onAttackingChange,
-  onBlockingChange
+  onBlockingChange,
+  inputSnapshot,
+  isHumanControlled = false,
 }: StickFigureProps) => {
   const groupRef = useRef<Group>(null);
   const [lastPunch, setLastPunch] = useState(0); // Kept useState for these as they weren't part of the conflict's focus
@@ -44,7 +79,7 @@ const StickFigure = ({
 
   // Resolved Conflict 1: Kept from 'main' branch
   // animationPhase and attackType use refs to avoid triggering React state updates
-  const attackType = useRef<'punch' | 'kick' | 'special' | 'air_attack' | 'grab' | 'dodge' | 'taunt' | null>(null);
+  const attackType = useRef<AttackAnimation>(null);
   const animationPhase = useRef(0);
   const phaseTimer = useRef(0); // Added by 'main'
 
@@ -63,20 +98,7 @@ const StickFigure = ({
   const characterStyle = isPlayer ? getPlayerStyle() : getCPUStyle();
   const characterAccessory = isPlayer ? getPlayerAccessory() : getCPUAccessory();
   
-  const jump = useKeyboardControls<Controls>(state => state.jump);
-  const backward = useKeyboardControls<Controls>(state => state.backward);
-  const leftward = useKeyboardControls<Controls>(state => state.leftward);
-  const rightward = useKeyboardControls<Controls>(state => state.rightward);
-  const attack1 = useKeyboardControls<Controls>(state => state.attack1);
-  const attack2 = useKeyboardControls<Controls>(state => state.attack2);
-  const shield = useKeyboardControls<Controls>(state => state.shield);
-  const special = useKeyboardControls<Controls>(state => state.special);
-  const dodge = useKeyboardControls<Controls>(state => state.dodge);
-  const airAttack = useKeyboardControls<Controls>(state => state.airAttack);
-  const grab = useKeyboardControls<Controls>(state => state.grab);
-  const taunt = useKeyboardControls<Controls>(state => state.taunt);
-  
-  const { 
+  const {
     position, 
     direction, 
     isJumping, 
@@ -92,32 +114,27 @@ const StickFigure = ({
     comboCount
   } = characterState;
   const [x, y, z] = position;
+  const attack1Pressed = readInput(inputSnapshot, Controls.attack1);
+  const attack2Pressed = readInput(inputSnapshot, Controls.attack2);
+  const specialPressed = readInput(inputSnapshot, Controls.special);
+  const dodgePressed = readInput(inputSnapshot, Controls.dodge);
+  const airAttackPressed = readInput(inputSnapshot, Controls.airAttack);
+  const grabPressed = readInput(inputSnapshot, Controls.grab);
+  const tauntPressed = readInput(inputSnapshot, Controls.taunt);
+  const inferAttackAnimation = (): AttackAnimation => {
+    if (characterState.isAirAttacking || airAttackPressed) return "air_attack";
+    if (characterState.isDodging || dodgePressed) return "dodge";
+    if (characterState.isGrabbing || grabPressed) return "grab";
+    if (characterState.isTaunting || tauntPressed) return "taunt";
+    if (specialPressed) return "special";
+    if (attack2Pressed) return "kick";
+    if (attack1Pressed) return "punch";
+    if (characterState.lastMoveType) {
+      return MOVE_TO_ANIMATION[characterState.lastMoveType] ?? null;
+    }
+    return null;
+  };
   // const [vx, vy, vz] = velocity; // vx, vy, vz are read but not directly used in this component's render logic after destructuring.
-
-  useEffect(() => {
-    const keyDebugInterval = setInterval(() => {
-      if (isPlayer && useControls.getState().debugMode) {
-        if (Math.random() < 0.05) {
-          if (jump) console.log("Jump key pressed, playerY:", y, "isJumping:", isJumping, "airJumpsLeft:", airJumpsLeft);
-          if (leftward) console.log("Left key detected in StickFigure");
-          if (rightward) console.log("Right key detected in StickFigure");
-          if (attack1) console.log("Quick attack key detected in StickFigure");
-          if (attack2) console.log("Strong attack key detected in StickFigure");
-          if (shield) console.log("Shield key detected in StickFigure");
-          if (special) console.log("Special key detected in StickFigure");
-          if (dodge) console.log("Dodge key detected in StickFigure");
-          if (airAttack) console.log("Air attack key detected in StickFigure");
-          if (grab) console.log("Grab key detected in StickFigure");
-          if (taunt) console.log("Taunt key detected in StickFigure");
-          if (isJumping && y > 0.1) {
-            console.log("Player in air at height:", y.toFixed(2), "Air jumps left:", airJumpsLeft);
-          }
-        }
-      }
-    }, 500);
-    
-    return () => clearInterval(keyDebugInterval);
-  }, [isPlayer, jump, y, isJumping, airJumpsLeft, leftward, rightward, attack1, attack2, shield, special, dodge, airAttack, grab, taunt]); // Added dependencies
 
   // Resolved Conflict 2: Kept the new useFrame from 'main' and the modified subsequent one
 
@@ -128,48 +145,17 @@ const StickFigure = ({
     phaseTimer.current = 0;
 
     if (isAttacking) {
-      if (isPlayer) {
-        if (isAirAttacking || (airAttack && isJumping)) {
-          attackType.current = 'air_attack';
+      if (isHumanControlled) {
+        const inferred = inferAttackAnimation();
+        if (inferred) {
+          attackType.current = inferred;
+        } else if (!attackType.current && characterState.lastMoveType) {
+          attackType.current = MOVE_TO_ANIMATION[characterState.lastMoveType] ?? "punch";
         }
-        else if (isDodging || dodge) {
-          attackType.current = 'dodge';
-        }
-        else if (isGrabbing || grab) {
-          attackType.current = 'grab';
-        }
-        else if (isTaunting || taunt) {
-          attackType.current = 'taunt';
-        }
-        else if (attack1) {
-          attackType.current = 'punch';
-        }
-        else if (attack2) {
-          attackType.current = 'kick';
-        }
-        else if (special) {
-          attackType.current = 'special';
-        }
-        else {
-          attackType.current = 'punch';
-        }
-      } else if (!attackType.current) { // CPU attack type logic
-        const attackRandom = Math.random();
-        if (attackRandom < 0.45) {
-          attackType.current = 'punch';
-        }
-        else if (attackRandom < 0.75) {
-          attackType.current = 'kick';
-        }
-        else if (attackRandom < 0.9) {
-          attackType.current = 'special';
-        }
-        else if (attackRandom < 0.95) {
-          attackType.current = 'grab';
-        }
-        else {
-          attackType.current = 'air_attack';
-        }
+      } else if (!attackType.current) {
+        attackType.current =
+          MOVE_TO_ANIMATION[characterState.lastMoveType] ??
+          (Math.random() < 0.5 ? "punch" : "kick");
       }
 
       animationPhase.current = (animationPhase.current + 1) % 6;
@@ -187,32 +173,201 @@ const StickFigure = ({
     }
   });
   
-  // Process attack type changes independently (this is the simplified second useFrame from main)
-  useFrame(() => {
-    if (isAttacking && !attackType.current) { // Condition from main
-      if (isPlayer) {
-        if (isAirAttacking || (airAttack && isJumping)) attackType.current = 'air_attack';
-        else if (isDodging || dodge) attackType.current = 'dodge';
-        else if (isGrabbing || grab) attackType.current = 'grab';
-        else if (isTaunting || taunt) attackType.current = 'taunt';
-        else if (attack1) attackType.current = 'punch';
-        else if (attack2) attackType.current = 'kick';
-        else if (special) attackType.current = 'special';
-        else attackType.current = 'punch'; // Default player attack type from main
+  const horizontalSpeed = Math.hypot(characterState.velocity[0], characterState.velocity[2]);
+  const speedRatio = Math.min(1, horizontalSpeed / (PLAYER_SPEED * 1.4));
+  const targetLean = Math.max(-0.45, Math.min(0.45, characterState.velocity[0] * (8 + speedRatio * 2)));
+  const leanRef = useRef(targetLean);
+  const timeRef = useRef(0);
+  const landingScaleRef = useRef(1);
+  const prevJumpRef = useRef(characterState.isJumping);
+  const [dustBursts, setDustBursts] = useState<DustBurst[]>([]);
+  const [speedTrails, setSpeedTrails] = useState<SpeedTrail[]>([]);
+  const dustIdRef = useRef(0);
+  const trailIdRef = useRef(0);
+  const trailCooldownRef = useRef(0);
+  const lastAirVelocityRef = useRef<[number, number, number]>([...characterState.velocity]);
+  const groundedIdle = !characterState.isJumping && speedRatio < 0.2;
+  const plantedFoot = groundedIdle ? (Math.floor(timeRef.current * 0.8) % 2 === 0 ? "left" : "right") : null;
+
+  useFrame((_, delta) => {
+    timeRef.current += delta;
+    leanRef.current += (targetLean - leanRef.current) * Math.min(1, delta * 10);
+    landingScaleRef.current += (1 - landingScaleRef.current) * Math.min(1, delta * 12);
+    trailCooldownRef.current = Math.max(0, trailCooldownRef.current - delta);
+
+    setDustBursts((bursts) => {
+      if (!bursts.length) return bursts;
+      let changed = false;
+      const next: DustBurst[] = [];
+      for (const burst of bursts) {
+        const age = burst.age + delta;
+        const life = burst.life ?? 0.6;
+        if (age < life) {
+          if (age !== burst.age || burst.life !== life) {
+            changed = true;
+            next.push({ ...burst, age, life });
+          } else {
+            next.push(burst);
+          }
+        } else {
+          changed = true;
+        }
       }
+      return changed ? next : bursts;
+    });
+
+    setSpeedTrails((trails) => {
+      if (!trails.length) return trails;
+      let changed = false;
+      const next: SpeedTrail[] = [];
+      for (const trail of trails) {
+        const age = trail.age + delta;
+        const life = 0.35 + trail.intensity * 0.2;
+        if (age < life) {
+          if (age !== trail.age) {
+            changed = true;
+            next.push({ ...trail, age });
+          } else {
+            next.push(trail);
+          }
+        } else {
+          changed = true;
+        }
+      }
+      return changed ? next : trails;
+    });
+
+    const horizontalSpeed = Math.hypot(characterState.velocity[0], characterState.velocity[2]);
+    const speedRatio = Math.min(1, horizontalSpeed / (PLAYER_SPEED * 1.4));
+    if (!characterState.isJumping && speedRatio > 0.25 && trailCooldownRef.current <= 0) {
+      const intensity = Math.min(1, (speedRatio - 0.25) / 0.75);
+      trailCooldownRef.current = Math.max(0.03, 0.09 - intensity * 0.04);
+      const directionSign = Math.sign(characterState.velocity[0]) || direction || 1;
+      setSpeedTrails((trails) => [
+        ...trails,
+        {
+          id: trailIdRef.current++,
+          age: 0,
+          direction: directionSign,
+          offsetZ: (Math.random() - 0.5) * 0.25,
+          length: 0.35 + intensity * 1,
+          height: 0.32 + intensity * 0.25,
+          intensity: 0.2 + intensity * 0.8,
+        },
+      ]);
     }
   });
+
+  useEffect(() => {
+    if (characterState.isJumping) {
+      lastAirVelocityRef.current = [...characterState.velocity];
+    }
+  }, [characterState.isJumping, characterState.velocity]);
+
+  useEffect(() => {
+    if (!characterState.isJumping && prevJumpRef.current) {
+      const lastAirVelocity = lastAirVelocityRef.current;
+      const normalizedVertical = Math.min(1, Math.abs(lastAirVelocity[1]) / (JUMP_FORCE * 1.5));
+      const normalizedHorizontal = Math.min(
+        1,
+        Math.hypot(lastAirVelocity[0], lastAirVelocity[2]) / (PLAYER_SPEED * 1.8),
+      );
+      const landingIntensity = Math.min(1, normalizedVertical * 0.7 + normalizedHorizontal * 0.5);
+      landingScaleRef.current = 1.05 + landingIntensity * 0.2;
+      triggerLandingBurst(0.4 + landingIntensity * 0.6);
+      const burstCount = 2 + Math.round(landingIntensity * 2);
+      const newBursts = Array.from({ length: burstCount }, () => ({
+        id: dustIdRef.current++,
+        age: 0,
+        offsetX: (Math.random() - 0.5) * (0.2 + landingIntensity * 0.5),
+        offsetZ: (Math.random() - 0.5) * 0.3,
+        intensity: landingIntensity,
+        rotation: Math.random() * Math.PI * 2,
+        life: 0.35 + landingIntensity * 0.3,
+      }));
+      setDustBursts((bursts) => [...bursts, ...newBursts]);
+    }
+    prevJumpRef.current = characterState.isJumping;
+  }, [characterState.isJumping, triggerLandingBurst]);
+
+  const lean = leanRef.current;
+
+  const landingScale = landingScaleRef.current;
+  const widthScale = 1 - (landingScale - 1) * 0.35;
 
   return (
     <group 
       ref={groupRef} 
       position={[x, y, z]} 
-      scale={[direction, 1, 1]} 
+      scale={[direction * widthScale, landingScale, widthScale]} 
       rotation={[0, direction < 0 ? Math.PI : 0, 0]}
     >
-      <Head colors={characterColors} style={characterStyle} accessory={characterAccessory} isAttacking={isAttacking} />
-      <Torso colors={characterColors} style={characterStyle} />
-      <Limbs colors={characterColors} style={characterStyle} attackType={attackType.current} animationPhase={animationPhase.current} isBlocking={isBlocking} isAttacking={isAttacking} isJumping={isJumping} direction={direction} />
+      <Head
+        colors={characterColors}
+        style={characterStyle}
+        accessory={characterAccessory}
+        isAttacking={isAttacking}
+        lean={lean}
+      />
+      <Torso colors={characterColors} style={characterStyle} lean={lean} />
+      <Limbs
+        colors={characterColors}
+        style={characterStyle}
+        attackType={attackType.current}
+        animationPhase={animationPhase.current}
+        isBlocking={isBlocking}
+        isAttacking={isAttacking}
+        isJumping={isJumping}
+        direction={direction}
+        time={timeRef.current}
+        speedRatio={speedRatio}
+        plantedFoot={plantedFoot}
+      />
+
+      {/* In-scene landing dust */}
+      {dustBursts.map((burst) => {
+        const life = burst.life ?? 0.6;
+        const t = Math.min(1, burst.age / life);
+        const baseScale = 0.4 + burst.intensity * 0.8;
+        return (
+          <mesh
+            key={`dust-${burst.id}`}
+            position={[burst.offsetX, -0.02, burst.offsetZ]}
+            rotation={[-Math.PI / 2, 0, burst.rotation]}
+            scale={baseScale + burst.age * 1.5}
+          >
+            <circleGeometry args={[0.5 + burst.intensity * 0.4, 24]} />
+            <meshStandardMaterial
+              color="#f7e3c4"
+              transparent
+              opacity={Math.max(0, (0.25 + burst.intensity * 0.35) * (1 - t))}
+            />
+          </mesh>
+        );
+      })}
+
+      {/* Speed trails */}
+      {speedTrails.map((trail) => {
+        const life = 0.35 + trail.intensity * 0.2;
+        const t = Math.min(1, trail.age / life);
+        const fade = Math.max(0, (0.25 + trail.intensity * 0.3) * (1 - t));
+        const lateral = -trail.direction * (0.25 + trail.length * 0.4) * (1 - t * 0.2);
+        return (
+          <mesh
+            key={`trail-${trail.id}`}
+            position={[lateral, trail.height, trail.offsetZ]}
+            rotation={[0, 0, trail.direction * Math.PI / 10]}
+            scale={[trail.length, 0.04 + trail.intensity * 0.08, 0.04]}
+          >
+            <boxGeometry args={[1, 0.2, 0.1]} />
+            <meshStandardMaterial
+              color={trail.intensity > 0.6 ? "#f0fdff" : "#c9f0ff"}
+              transparent
+              opacity={fade}
+            />
+          </mesh>
+        );
+      })}
 
       
       {/* Visual indicators for different actions */}
@@ -225,7 +380,7 @@ const StickFigure = ({
             transparent={true}
             opacity={0.8}
             emissive={"#32cd32"}
-            emissiveIntensity={0.3 + Math.sin(Date.now() * 0.01) * 0.2}
+            emissiveIntensity={0.3 + Math.sin(timeRef.current * 10) * 0.2}
           />
         </mesh>
       )}
@@ -269,13 +424,15 @@ const StickFigure = ({
             />
           </mesh>
           
-          {Array.from({ length: 5 }).map((_, i) => (
+          {Array.from({ length: 5 }).map((_, i) => {
+            const wobble = timeRef.current + i * 0.4;
+            return (
             <mesh 
               key={i} 
               position={[
-                (Math.sin(Date.now() * 0.001 * (i + 1)) * 0.2), 
+                Math.sin(wobble) * 0.2, 
                 -0.5 - (i * 0.1), 
-                (Math.cos(Date.now() * 0.001 * (i + 1)) * 0.2)
+                Math.cos(wobble) * 0.2
               ]}
             >
               <sphereGeometry args={[0.05 + Math.random() * 0.05, 8, 8]} />
@@ -287,7 +444,8 @@ const StickFigure = ({
                 emissiveIntensity={0.7}
               />
             </mesh>
-          ))}
+          );
+          })}
         </group>
       )}
       
@@ -314,7 +472,7 @@ const StickFigure = ({
               transparent={true}
               opacity={0.6}
               emissive={"#f5deb3"}
-              emissiveIntensity={0.4 + Math.sin(Date.now() * 0.01) * 0.2}
+            emissiveIntensity={0.4 + Math.sin(timeRef.current * 8) * 0.2}
             />
           </mesh>
         </group>
@@ -327,7 +485,7 @@ const StickFigure = ({
             <meshStandardMaterial 
               color={"#ff69b4"} 
               transparent={true}
-              opacity={0.7 + Math.sin(Date.now() * 0.01) * 0.3}
+              opacity={0.7 + Math.sin(timeRef.current * 10) * 0.3}
               emissive={"#ff69b4"}
               emissiveIntensity={0.8}
             />
@@ -337,9 +495,9 @@ const StickFigure = ({
             <mesh 
               key={i} 
               position={[
-                Math.sin(Date.now() * 0.001 * (i + 1) + i * Math.PI/2) * 0.3, 
-                2.0 + Math.sin(Date.now() * 0.002 * (i + 1)) * 0.2, 
-                Math.cos(Date.now() * 0.001 * (i + 1) + i * Math.PI/2) * 0.3
+                Math.sin(timeRef.current * 2 + i * Math.PI / 2) * 0.3, 
+                2.0 + Math.sin(timeRef.current * 3 + i) * 0.2, 
+                Math.cos(timeRef.current * 2 + i * Math.PI / 2) * 0.3
               ]}
             >
               <sphereGeometry args={[0.05, 8, 8]} />
@@ -348,7 +506,7 @@ const StickFigure = ({
                 transparent={true}
                 opacity={0.5}
                 emissive={"#ff1493"}
-                emissiveIntensity={0.6 + Math.sin(Date.now() * 0.01 * (i + 1)) * 0.4}
+                emissiveIntensity={0.6 + Math.sin(timeRef.current * 12 + i) * 0.4}
               />
             </mesh>
           ))}
@@ -373,7 +531,7 @@ const StickFigure = ({
             />
           </mesh>
           
-          <mesh position={[0, 0, -0.12]} rotation={[0, 0, Date.now() * 0.001]}>
+          <mesh position={[0, 0, -0.12]} rotation={[0, 0, timeRef.current * 1.5]}>
             <ringGeometry args={[0.35, 0.4, 32]} />
             <meshStandardMaterial 
               color={
@@ -383,7 +541,7 @@ const StickFigure = ({
                 "#ffffff"
               }
               transparent={true}
-              opacity={0.4 + 0.3 * Math.sin(Date.now() * 0.002)}
+              opacity={0.4 + 0.3 * Math.sin(timeRef.current * 3)}
               emissive={
                 comboCount >= 20 ? "#ff0000" :
                 comboCount >= 10 ? "#ff9900" :
@@ -411,7 +569,7 @@ const StickFigure = ({
                     comboCount >= 5 ? "#ffff00" :
                     "#ffffff"
                   }
-                  emissiveIntensity={0.6 + 0.4 * Math.sin(Date.now() * 0.005 * comboCount + i)}
+                emissiveIntensity={0.6 + 0.4 * Math.sin(timeRef.current * 5 * comboCount + i)}
                 />
               </mesh>
               
@@ -419,7 +577,7 @@ const StickFigure = ({
                 <mesh 
                   position={[
                     (i - 2) * 0.15, 
-                    0.1 * Math.sin(Date.now() * 0.003 * (i + 1)), 
+                    0.1 * Math.sin(timeRef.current * 3 + i), 
                     0.05
                   ]}
                 >

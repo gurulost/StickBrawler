@@ -1,9 +1,6 @@
 import type { CharacterState } from "../lib/stores/useFighting";
-import type {
-  FighterCombatState,
-  MoveDefinition,
-  HitResolution,
-} from "../combat";
+import type { FighterCombatState, MoveDefinition, HitResolution } from "../combat";
+import { clamp } from "../lib/clamp";
 
 export const DEFAULT_GUARD_METER = 80;
 export const DEFAULT_STAMINA_METER = 100;
@@ -25,6 +22,14 @@ export type PlayerInputState = {
   dodge?: boolean;
   grab?: boolean;
 };
+
+export interface DirectionalInfluence {
+  horizontal?: number;
+  vertical?: number;
+}
+
+const HORIZONTAL_DI_STRENGTH = 0.35;
+const VERTICAL_DI_STRENGTH = 0.25;
 
 export function toCombatState(character: CharacterState): FighterCombatState {
   return {
@@ -75,12 +80,26 @@ export function selectMoveFromInputs(
 export function applyKnockbackToVelocity(
   target: CharacterState,
   hit: HitResolution,
+  influence?: DirectionalInfluence,
 ): [number, number, number] {
   const damping = 0.65;
   const [vx, vy, vz] = target.velocity;
+  const diHorizontal = clamp(influence?.horizontal ?? 0, -1, 1);
+  const diVertical = clamp(influence?.vertical ?? 0, -1, 1);
+  const knockbackX =
+    hit.knockbackVector[0] -
+    Math.sign(hit.knockbackVector[0] || 1) *
+      Math.abs(hit.knockbackVector[0]) *
+      diHorizontal *
+      HORIZONTAL_DI_STRENGTH;
+  const knockbackY =
+    hit.knockbackVector[1] +
+    Math.abs(hit.knockbackVector[1]) *
+      diVertical *
+      VERTICAL_DI_STRENGTH;
   return [
-    vx * damping + hit.knockbackVector[0],
-    vy * damping + hit.knockbackVector[1],
+    vx * damping + knockbackX,
+    vy * damping + knockbackY,
     vz * damping + hit.knockbackVector[2],
   ];
 }

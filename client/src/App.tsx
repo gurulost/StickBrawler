@@ -1,40 +1,14 @@
 import { Canvas } from "@react-three/fiber";
 import { Suspense, useEffect, useState } from "react";
-import { KeyboardControls } from "@react-three/drei";
 import { useAudio } from "./lib/stores/useAudio";
 import { useAuth } from "./lib/stores/useAuth";
 import "@fontsource/inter";
-import { Controls } from "./lib/stores/useControls";
 import GameManager from "./game/GameManager";
 import Menu from "./game/Menu";
+import Lobby from "./game/Lobby";
 import UI from "./game/UI";
 import { useFighting } from "./lib/stores/useFighting";
 import { useEconomySync } from "./hooks/use-economy-sync";
-
-// Define control keys for the game - Updated control scheme
-const keyboardMap = [
-  // Movement controls (WASD core movement + Arrow keys)
-  { name: Controls.jump, keys: ["KeyW"] },                        // W for jump
-  { name: Controls.forward, keys: ["ArrowUp"] },                  // Up Arrow for forward
-  { name: Controls.backward, keys: ["KeyS", "ArrowDown"] },       // S or Down Arrow for backward
-  { name: Controls.leftward, keys: ["KeyA", "ArrowLeft"] },       // A or Left Arrow for left
-  { name: Controls.rightward, keys: ["KeyD", "ArrowRight"] },     // D or Right Arrow for right
-  
-  // Combat controls (separated and logical)
-  { name: Controls.attack1, keys: ["KeyJ"] },          // J for quick attack
-  { name: Controls.attack2, keys: ["KeyK"] },          // K for strong attack
-  { name: Controls.shield, keys: ["KeyL"] },           // L for shield/block
-  { name: Controls.special, keys: ["Space"] },         // Space for special move
-  
-  // Advanced techniques
-  { name: Controls.dodge, keys: ["ShiftLeft", "ShiftRight"] }, // Shift for dodge
-  { name: Controls.airAttack, keys: ["KeyE"] },        // E for air attack
-  { name: Controls.grab, keys: ["KeyG"] },             // G for grab
-  { name: Controls.taunt, keys: ["KeyT"] },            // T for taunt
-];
-
-// Log the key mapping configuration to help with debugging
-console.log("Keyboard controls configuration:", keyboardMap);
 
 // Main App component
 function App() {
@@ -116,8 +90,9 @@ function App() {
   return (
     <div style={{ width: '100vw', height: '100vh', position: 'relative', overflow: 'hidden' }}>
       {showCanvas && (
-        <KeyboardControls map={keyboardMap}>
+        <>
           {gamePhase === 'menu' && <Menu />}
+          {gamePhase === 'lobby' && <Lobby />}
 
           {(gamePhase === 'fighting' || gamePhase === 'round_end' || gamePhase === 'match_end') && (
             <>
@@ -148,7 +123,7 @@ function App() {
               <UI />
             </>
           )}
-        </KeyboardControls>
+        </>
       )}
     </div>
   );

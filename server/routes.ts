@@ -2,7 +2,7 @@ import type { Express, RequestHandler } from "express";
 import { createServer, type Server } from "http";
 import { z } from "zod";
 import { storage } from "./storage";
-import { hitTelemetrySchema, storeTelemetry } from "./telemetry";
+import { hitTelemetrySchema, storeTelemetry, summarizeTelemetry, peekTelemetryBuffer } from "./telemetry";
 
 const scoreSubmissionSchema = z.object({
   userId: z
@@ -163,6 +163,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       storeTelemetry(payload.data.entries);
       res.status(204).end();
+    }),
+  );
+  app.get(
+    "/api/telemetry/summary",
+    asyncHandler(async (_req, res) => {
+      res.json({
+        summary: summarizeTelemetry(),
+        entries: peekTelemetryBuffer().length,
+      });
     }),
   );
 

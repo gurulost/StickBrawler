@@ -1,6 +1,7 @@
 import { colorThemes, figureStyles, accessories } from "../../lib/stores/useCustomization";
 import type { FC } from "react";
 import * as THREE from "three";
+import { useInkMaterial, useOutlineMaterial } from "./inkMaterial";
 
 export type ColorThemeValues = (typeof colorThemes)[keyof typeof colorThemes];
 export type FigureStyleValues = (typeof figureStyles)[keyof typeof figureStyles];
@@ -11,24 +12,33 @@ interface HeadProps {
   style: FigureStyleValues;
   accessory: AccessoryValues;
   isAttacking: boolean;
+  lean: number;
 }
 
-const Head: FC<HeadProps> = ({ colors, style, accessory, isAttacking }) => {
+const Head: FC<HeadProps> = ({ colors, style, accessory, isAttacking, lean }) => {
+  const inkMaterial = useInkMaterial({
+    baseColor: colors.primary,
+    rimColor: colors.glow ?? colors.secondary,
+    shadeBands: 3,
+    glow: isAttacking ? 0.25 : 0.05,
+  });
+  const outlineMaterial = useOutlineMaterial();
+  const headScale = style.headSize;
+  const outlineScale = 1 + (style.outlineWidth ?? 0.04);
+
   return (
     <>
-      <mesh position={[0, 1.8, 0]} castShadow>
-        <sphereGeometry args={[style.headSize, 24, 24]} />
-        <meshStandardMaterial
-          color={colors.primary}
-          emissive={isAttacking ? colors.emissive : "#000000"}
-          emissiveIntensity={isAttacking ? 0.5 : 0}
-          metalness={style.metalness}
-          roughness={style.roughness}
-        />
-      </mesh>
+      <group position={[lean * 0.12, 1.8, 0]} rotation={[0, 0, lean * 0.25]}>
+        <mesh castShadow material={inkMaterial}>
+          <sphereGeometry args={[headScale, 32, 32]} />
+        </mesh>
+        <mesh castShadow scale={[outlineScale, outlineScale, outlineScale]} material={outlineMaterial}>
+          <sphereGeometry args={[headScale, 32, 32]} />
+        </mesh>
+      </group>
 
       {accessory.geometry && (
-        <group position={[0, 1.8 + style.headSize * 0.5, 0]}>
+        <group position={[lean * 0.12, 1.8 + style.headSize * 0.5, 0]} rotation={[0, 0, lean * 0.25]}>
           {(Array.isArray(accessory.geometry)
             ? accessory.geometry
             : [accessory.geometry]

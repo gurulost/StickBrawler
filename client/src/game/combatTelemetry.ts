@@ -1,9 +1,11 @@
 import type { HitResolution } from "../combat";
 
 export type TelemetrySource = "player" | "cpu";
+export type TelemetrySlot = "player1" | "player2" | "cpu";
 
 export interface HitTelemetry {
   source: TelemetrySource;
+  slot: TelemetrySlot;
   hit: HitResolution;
   comboCount: number;
   timestamp: number;

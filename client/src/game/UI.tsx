@@ -4,7 +4,14 @@ import { useAudio } from "../lib/stores/useAudio";
 import { useControls } from "../lib/stores/useControls";
 import { useCustomization } from "../lib/stores/useCustomization";
 import { Coins } from "lucide-react";
+import { useEffects } from "../lib/stores/useEffects";
 
+type TelemetryDigest = Partial<
+    Record<
+      "player1" | "player2" | "cpu",
+      { hits: number; totalDamage: number; maxCombo: number }
+    >
+  >;
 const UI = () => {
   const {
     player,
@@ -17,18 +24,34 @@ const UI = () => {
     resetRound,
     returnToMenu,
     calculateFinalScore,
-    submitScore
+    submitScore,
+    playerStatus,
+    cpuStatus,
+    slots,
+    paused,
+    togglePause,
   } = useFighting();
   
   const { toggleMute, isMuted, playSuccess, setMasterVolume, masterVolume } = useAudio();
   const { debugMode, toggleDebugMode } = useControls();
   const { coins, lastCoinEvent } = useCustomization();
-  
+  const landingBurst = useEffects((state) => state.landingBurst);
+  const impactFlash = useEffects((state) => state.impactFlash);
+  const isLocalMultiplayer = slots.player2.type === "human";
+  const playerOneLabel = slots.player1.label;
+  const opponentLabel = slots.player2.label;
+  const playerOneBadge = slots.player1.type === "human" ? "Human" : "CPU";
+  const opponentBadge = slots.player2.type === "human" ? "Human" : "CPU";
+  const timerSubtitle = isLocalMultiplayer ? "Local Versus" : "Solo vs CPU";
+
   // Animation states for UI elements
   const [showControls, setShowControls] = useState(false);
   const [pulseHealth, setPulseHealth] = useState(false);
   const [scoreSubmitted, setScoreSubmitted] = useState(false);
   const [coinFlash, setCoinFlash] = useState<string | null>(null);
+  const [playerGuardFlash, setPlayerGuardFlash] = useState(false);
+  const [cpuGuardFlash, setCpuGuardFlash] = useState(false);
+  const [telemetrySummary, setTelemetrySummary] = useState<TelemetryDigest>({});
   
   // Format time as MM:SS
   const formatTime = (seconds: number) => {
@@ -39,12 +62,15 @@ const UI = () => {
   
   // Determine round winner
   const determineWinner = () => {
-    if (player.health <= 0) return "CPU Wins!";
-    if (cpu.health <= 0) return "You Win!";
-    if (player.health > cpu.health) return "You Win!";
-    if (cpu.health > player.health) return "CPU Wins!";
+    if (player.health <= 0) return `${opponentLabel} Wins!`;
+    if (cpu.health <= 0) return `${playerOneLabel} Wins!`;
+    if (player.health > cpu.health) return `${playerOneLabel} Wins!`;
+    if (cpu.health > player.health) return `${opponentLabel} Wins!`;
     return "Draw!";
   };
+
+  const winnerMessage = determineWinner();
+  const playerWon = winnerMessage.includes(playerOneLabel);
   
   // Play win sound effect and submit score
   useEffect(() => {
@@ -75,6 +101,29 @@ const UI = () => {
     const timeout = setTimeout(() => setCoinFlash(null), 1500);
     return () => clearTimeout(timeout);
   }, [lastCoinEvent]);
+  useEffect(() => {
+    if (!debugMode) return;
+    let cancelled = false;
+    const fetchSummary = () => {
+      fetch("/api/telemetry/summary")
+        .then((res) => res.json())
+        .then((data: { summary?: TelemetryDigest }) => {
+          if (cancelled) return;
+          setTelemetrySummary(data?.summary ?? {});
+        })
+        .catch(() => {
+          if (!cancelled) {
+            setTelemetrySummary({});
+          }
+        });
+    };
+    fetchSummary();
+    const id = setInterval(fetchSummary, 2000);
+    return () => {
+      cancelled = true;
+      clearInterval(id);
+    };
+  }, [debugMode]);
   
   // Pulse health bar when low health
   useEffect(() => {
@@ -89,6 +138,22 @@ const UI = () => {
       setPulseHealth(false);
     }
   }, [player.health, cpu.health]);
+
+  useEffect(() => {
+    if (playerStatus === "guard_break") {
+      setPlayerGuardFlash(true);
+      const timeout = setTimeout(() => setPlayerGuardFlash(false), 700);
+      return () => clearTimeout(timeout);
+    }
+  }, [playerStatus]);
+
+  useEffect(() => {
+    if (cpuStatus === "guard_break") {
+      setCpuGuardFlash(true);
+      const timeout = setTimeout(() => setCpuGuardFlash(false), 700);
+      return () => clearTimeout(timeout);
+    }
+  }, [cpuStatus]);
   
   // Toggle controls visibility
   const toggleControls = () => {
@@ -118,6 +183,40 @@ const UI = () => {
   
   return (
     <div className="absolute top-0 left-0 w-full h-full pointer-events-none">
+      {gamePhase === 'fighting' && (
+        <div className="absolute top-4 left-4 pointer-events-auto flex gap-2">
+          <button
+            onClick={() => togglePause()}
+            className={`px-4 py-2 rounded-full text-sm font-semibold transition ${
+              paused ? "bg-emerald-500 text-black" : "bg-white/20 text-white hover:bg-white/30"
+            }`}
+          >
+            {paused ? "Resume" : "Pause"}
+          </button>
+        </div>
+      )}
+      {impactFlash > 0 && (
+        <div
+          className="absolute inset-0 bg-white pointer-events-none"
+          style={{ opacity: impactFlash * 0.3 }}
+        />
+      )}
+      {landingBurst > 0 && (
+        <div
+          className="absolute bottom-4 left-1/2 -translate-x-1/2 rounded-full bg-gradient-to-t from-white/60 via-white/30 to-transparent blur-3xl"
+          style={{
+            opacity: landingBurst * 0.45,
+            width: `${12 + landingBurst * 18}rem`,
+            height: `${4 + landingBurst * 6}rem`,
+          }}
+        />
+      )}
+      {playerGuardFlash && (
+        <div className="absolute inset-0 bg-gradient-to-r from-blue-500/20 to-transparent animate-pulse" />
+      )}
+      {cpuGuardFlash && (
+        <div className="absolute inset-0 bg-gradient-to-l from-red-500/20 to-transparent animate-pulse" />
+      )}
       <div className="absolute top-4 right-4 pointer-events-none">
         <div className="bg-black bg-opacity-70 text-amber-200 px-4 py-2 rounded-full shadow-lg flex items-center gap-2">
           <Coins className="w-4 h-4" />
@@ -125,11 +224,34 @@ const UI = () => {
           {coinFlash && <span className="text-green-300 text-sm font-semibold">{coinFlash}</span>}
         </div>
       </div>
+      {debugMode && (
+        <div className="absolute bottom-4 left-4 bg-black/70 text-white text-xs p-3 rounded-xl pointer-events-auto space-y-2">
+          <p className="text-indigo-200 uppercase tracking-widest text-[10px]">Telemetry</p>
+          {(["player1", "player2", "cpu"] as const).map((slot) => {
+            const summary = telemetrySummary[slot];
+            return (
+              <div key={slot} className="flex justify-between gap-4">
+                <span className="text-gray-300">{slot.toUpperCase()}</span>
+                {summary ? (
+                  <span className="text-gray-100">
+                    {summary.hits} hits · {Math.round(summary.totalDamage)} dmg · max combo {summary.maxCombo}
+                  </span>
+                ) : (
+                  <span className="text-gray-500">—</span>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
       
       {/* Health bars with improved styling */}
       <div className="flex justify-between p-4">
         <div className="w-2/5">
-          <div className="text-white font-bold text-lg mb-1 drop-shadow-md">Player</div>
+          <div className="flex items-center gap-3">
+            <div className="text-white font-bold text-lg mb-1 drop-shadow-md">{playerOneLabel}</div>
+            <span className="px-2 py-0.5 rounded-full text-xs bg-white/15 text-indigo-100">{playerOneBadge}</span>
+          </div>
           <div className="w-full bg-gray-800 h-6 rounded-lg overflow-hidden shadow-lg">
             <div 
               className={`bg-gradient-to-r from-blue-700 to-blue-400 h-full transition-all duration-300 ease-out 
@@ -142,12 +264,16 @@ const UI = () => {
           {renderMeter("Special", player.specialMeter, "bg-indigo-400")}
         </div>
         
-        <div className="bg-black bg-opacity-70 text-white font-bold text-xl px-5 py-2 rounded-full shadow-lg">
-          {formatTime(roundTime)}
+        <div className="bg-black bg-opacity-70 text-white font-bold text-xl px-5 py-2 rounded-full shadow-lg flex flex-col items-center min-w-[150px]">
+          <span>{formatTime(roundTime)}</span>
+          <span className="text-xs tracking-widest text-gray-300 uppercase">{timerSubtitle}</span>
         </div>
         
         <div className="w-2/5 text-right">
-          <div className="text-white font-bold text-lg mb-1 drop-shadow-md">CPU</div>
+          <div className="flex items-center justify-end gap-3">
+            <span className="px-2 py-0.5 rounded-full text-xs bg-white/15 text-indigo-100">{opponentBadge}</span>
+            <div className="text-white font-bold text-lg mb-1 drop-shadow-md">{opponentLabel}</div>
+          </div>
           <div className="w-full bg-gray-800 h-6 rounded-lg overflow-hidden shadow-lg">
             <div 
               className={`bg-gradient-to-r from-red-400 to-red-700 h-full transition-all duration-300 ease-out ml-auto
@@ -163,10 +289,12 @@ const UI = () => {
       
       {/* Score display with animation */}
       <div className="absolute top-20 left-0 w-full text-center">
-        <div className="bg-black bg-opacity-70 text-white font-bold text-2xl px-8 py-2 rounded-full inline-block shadow-lg">
+        <div className="bg-black bg-opacity-70 text-white font-bold text-2xl px-8 py-2 rounded-full inline-block shadow-lg flex items-center gap-3">
+          <span className="text-sm uppercase tracking-wide text-gray-300">{playerOneLabel}</span>
           <span className={`${playerScore > cpuScore ? 'text-blue-400' : ''}`}>{playerScore}</span>
-          {" - "}
+          <span className="text-gray-500">-</span>
           <span className={`${cpuScore > playerScore ? 'text-red-400' : ''}`}>{cpuScore}</span>
+          <span className="text-sm uppercase tracking-wide text-gray-300">{opponentLabel}</span>
         </div>
       </div>
       
@@ -174,9 +302,11 @@ const UI = () => {
       {gamePhase === 'round_end' && (
         <div className="absolute inset-0 bg-gradient-to-b from-black to-gray-900 bg-opacity-90 flex flex-col items-center justify-center pointer-events-auto animate-fadeIn">
           <div className="text-5xl font-bold text-white mb-8 animate-bounce">
-            {determineWinner() === "You Win!" 
-              ? <span className="text-blue-400">{determineWinner()}</span>
-              : <span className="text-red-400">{determineWinner()}</span>}
+            {playerWon ? (
+              <span className="text-blue-400">{winnerMessage}</span>
+            ) : (
+              <span className="text-red-400">{winnerMessage}</span>
+            )}
           </div>
           
           <div className="text-2xl text-white mb-10">
@@ -272,3 +402,35 @@ const UI = () => {
 };
 
 export default UI;
+      {paused && gamePhase === 'fighting' && (
+        <div className="absolute inset-0 bg-black/70 flex flex-col items-center justify-center gap-6 pointer-events-auto">
+          <h2 className="text-4xl font-bold text-white tracking-wide">Paused</h2>
+          <div className="flex flex-col md:flex-row gap-4">
+            <button
+              className="px-8 py-3 rounded-full bg-emerald-500 text-black font-semibold hover:bg-emerald-400 transition"
+              onClick={() => togglePause()}
+            >
+              Resume
+            </button>
+            <button
+              className="px-8 py-3 rounded-full bg-white/20 text-white font-semibold hover:bg-white/30 transition"
+              onClick={() => {
+                togglePause();
+                resetRound();
+              }}
+            >
+              Restart Round
+            </button>
+            <button
+              className="px-8 py-3 rounded-full bg-white/10 text-white font-semibold hover:bg-white/20 transition"
+              onClick={() => {
+                togglePause();
+                returnToMenu();
+              }}
+            >
+              Exit to Menu
+            </button>
+          </div>
+          <p className="text-sm text-gray-300 uppercase tracking-widest">Press Esc to resume</p>
+        </div>
+      )}

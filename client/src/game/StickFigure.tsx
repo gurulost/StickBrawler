@@ -79,6 +79,8 @@ const StickFigure = ({
 
   // Resolved Conflict 1: Kept from 'main' branch
   // animationPhase and attackType use refs to avoid triggering React state updates
+  // Note: These use Math.random() for visual variety - this is intentional per determinism policy
+  // (gameplay state is deterministic in MatchRuntime, visual animations can vary)
   const attackType = useRef<AttackAnimation>(null);
   const animationPhase = useRef(0);
   const phaseTimer = useRef(0); // Added by 'main'

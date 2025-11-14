@@ -29,6 +29,7 @@ import {
 import type { CharacterState, GamePhase, MatchMode } from "../lib/stores/useFighting";
 import { Controls } from "../lib/stores/useControls";
 import { recordTelemetry, drainTelemetry, type HitTelemetry } from "./combatTelemetry";
+import { DeterministicRandom } from "./prng";
 
 type FightingActions = Pick<
   ReturnType<typeof import("../lib/stores/useFighting").useFighting>,
@@ -154,6 +155,14 @@ const createActionTimers = (): ActionTimers => ({
   guardBreak: 0,
 });
 
+/**
+ * MatchRuntime manages the deterministic game state for a single fight.
+ * 
+ * **Determinism Policy:**
+ * - Gameplay-affecting randomness uses DeterministicRandom (seeded PRNG)
+ * - Visual-only effects (animations, particles) may use Math.random()
+ * - This ensures replays and netcode remain synchronized while preserving visual variety
+ */
 export class MatchRuntime {
   private readonly engine = new GameEngine(createInitialState(Date.now()));
   private readonly playerMachine = new CombatStateMachine();
@@ -169,11 +178,40 @@ export class MatchRuntime {
   private readonly cpuBrain = new CpuBrain({ style: CpuStyle.BALANCED });
   private playerTimers: ActionTimers = createActionTimers();
   private cpuTimers: ActionTimers = createActionTimers();
+  
+  /** Deterministic RNG for gameplay decisions (air jumps, etc.) - seeded per match */
+  private readonly rng: DeterministicRandom;
 
   constructor(private readonly deps: MatchRuntimeDeps, snapshot: { player: CharacterState; cpu: CharacterState }) {
     this.playerCombatState = toCombatState(snapshot.player);
     this.cpuCombatState = toCombatState(snapshot.cpu);
     this.engine.registerSystem(this.handleSystem);
+    
+    // Create deterministic seed from match start positions
+    const seed = this.createMatchSeed(snapshot);
+    this.rng = new DeterministicRandom(seed);
+  }
+  
+  /**
+   * Creates a deterministic seed from initial match state
+   * Provides consistent RNG behavior for local CPU opponents
+   * 
+   * **Current Scope:** Position-based seeding for local play consistency
+   * **Future Work (if replay/netcode added):**
+   * - Include full state (z-position, velocities, meters, timers)
+   * - Serialize/deserialize RNG state with snapshots
+   * - Add regression tests for deterministic rebuilds
+   */
+  private createMatchSeed(snapshot: { player: CharacterState; cpu: CharacterState }): number {
+    const p = snapshot.player.position;
+    const c = snapshot.cpu.position;
+    // Hash initial positions to create reproducible seed
+    let hash = 0;
+    hash = ((hash << 5) - hash) + Math.floor(p[0] * 1000);
+    hash = ((hash << 5) - hash) + Math.floor(p[1] * 1000);
+    hash = ((hash << 5) - hash) + Math.floor(c[0] * 1000);
+    hash = ((hash << 5) - hash) + Math.floor(c[1] * 1000);
+    return hash & hash; // Convert to 32-bit integer
   }
 
   update(payload: FramePayload) {
@@ -199,6 +237,10 @@ export class MatchRuntime {
     this.cpuHitLag = 0;
     this.playerTimers = createActionTimers();
     this.cpuTimers = createActionTimers();
+    
+    // Reset RNG with new deterministic seed for match consistency
+    const seed = this.createMatchSeed(snapshot);
+    this.rng.reset(seed);
   }
 
   private handleSystem = (context: SystemContext) => {
@@ -643,7 +685,7 @@ export class MatchRuntime {
     if (controlState.jump && !cpu.isJumping && cpu.position[1] <= 0.01 && cpuCanAct) {
       cpuVY = JUMP_FORCE;
       fighting.setCPUJumping(true);
-    } else if (controlState.jump && cpu.isJumping && cpu.airJumpsLeft > 0 && Math.random() < 0.15) {
+    } else if (controlState.jump && cpu.isJumping && cpu.airJumpsLeft > 0 && this.rng.nextBool(0.15)) {
       cpuVY = JUMP_FORCE * 0.8;
       fighting.useCPUAirJump?.();
     }

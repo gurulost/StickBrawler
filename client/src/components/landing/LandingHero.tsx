@@ -1,3 +1,4 @@
+import { useEffect, useRef, useState } from "react";
 import { CharacterPreview } from "../preview/CharacterPreview";
 import { heroBadges } from "../../data/landingContent";
 import { MatchMode } from "../../lib/stores/useFighting";
@@ -30,8 +31,42 @@ export function LandingHero({
   masterVolume,
   onVolumeChange,
 }: LandingHeroProps) {
+  const sectionRef = useRef<HTMLElement | null>(null);
+  const [heroInView, setHeroInView] = useState(false);
+  const [secondPreviewReady, setSecondPreviewReady] = useState(false);
+  const [showControllerPrompt, setShowControllerPrompt] = useState(false);
+
+  useEffect(() => {
+    const observer = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          if (entry.isIntersecting) {
+            setHeroInView(true);
+            setTimeout(() => setSecondPreviewReady(true), 400);
+          }
+        });
+      },
+      { threshold: 0.35 },
+    );
+    if (sectionRef.current) {
+      observer.observe(sectionRef.current);
+    }
+    return () => {
+      if (sectionRef.current) {
+        observer.unobserve(sectionRef.current);
+      }
+    };
+  }, []);
+
+  useEffect(() => {
+    setShowControllerPrompt(controllerConnected);
+  }, [controllerConnected]);
+
   return (
-    <section className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-slate-950 via-indigo-950 to-slate-900 p-8 shadow-[0_25px_120px_rgba(45,78,255,0.25)]">
+    <section
+      ref={sectionRef}
+      className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-slate-950 via-indigo-950 to-slate-900 p-8 shadow-[0_25px_120px_rgba(45,78,255,0.25)]"
+    >
       <video
         className="pointer-events-none absolute inset-0 h-full w-full object-cover opacity-20"
         src="/media/ink-hero-loop.mp4"
@@ -124,6 +159,11 @@ export function LandingHero({
               />
             </div>
           </div>
+          {showControllerPrompt && (
+            <div className="rounded-xl border border-white/20 bg-white/10 px-3 py-2 text-xs font-semibold uppercase tracking-wide text-white/90">
+              Press any button on your controller to add Player 2
+            </div>
+          )}
         </div>
         <motion.div
           initial={{ opacity: 0, y: 40 }}
@@ -131,8 +171,12 @@ export function LandingHero({
           transition={{ duration: 0.6 }}
           className="grid gap-6 lg:grid-rows-[1fr_auto]"
         >
-          <CharacterPreview animate isPlayer className="shadow-[0_20px_80px_rgba(147,197,253,0.25)]" />
-          <CharacterPreview animate isPlayer={false} className="shadow-[0_20px_80px_rgba(248,113,113,0.25)]" />
+          {heroInView && (
+            <CharacterPreview animate isPlayer className="shadow-[0_20px_80px_rgba(147,197,253,0.25)]" />
+          )}
+          {secondPreviewReady && (
+            <CharacterPreview animate isPlayer={false} className="shadow-[0_20px_80px_rgba(248,113,113,0.25)]" />
+          )}
         </motion.div>
       </div>
       <div className="pointer-events-none absolute inset-0 rounded-3xl border border-white/10" />

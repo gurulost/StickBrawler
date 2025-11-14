@@ -17,7 +17,7 @@ import { useCustomization } from "../lib/stores/useCustomization";
 import { useEffects } from "../lib/stores/useEffects";
 import type { PlayerInputSnapshot } from "../hooks/use-player-controls";
 
-import { Head, Torso, Limbs } from "./stickfigure";
+import { Head, Torso, Limbs } from "./stickfigure/index";
 import { useInkMaterial, useOutlineMaterial } from "./stickfigure/inkMaterial";
 interface StickFigureProps {
   isPlayer: boolean;

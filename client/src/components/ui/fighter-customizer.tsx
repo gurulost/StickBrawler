@@ -1754,9 +1754,9 @@ export function FighterCustomizer() {
                     onChange={(style) => {
                       try {
                         if (activeTab === 'player') {
-                          setPlayerAnimationStyle(style);
+                          setPlayerAnimationStyle(style as AnimationStyle);
                         } else {
-                          setCPUAnimationStyle(style);
+                          setCPUAnimationStyle(style as AnimationStyle);
                         }
                       } catch (error) {
                         console.error('Error setting animation style:', error);

@@ -595,10 +595,10 @@ type FigureStyleDefinition = (typeof figureStyles)[FigureStyle];
 
 interface LimbProfile {
   length: number;
-  base?: number;
-  mid?: number;
-  tip?: number;
-  curvature?: number;
+  base: number;
+  mid: number;
+  tip: number;
+  curvature: number;
 }
 
 interface SilhouetteProfile {
@@ -625,7 +625,7 @@ const DEFAULT_LEG_PROFILE: LimbProfile = {
 const clamp01 = (value: number) => Math.min(1, Math.max(0, value));
 const lerp = (from: number, to: number, t: number) => from + (to - from) * t;
 
-const cloneLimbProfile = (profile?: LimbProfile, fallback: LimbProfile = DEFAULT_ARM_PROFILE): LimbProfile => ({
+const cloneLimbProfile = (profile?: Partial<LimbProfile>, fallback: LimbProfile = DEFAULT_ARM_PROFILE): LimbProfile => ({
   length: profile?.length ?? fallback.length,
   base: profile?.base ?? fallback.base,
   mid: profile?.mid ?? fallback.mid,
@@ -636,8 +636,8 @@ const cloneLimbProfile = (profile?: LimbProfile, fallback: LimbProfile = DEFAULT
 const blendLimbProfile = (base: LimbProfile, target: LimbProfile, t: number): LimbProfile => ({
   length: lerp(base.length, target.length, t),
   base: lerp(base.base ?? 1, target.base ?? 1, t),
-  mid: lerp(base.mid ?? base.base ?? 1, target.mid ?? target.base ?? 1, t),
-  tip: lerp(base.tip ?? base.mid ?? 1, target.tip ?? target.mid ?? 1, t),
+  mid: lerp(base.mid ?? 1, target.mid ?? 1, t),
+  tip: lerp(base.tip ?? 1, target.tip ?? 1, t),
   curvature: lerp(base.curvature ?? 0, target.curvature ?? 0, t),
 });
 
@@ -649,7 +649,7 @@ const cloneFigureStyle = (style: FigureStyleDefinition): FigureStyleDefinition &
   },
 });
 
-const NUMERIC_BLEND_KEYS: Array<keyof FigureStyleDefinition> = [
+const NUMERIC_BLEND_KEYS = [
   "headSize",
   "bodyLength",
   "limbThickness",
@@ -659,7 +659,9 @@ const NUMERIC_BLEND_KEYS: Array<keyof FigureStyleDefinition> = [
   "glowIntensity",
   "animationMultiplier",
   "particleCount",
-];
+] as const;
+
+type NumericStyleKey = typeof NUMERIC_BLEND_KEYS[number];
 
 export type FigureStyleOverrides = SharedFigureStyleOverrideSnapshot;
 
@@ -674,7 +676,7 @@ const blendStyleValues = (
     const baseValue = style[key];
     const targetValue = target[key];
     if (typeof baseValue === "number" && typeof targetValue === "number") {
-      (style as Record<string, number>)[key as string] = lerp(baseValue, targetValue, t);
+      (style as any)[key] = lerp(baseValue, targetValue, t);
     }
   }
   if (target.silhouette) {
@@ -700,7 +702,7 @@ const applyOverridesToStyle = (
   const assign = <K extends keyof FigureStyleOverrides>(key: K) => {
     const value = overrides[key];
     if (typeof value === "number") {
-      (style as Record<string, number>)[key as string] = value;
+      (style as any)[key] = value;
     }
   };
   assign("headSize");
@@ -1007,7 +1009,7 @@ export interface CustomizationOptions {
   playerStyleOverrides: FigureStyleOverrides | null;
   playerAccessory: Accessory;
   playerAccessoryColor: string;
-  playerAnimationStyle: string;
+  playerAnimationStyle: AnimationStyle;
   playerInkStyle: InkStyle;
   playerInkOverrides: InkOverrides | null;
   
@@ -1018,7 +1020,7 @@ export interface CustomizationOptions {
   cpuStyleOverrides: FigureStyleOverrides | null;
   cpuAccessory: Accessory;
   cpuAccessoryColor: string;
-  cpuAnimationStyle: string;
+  cpuAnimationStyle: AnimationStyle;
   cpuInkStyle: InkStyle;
   cpuInkOverrides: InkOverrides | null;
 }
@@ -1031,7 +1033,7 @@ export interface SavedCharacter {
   figureStyle: FigureStyle;
   accessory: Accessory;
   accessoryColor: string;
-  animationStyle: string;
+  animationStyle: AnimationStyle;
   inkStyle: InkStyle;
   inkOverrides?: InkOverrides | null;
   figureBlendTarget?: FigureStyle | null;
@@ -1070,7 +1072,7 @@ interface CustomizationState extends CustomizationOptions {
   updatePlayerStyleOverrides: (overrides: Partial<FigureStyleOverrides>) => void;
   resetPlayerStyleOverrides: () => void;
   setPlayerAccessory: (accessory: Accessory, color?: string) => void;
-  setPlayerAnimationStyle: (style: string) => void;
+  setPlayerAnimationStyle: (style: AnimationStyle) => void;
   setPlayerInkStyle: (style: InkStyle) => void;
   setPlayerInkOverrides: (overrides: InkOverrides | null) => void;
   
@@ -1081,7 +1083,7 @@ interface CustomizationState extends CustomizationOptions {
   updateCPUStyleOverrides: (overrides: Partial<FigureStyleOverrides>) => void;
   resetCPUStyleOverrides: () => void;
   setCPUAccessory: (accessory: Accessory, color?: string) => void;
-  setCPUAnimationStyle: (style: string) => void;
+  setCPUAnimationStyle: (style: AnimationStyle) => void;
   setCPUInkStyle: (style: InkStyle) => void;
   setCPUInkOverrides: (overrides: InkOverrides | null) => void;
   

@@ -797,10 +797,10 @@ const StickFigure = ({
       )}
       {showSilhouetteDebug &&
         silhouetteLines.map((positions, index) => (
-          <line key={`silhouette-${index}`} renderOrder={10}>
+          <line key={`silhouette-${index}`}>
             <bufferGeometry>
               <bufferAttribute
-                attachObject={["attributes", "position"]}
+                attach="attributes-position"
                 array={positions}
                 count={positions.length / 3}
                 itemSize={3}

@@ -1,0 +1,36 @@
+
+• Here’s what to hand your developer so they can finish the stylized look and customization overhaul:
+
+  1. Apply ink shaders to accessories/effects
+      - In client/src/game/stickfigure/Head.tsx, we already switched the base meshes to useInkMaterial.
+        Extend that to each accessory mesh: replace every meshStandardMaterial block with useInkMaterial plus
+        useOutlineMaterial, using accessory-specific colors (accessory.color, accessory.rimColor, etc.).
+      - Do the same for body accessories (cape, swords, shields) wherever they’re mounted (currently in Head.tsx;
+        future pass for StickFigure decorations). If an accessory uses planeGeometry (capes, wings), ensure the
+        shader handles double-sided rendering (side: THREE.DoubleSide).
+  2. Extend accessory definitions
+      - Update client/src/lib/stores/useCustomization.tsx accessory entries to include ink-specific params
+        (rimColor, lineWidth, outlineColor, shadeBands, glow). This lets the shader pick up unique looks per
+        accessory.
+  3. Fallback material
+      - Add a useControls or useFighting flag (e.g., settings.lowGraphics) and provide a fallback MeshStandard
+        material if that flag is set. useInkMaterial should check the flag and return a basic material to avoid
+        shader cost on low-end devices.
+  4. Customization UI
+      - Update fighter-customizer (client/src/components/ui/fighter-customizer.tsx) so players see silhouette
+        presets (the new outlineWidth + silhouette data). Add preview thumbnails or at least textual descriptions
+        for “ink styles.”
+      - Offer toggle/slider for outline weight and curvature overrides so advanced users can tweak beyond
+        presets.
+  5. QA & Docs
+      - Run npm run check && npm test once the toolchain is ready to ensure TS/types stay solid.
+      - Playtest across all figure styles/accessories with pauses, telemetry, and multiplayer to confirm
+        determinism/performance.
+      - Update docs/screenshots (maybe in docs/ or ROADMAP.md) showcasing the new ink look and customization
+        panel.
+  6. Optional stretch
+      - If time allows, propagate the ink shader to VFX meshes (dust, trails) for consistency.
+      - Add analytics hooks to store which silhouette/accessory combos players pick, using the existing telemetry
+        infrastructure.
+
+  With these steps, the next developer can finish the ink treatment and truly unlock the customization system.

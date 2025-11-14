@@ -68,14 +68,14 @@ const Head: FC<HeadProps> = ({ colors, style, accessory, isAttacking, lean, isPl
                   return <boxGeometry args={[0.1, 0.1, 0.1]} />;
               }
             };
-            const strokeWidth = accessory.lineWidth ?? (style.outlineWidth ?? 0.04);
+            const strokeWidth = inkParams.lineWidth;
             const accessoryMaterial = useInkMaterial({
               baseColor: accessory.color ?? colors.secondary,
-              rimColor: accessory.rimColor ?? colors.glow ?? accessory.color,
-              shadeBands: accessory.shadeBands ?? 3,
-              glow: accessory.emissive ? 0.3 : 0.05,
+              rimColor: accessory.rimColor ?? inkParams.rimColor,
+              shadeBands: accessory.shadeBands ?? inkParams.shadeBands,
+              glow: accessory.emissive ? Math.max(0.3, inkParams.glow + 0.2) : inkParams.glow,
             });
-            const outlineMat = useOutlineMaterial(accessory.outlineColor ?? "#080808", accessory.emissive ? 0.95 : 0.8);
+            const outlineMat = useOutlineMaterial(accessory.outlineColor ?? inkParams.outlineColor, accessory.emissive ? 0.95 : 0.8);
             return (
               <group key={idx} position={geom.position as [number, number, number]} rotation={geom.rotation as [number, number, number]}>
                 <mesh castShadow material={accessoryMaterial}>{geoBuilder()}</mesh>

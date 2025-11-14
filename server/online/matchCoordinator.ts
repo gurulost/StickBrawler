@@ -2,9 +2,11 @@ import { randomUUID } from "node:crypto";
 import type { OnlineMatchDescriptor, OnlineMatchMessage, RuntimeKeyboardState } from "@shared/match/types";
 import { MatchRuntimeServerAdapter } from "./matchRuntimeAdapter";
 
-type PlayerConnection = {
+export type PlayerConnection = {
   profileId: string;
+  connectionId: string;
   send: (msg: OnlineMatchMessage<string>) => void;
+  close: () => void;
 };
 
 type MatchState<TControl extends string> = {
@@ -15,6 +17,7 @@ type MatchState<TControl extends string> = {
     guest?: PlayerConnection;
   };
   frame: number;
+  activeTokens: Set<string>; // Track active connection tokens
 };
 
 export class MatchCoordinator<TControl extends string> {
@@ -37,6 +40,7 @@ export class MatchCoordinator<TControl extends string> {
       runtime,
       connections: {},
       frame: 0,
+      activeTokens: new Set(),
     });
     return descriptor;
   }
@@ -57,13 +61,19 @@ export class MatchCoordinator<TControl extends string> {
         return null;
       }
       
-      // If reconnecting, unregister the old connection first
+      // If reconnecting, close and cleanup the old connection
       if (existingHost) {
+        console.log(`[MatchCoordinator] Host ${existingHost.profileId} reconnecting, closing old connection ${existingHost.connectionId}`);
+        state.activeTokens.delete(existingHost.connectionId);
         state.runtime.unregisterPlayer(existingHost.profileId);
+        existingHost.close();
       }
       
+      // Register the new connection
       state.connections.host = conn;
+      state.activeTokens.add(conn.connectionId);
       state.runtime.registerPlayer(conn.profileId, 'host');
+      console.log(`[MatchCoordinator] Host ${conn.profileId} joined with connection ${conn.connectionId}`);
       return state.descriptor;
     }
     
@@ -76,23 +86,44 @@ export class MatchCoordinator<TControl extends string> {
         return null;
       }
       
-      // If reconnecting, unregister the old connection first
+      // If reconnecting, close and cleanup the old connection
       if (existingGuest) {
+        console.log(`[MatchCoordinator] Guest ${existingGuest.profileId} reconnecting, closing old connection ${existingGuest.connectionId}`);
+        state.activeTokens.delete(existingGuest.connectionId);
         state.runtime.unregisterPlayer(existingGuest.profileId);
+        existingGuest.close();
       }
       
+      // Register the new connection
       state.connections.guest = conn;
+      state.activeTokens.add(conn.connectionId);
       state.descriptor.guestProfileId = conn.profileId;
       state.runtime.registerPlayer(conn.profileId, 'guest');
+      console.log(`[MatchCoordinator] Guest ${conn.profileId} joined with connection ${conn.connectionId}`);
       return state.descriptor;
     }
     
     return null;
   }
 
-  submitInputs(matchId: string, profileId: string, frame: number, inputs: RuntimeKeyboardState<TControl>) {
+  submitInputs(matchId: string, profileId: string, connectionId: string, frame: number, inputs: RuntimeKeyboardState<TControl>) {
     const state = this.matches.get(matchId);
     if (!state) return;
+
+    // Validate that this connection is active for this match
+    if (!state.activeTokens.has(connectionId)) {
+      console.warn(`[MatchCoordinator] Rejecting inputs from inactive connection ${connectionId} for profile ${profileId}`);
+      return;
+    }
+
+    // Verify the connection matches the current slot
+    const isActiveHost = state.connections.host?.connectionId === connectionId;
+    const isActiveGuest = state.connections.guest?.connectionId === connectionId;
+    
+    if (!isActiveHost && !isActiveGuest) {
+      console.warn(`[MatchCoordinator] Rejecting inputs from stale connection ${connectionId} for profile ${profileId}`);
+      return;
+    }
 
     state.runtime.applyInputs(profileId, inputs, frame);
     state.frame = Math.max(state.frame, frame);
@@ -108,9 +139,12 @@ export class MatchCoordinator<TControl extends string> {
     }
   }
 
-  leaveMatch(matchId: string, profileId: string, reason?: string) {
+  leaveMatch(matchId: string, profileId: string, connectionId: string, reason?: string) {
     const state = this.matches.get(matchId);
     if (!state) return;
+    
+    // Remove the connection token
+    state.activeTokens.delete(connectionId);
     
     // Unregister the leaving player from the runtime
     state.runtime.unregisterPlayer(profileId);
@@ -123,6 +157,8 @@ export class MatchCoordinator<TControl extends string> {
       state.connections.guest = undefined;
     }
     
+    console.log(`[MatchCoordinator] Player ${profileId} left match ${matchId} (connection ${connectionId})`);
+    
     // Notify other players
     const payload: OnlineMatchMessage<TControl> = { type: "leave", reason };
     for (const conn of Object.values(state.connections)) {
@@ -133,6 +169,7 @@ export class MatchCoordinator<TControl extends string> {
     
     // Only delete the match if both players have left
     if (!state.connections.host && !state.connections.guest) {
+      console.log(`[MatchCoordinator] Match ${matchId} deleted (both players left)`);
       this.matches.delete(matchId);
     }
   }

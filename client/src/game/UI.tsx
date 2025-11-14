@@ -397,11 +397,8 @@ const UI = () => {
           {debugMode ? "Debug: ON" : "Debug: OFF"}
         </button>
       )}
-    </div>
-  );
-};
-
-export default UI;
+      
+      {/* Pause menu */}
       {paused && gamePhase === 'fighting' && (
         <div className="absolute inset-0 bg-black/70 flex flex-col items-center justify-center gap-6 pointer-events-auto">
           <h2 className="text-4xl font-bold text-white tracking-wide">Paused</h2>
@@ -434,3 +431,8 @@ export default UI;
           <p className="text-sm text-gray-300 uppercase tracking-widest">Press Esc to resume</p>
         </div>
       )}
+    </div>
+  );
+};
+
+export default UI;

@@ -141,4 +141,6 @@ export type OnlineMatchMessage<TControl extends string> =
   | { type: "state"; snapshot: OnlineMatchSnapshot<TControl> }
   | { type: "inputs"; frame: number; inputs: RuntimeKeyboardState<TControl> }
   | { type: "resync"; snapshot: OnlineMatchSnapshot<TControl> }
-  | { type: "leave"; reason?: string };
+  | { type: "leave"; reason?: string }
+  | { type: "ping" }
+  | { type: "pong" };

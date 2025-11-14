@@ -1,3 +1,4 @@
+import "dotenv/config";
 import express, { type Request, Response, NextFunction } from "express";
 import session from "express-session";
 import passport from "passport";
@@ -8,7 +9,7 @@ import { registerAuthRoutes } from "./auth-routes";
 import { configurePassport } from "./auth";
 import { setupVite, serveStatic, log } from "./vite";
 import { env } from "./env";
-import { OnlineSocketServer } from "./online/socketServer";
+import { initOnlineSocketServer } from "./online/serverProvider";
 
 const app = express();
 app.set("trust proxy", 1);
@@ -103,29 +104,14 @@ app.use((req, res, next) => {
   });
 
   // Online multiplayer WebSocket server (feature-flagged)
-  let onlineSocketServer: OnlineSocketServer<string> | null = null;
-  if (env.ENABLE_ONLINE_MULTIPLAYER) {
-    onlineSocketServer = new OnlineSocketServer<string>(env.ONLINE_WS_PORT);
-    onlineSocketServer.start();
+  const onlineSocketServer = initOnlineSocketServer({
+    enabled: env.ENABLE_ONLINE_MULTIPLAYER,
+    port: env.ONLINE_WS_PORT,
+  });
+
+  if (onlineSocketServer) {
     log(`online multiplayer websocket server started on port ${env.ONLINE_WS_PORT}`, "websocket");
   } else {
     log(`online multiplayer disabled (set ENABLE_ONLINE_MULTIPLAYER=true to enable)`, "websocket");
   }
-
-  // Health check endpoint for online multiplayer
-  app.get("/api/online/health", (_req, res) => {
-    if (onlineSocketServer) {
-      res.json(onlineSocketServer.getMetrics());
-    } else {
-      res.json({
-        websocketEnabled: false,
-        websocketPort: env.ONLINE_WS_PORT,
-        status: "stopped",
-        activeMatches: 0,
-        activePlayers: 0,
-        connectedSockets: 0,
-        uptimeMs: 0,
-      });
-    }
-  });
 })();

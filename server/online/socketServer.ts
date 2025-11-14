@@ -53,6 +53,10 @@ export class OnlineSocketServer<TControl extends string> {
     };
   }
 
+  getCoordinator() {
+    return this.coordinator;
+  }
+
   private handleConnection(socket: WebSocket) {
     console.log("[OnlineSocketServer] New WebSocket connection established");
     

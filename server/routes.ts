@@ -3,6 +3,7 @@ import { createServer, type Server } from "http";
 import { z } from "zod";
 import { storage } from "./storage";
 import { hitTelemetrySchema, storeTelemetry, summarizeTelemetry, peekTelemetryBuffer } from "./telemetry";
+import { onlineRouter } from "./online-routes";
 const scoreSubmissionSchema = z.object({
   userId: z
     .number({ coerce: true })
@@ -247,6 +248,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
     }),
   );
+
+  // Online multiplayer routes
+  app.use("/api/online", onlineRouter);
 
   const httpServer = createServer(app);
   return httpServer;

@@ -82,7 +82,7 @@ export function useOnlineMatch<TControl extends string>({
 
     try {
       setStatus(retryCountRef.current > 0 ? "reconnecting" : "connecting");
-      const wsUrl = import.meta.env.VITE_ONLINE_MATCH_URL || "ws://localhost:3001";
+      const wsUrl = import.meta.env.VITE_ONLINE_MATCH_URL || "ws://localhost:5001";
       const ws = new WebSocket(wsUrl);
       wsRef.current = ws;
 

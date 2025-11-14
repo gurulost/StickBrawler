@@ -16,13 +16,24 @@ export const OnlineMultiplayer = ({ onStartMatch }: OnlineMultiplayerProps) => {
     
     setIsCreating(true);
     try {
-      // Generate a simple random match ID (6 characters)
-      const newMatchId = Math.random().toString(36).substring(2, 8).toUpperCase();
+      const response = await fetch("/api/online/create", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ profileId: user.username }),
+      });
+      
+      if (!response.ok) {
+        throw new Error("Failed to create match");
+      }
+      
+      const data = await response.json();
+      const newMatchId = data.matchId;
       setCreatedMatchId(newMatchId);
       setMatchId(newMatchId);
       setIsCreating(false);
     } catch (error) {
       console.error("Failed to create match:", error);
+      alert("Failed to create match. Please try again.");
       setIsCreating(false);
     }
   };

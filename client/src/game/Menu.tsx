@@ -47,9 +47,13 @@ const Menu = () => {
 
   const handleStartOnlineMatch = (matchId: string) => {
     console.log("Starting online match:", matchId);
-    // TODO: Wire up online match logic with matchId
-    // For now, start a regular match
-    startGame();
+    // Store matchId in sessionStorage for the game to pick up
+    sessionStorage.setItem("onlineMatchId", matchId);
+    sessionStorage.setItem("matchMode", "online");
+    
+    // Start the game in online mode
+    setMatchMode("online");
+    startGame("online");
   };
 
   const handleVolumeChange = (value: number) => {

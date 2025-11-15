@@ -4,6 +4,7 @@ import { useControls } from './useControls';
 import { clamp } from '../clamp';
 import { useCustomization } from './useCustomization';
 import type { CoinAwardPayload } from './useCustomization';
+import { DEFAULT_ARENA } from '../../game/arenas';
 
 export type GamePhase = 'menu' | 'lobby' | 'fighting' | 'round_end' | 'match_end';
 export type MatchMode = "single" | "local" | "online";
@@ -118,6 +119,10 @@ interface FightingState {
   pauseGame: () => void;
   resumeGame: () => void;
   togglePause: () => void;
+  
+  // Arena selection
+  arenaId: string;
+  setArenaId: (id: string) => void;
 }
 
 const DEFAULT_HEALTH = 100;
@@ -989,6 +994,10 @@ export const useFighting = create<FightingState>((set, get) => ({
           }
         : state,
     ),
+
+  // Arena selection
+  arenaId: DEFAULT_ARENA,
+  setArenaId: (id) => set({ arenaId: id }),
 
   // Score calculation and submission
   calculateFinalScore: () => {

@@ -228,7 +228,7 @@ const GameManager = () => {
 
   return (
     <>
-      <Arena />
+      <Arena variant={fighting.arenaId} />
       <StickFigure
         isPlayer={true}
         characterState={fighting.player}

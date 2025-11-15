@@ -9,23 +9,17 @@ import { LandingHero } from "../components/landing/LandingHero";
 import { FeatureGrid } from "../components/landing/FeatureGrid";
 import { ARENA_OPTIONS } from "./arenas";
 import { OnlineMultiplayer } from "../components/online/OnlineMultiplayer";
+import { MusicToggle } from "../components/ui/music-toggle";
 
 type Panel = "main" | "customization" | "leaderboard" | "controls" | "online";
 
 const Menu = () => {
   const { startGame, matchMode, setMatchMode, arenaId, setArenaId } = useFighting();
-  const { playBackgroundMusic, toggleMute, isMuted, setMasterVolume, masterVolume } = useAudio();
+  const { toggleMute, isMuted, setMasterVolume, masterVolume } = useAudio();
   const { user, status, logout } = useAuth();
   const [activePanel, setActivePanel] = useState<Panel>("main");
   const [controllerConnected, setControllerConnected] = useState(false);
   const [showAuthModal, setShowAuthModal] = useState(false);
-
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      playBackgroundMusic();
-    }, 400);
-    return () => clearTimeout(timer);
-  }, [playBackgroundMusic]);
 
   useEffect(() => {
     const refreshPads = () => {
@@ -230,6 +224,7 @@ const Menu = () => {
             />
           </nav>
           <div className="flex items-center gap-3">
+            <MusicToggle variant="outline" />
             {status === "authenticated" && user ? (
               <>
                 <span className="text-sm text-white/70">Signed in as {user.username}</span>

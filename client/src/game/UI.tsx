@@ -5,6 +5,7 @@ import { useControls } from "../lib/stores/useControls";
 import { useCustomization } from "../lib/stores/useCustomization";
 import { Coins } from "lucide-react";
 import { useEffects } from "../lib/stores/useEffects";
+import { MusicToggle } from "../components/ui/music-toggle";
 
 type TelemetryDigest = Partial<
     Record<
@@ -203,6 +204,7 @@ const UI = () => {
             {paused ? "Resume" : "Pause"}
           </button>
         )}
+        <MusicToggle className="bg-white/20 hover:bg-white/30 text-white" />
         <button
           onClick={toggleSilhouetteDebug}
           className={`px-3 py-2 rounded-full text-xs font-semibold transition ${

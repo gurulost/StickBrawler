@@ -3,8 +3,26 @@ import { create } from "zustand";
 /**
  * Advanced audio system for an immersive fighting game experience
  * Includes dynamic sound effects with pitch variation and 3D positional audio
+ * Enhanced music system with context-aware playback and alternating battle themes
  */
+
+export type MusicContext = 'menu' | 'fighting';
+
 interface AudioState {
+  // Music elements
+  menuTheme: HTMLAudioElement | null;
+  battleTheme1: HTMLAudioElement | null;
+  battleTheme2: HTMLAudioElement | null;
+  currentMusicTrack: HTMLAudioElement | null;
+  
+  // Music state management
+  musicContext: MusicContext;
+  musicEnabled: boolean;
+  battleThemeIndex: number; // 0 for theme 1, 1 for theme 2
+  musicVolume: number;
+  fadeIntervalId: NodeJS.Timeout | null;
+  autoplayBlocked: boolean;
+  
   // Audio elements
   backgroundMusic: HTMLAudioElement | null;
   hitSound: HTMLAudioElement | null;
@@ -23,6 +41,15 @@ interface AudioState {
   // Master volume and state
   isMuted: boolean;
   masterVolume: number;
+  
+  // Music management functions
+  ensureMusicPlaying: () => void;
+  setMenuTheme: (music: HTMLAudioElement) => void;
+  setBattleTheme1: (music: HTMLAudioElement) => void;
+  setBattleTheme2: (music: HTMLAudioElement) => void;
+  switchMusicContext: (context: MusicContext) => void;
+  toggleMusic: () => void;
+  setMusicVolume: (volume: number) => void;
   
   // Setter functions for audio sources
   setBackgroundMusic: (music: HTMLAudioElement) => void;
@@ -65,6 +92,20 @@ interface AudioState {
 }
 
 export const useAudio = create<AudioState>((set, get) => ({
+  // Initialize music elements
+  menuTheme: null,
+  battleTheme1: null,
+  battleTheme2: null,
+  currentMusicTrack: null,
+  
+  // Music state
+  musicContext: 'menu',
+  musicEnabled: true,
+  battleThemeIndex: 0,
+  musicVolume: 0.35,
+  fadeIntervalId: null as NodeJS.Timeout | null,
+  autoplayBlocked: false,
+  
   // Initialize all audio elements as null
   backgroundMusic: null,
   hitSound: null,
@@ -83,6 +124,183 @@ export const useAudio = create<AudioState>((set, get) => ({
   // Default audio settings
   isMuted: false, // Start unmuted for better user experience
   masterVolume: 0.8, // Default volume at 80%
+  
+  // Helper to ensure music starts (call from user gesture)
+  ensureMusicPlaying: () => {
+    const { currentMusicTrack, musicEnabled, isMuted, musicVolume } = get();
+    if (currentMusicTrack && musicEnabled && !isMuted && currentMusicTrack.paused) {
+      currentMusicTrack.volume = musicVolume;
+      currentMusicTrack.play().then(() => {
+        set({ autoplayBlocked: false });
+      }).catch(() => {});
+    }
+  },
+  
+  // Music management functions
+  setMenuTheme: (music) => {
+    music.loop = true;
+    music.volume = get().musicVolume;
+    set({ menuTheme: music });
+  },
+  
+  setBattleTheme1: (music) => {
+    music.loop = true;
+    music.volume = get().musicVolume;
+    set({ battleTheme1: music });
+  },
+  
+  setBattleTheme2: (music) => {
+    music.loop = true;
+    music.volume = get().musicVolume;
+    set({ battleTheme2: music });
+  },
+  
+  switchMusicContext: (context) => {
+    const { musicContext, currentMusicTrack, menuTheme, battleTheme1, battleTheme2, battleThemeIndex, musicEnabled, isMuted, musicVolume, fadeIntervalId, backgroundMusic } = get();
+    
+    // Short-circuit only if switching to the same context and track is actively playing
+    if (musicContext === context && currentMusicTrack && !currentMusicTrack.paused) {
+      return;
+    }
+    
+    // Update context even if tracks aren't loaded yet
+    set({ musicContext: context });
+    
+    // Clear any existing fade interval
+    if (fadeIntervalId) {
+      clearInterval(fadeIntervalId);
+      set({ fadeIntervalId: null });
+    }
+    
+    // Stop legacy background music if it's playing
+    if (backgroundMusic && !backgroundMusic.paused) {
+      backgroundMusic.pause();
+      backgroundMusic.currentTime = 0;
+    }
+    
+    // Select the new track based on context
+    let newTrack: HTMLAudioElement | null = null;
+    
+    if (context === 'menu') {
+      newTrack = menuTheme;
+    } else if (context === 'fighting') {
+      // Alternate between battle themes
+      if (battleThemeIndex === 0) {
+        newTrack = battleTheme1;
+        set({ battleThemeIndex: 1 }); // Next time use theme 2
+      } else {
+        newTrack = battleTheme2;
+        set({ battleThemeIndex: 0 }); // Next time use theme 1
+      }
+    }
+    
+    // If track isn't loaded yet, just update context and return
+    if (!newTrack) {
+      console.log(`Music track for context '${context}' not loaded yet`);
+      return;
+    }
+    
+    // Fade out current track only if it's different from the new track
+    if (currentMusicTrack && currentMusicTrack !== newTrack && !currentMusicTrack.paused) {
+      const fadeOut = setInterval(() => {
+        if (currentMusicTrack.volume > 0.05) {
+          currentMusicTrack.volume = Math.max(0, currentMusicTrack.volume - 0.05);
+        } else {
+          currentMusicTrack.pause();
+          currentMusicTrack.currentTime = 0;
+          clearInterval(fadeOut);
+        }
+      }, 50);
+    }
+    
+    // Update current track
+    set({ currentMusicTrack: newTrack });
+    
+    // Play new track if music is enabled
+    if (newTrack && musicEnabled && !isMuted) {
+      // Reset track if it was paused
+      if (newTrack.paused) {
+        newTrack.currentTime = 0;
+      }
+      
+      newTrack.volume = 0;
+      
+      // Attempt to play with autoplay policy handling
+      newTrack.play().then(() => {
+        // Autoplay succeeded, clear blocked flag
+        set({ autoplayBlocked: false });
+        
+        // Fade in new track with interval tracking
+        const fadeIn = setInterval(() => {
+          if (newTrack && newTrack.volume < musicVolume - 0.05) {
+            newTrack.volume = Math.min(musicVolume, newTrack.volume + 0.05);
+          } else {
+            if (newTrack) newTrack.volume = musicVolume;
+            clearInterval(fadeIn);
+            set({ fadeIntervalId: null });
+          }
+        }, 50);
+        set({ fadeIntervalId: fadeIn });
+      }).catch((error) => {
+        // Autoplay blocked - flag it for retry on next user interaction
+        set({ autoplayBlocked: true });
+        console.log('Music autoplay blocked, will retry on next user interaction (e.g., clicking Play)');
+      });
+    } else if (get().autoplayBlocked && newTrack) {
+      // If autoplay was previously blocked and we have a track, try again
+      // This happens when user interacts (e.g., clicks Play button)
+      newTrack.volume = 0;
+      newTrack.play().then(() => {
+        set({ autoplayBlocked: false });
+        const fadeIn = setInterval(() => {
+          if (newTrack && newTrack.volume < musicVolume - 0.05) {
+            newTrack.volume = Math.min(musicVolume, newTrack.volume + 0.05);
+          } else {
+            if (newTrack) newTrack.volume = musicVolume;
+            clearInterval(fadeIn);
+            set({ fadeIntervalId: null });
+          }
+        }, 50);
+        set({ fadeIntervalId: fadeIn });
+      }).catch(() => {
+        // Still blocked, will try again later
+        console.log('Music still blocked');
+      });
+    }
+  },
+  
+  toggleMusic: () => {
+    const { musicEnabled, currentMusicTrack, isMuted, autoplayBlocked } = get();
+    const newMusicEnabled = !musicEnabled;
+    
+    set({ musicEnabled: newMusicEnabled });
+    
+    if (currentMusicTrack) {
+      if (newMusicEnabled && !isMuted) {
+        // This is a user gesture - perfect for unblocking autoplay
+        currentMusicTrack.currentTime = 0;
+        currentMusicTrack.volume = get().musicVolume;
+        currentMusicTrack.play().then(() => {
+          set({ autoplayBlocked: false });
+        }).catch(() => {
+          console.log('Music toggle blocked');
+        });
+      } else {
+        currentMusicTrack.pause();
+      }
+    }
+  },
+  
+  setMusicVolume: (volume) => {
+    const clampedVolume = Math.max(0, Math.min(1, volume));
+    const { currentMusicTrack } = get();
+    
+    set({ musicVolume: clampedVolume });
+    
+    if (currentMusicTrack) {
+      currentMusicTrack.volume = clampedVolume;
+    }
+  },
   
   // Setter functions for all audio elements
   setBackgroundMusic: (music) => {
@@ -106,14 +324,21 @@ export const useAudio = create<AudioState>((set, get) => ({
   
   // Volume and mute controls
   toggleMute: () => {
-    const { isMuted, backgroundMusic } = get();
+    const { isMuted, currentMusicTrack } = get();
     const newMutedState = !isMuted;
     
     set({ isMuted: newMutedState });
     
-    // Also update background music if it's playing
-    if (backgroundMusic) {
-      backgroundMusic.muted = newMutedState;
+    // Mute/unmute current music track (context-aware music only)
+    if (currentMusicTrack) {
+      if (newMutedState) {
+        currentMusicTrack.pause();
+      } else {
+        const { musicEnabled } = get();
+        if (musicEnabled) {
+          currentMusicTrack.play().catch(() => {});
+        }
+      }
     }
   },
   

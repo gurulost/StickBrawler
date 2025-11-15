@@ -34,7 +34,11 @@ function App() {
     setGrabSound,
     setThrowSound,
     setTauntSound,
-    playBackgroundMusic
+    playBackgroundMusic,
+    setMenuTheme,
+    setBattleTheme1,
+    setBattleTheme2,
+    switchMusicContext
   } = useAudio();
 
   // Initialize audio elements
@@ -52,10 +56,24 @@ function App() {
       }
     };
 
-    // Background music
+    // Background music (legacy)
     const backgroundMusic = loadAudio("/sounds/background.mp3", 0.4);
     backgroundMusic.loop = true;
     setBackgroundMusic(backgroundMusic);
+
+    // Music system - Context-aware tracks
+    const menuTheme = loadAudio("/sounds/menu-theme.mp3", 0.35);
+    const battleTheme1 = loadAudio("/sounds/battle-theme-1.mp3", 0.35);
+    const battleTheme2 = loadAudio("/sounds/battle-theme-2.mp3", 0.35);
+    
+    setMenuTheme(menuTheme);
+    setBattleTheme1(battleTheme1);
+    setBattleTheme2(battleTheme2);
+    
+    // Start menu music after tracks are loaded
+    setTimeout(() => {
+      switchMusicContext('menu');
+    }, 100);
 
     // Combat sounds
     setHitSound(loadAudio("/sounds/hit.mp3", 0.5));
@@ -77,14 +95,18 @@ function App() {
     setThrowSound(loadAudio("/sounds/throw.mp3", 0.55));
     setTauntSound(loadAudio("/sounds/taunt.mp3", 0.5));
 
-    // Start playing background music
-    setTimeout(() => {
-      playBackgroundMusic();
-    }, 1000);
-
     // Show the canvas once everything is loaded
     setShowCanvas(true);
   }, []);
+
+  // Music context switching based on game phase
+  useEffect(() => {
+    if (gamePhase === 'fighting') {
+      switchMusicContext('fighting');
+    } else if (gamePhase === 'menu' || gamePhase === 'lobby') {
+      switchMusicContext('menu');
+    }
+  }, [gamePhase, switchMusicContext]);
 
   return (
     <div style={{ width: '100vw', height: '100vh', position: 'relative', overflow: 'hidden' }}>

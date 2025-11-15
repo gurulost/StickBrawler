@@ -9,12 +9,14 @@ import Lobby from "./game/Lobby";
 import UI from "./game/UI";
 import { useFighting } from "./lib/stores/useFighting";
 import { useEconomySync } from "./hooks/use-economy-sync";
+import { useAutoStartMusic } from "./hooks/use-auto-start-music";
 
 // Main App component
 function App() {
   const { gamePhase } = useFighting();
   const { fetchMe } = useAuth();
   useEconomySync();
+  useAutoStartMusic(); // Auto-start music on first user interaction
   const [showCanvas, setShowCanvas] = useState(false);
   
   useEffect(() => {

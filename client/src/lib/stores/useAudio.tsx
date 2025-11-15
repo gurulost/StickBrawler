@@ -367,7 +367,9 @@ export const useAudio = create<AudioState>((set, get) => ({
       } else {
         const { musicEnabled } = get();
         if (musicEnabled) {
-          currentMusicTrack.play().catch(() => {});
+          currentMusicTrack.play().then(() => {
+            set({ autoplayBlocked: false });
+          }).catch(() => {});
         }
       }
     }

@@ -16,6 +16,9 @@ interface LandingHeroProps {
   toggleMute: () => void;
   masterVolume: number;
   onVolumeChange: (value: number) => void;
+  arenaId: string;
+  arenaOptions: Array<{ id: string; name: string; description: string }>;
+  onArenaSelect: (id: string) => void;
 }
 
 export function LandingHero({
@@ -30,11 +33,15 @@ export function LandingHero({
   toggleMute,
   masterVolume,
   onVolumeChange,
+  arenaId,
+  arenaOptions,
+  onArenaSelect,
 }: LandingHeroProps) {
   const sectionRef = useRef<HTMLElement | null>(null);
   const [heroInView, setHeroInView] = useState(false);
   const [secondPreviewReady, setSecondPreviewReady] = useState(false);
   const [showControllerPrompt, setShowControllerPrompt] = useState(false);
+  const selectedArena = arenaOptions.find((arena) => arena.id === arenaId);
 
   useEffect(() => {
     const observer = new IntersectionObserver(
@@ -100,6 +107,32 @@ export function LandingHero({
                 {badge.label}
               </span>
             ))}
+          </div>
+          <div className="space-y-2 pt-2">
+            <p className="text-xs font-semibold uppercase tracking-[0.35em] text-white/60">
+              Arena
+            </p>
+            <div className="flex flex-wrap gap-2">
+              {arenaOptions.map((arena) => {
+                const active = arena.id === arenaId;
+                return (
+                  <button
+                    key={arena.id}
+                    onClick={() => onArenaSelect(arena.id)}
+                    className={`rounded-2xl border px-4 py-2 text-xs font-semibold uppercase tracking-wide transition ${
+                      active
+                        ? "border-white bg-white text-slate-900"
+                        : "border-white/30 text-white/80 hover:text-white"
+                    }`}
+                  >
+                    {arena.name}
+                  </button>
+                );
+              })}
+            </div>
+            {selectedArena && (
+              <p className="text-xs text-white/60">{selectedArena.description}</p>
+            )}
           </div>
           <div className="flex flex-wrap gap-3 pt-2">
             <button

@@ -7,12 +7,13 @@ import { Leaderboard } from "../components/ui/leaderboard";
 import { AuthModal } from "../components/ui/auth-modal";
 import { LandingHero } from "../components/landing/LandingHero";
 import { FeatureGrid } from "../components/landing/FeatureGrid";
+import { ARENA_OPTIONS } from "./arenas";
 import { OnlineMultiplayer } from "../components/online/OnlineMultiplayer";
 
 type Panel = "main" | "customization" | "leaderboard" | "controls" | "online";
 
 const Menu = () => {
-  const { startGame, matchMode, setMatchMode } = useFighting();
+  const { startGame, matchMode, setMatchMode, arenaId, setArenaId } = useFighting();
   const { playBackgroundMusic, toggleMute, isMuted, setMasterVolume, masterVolume } = useAudio();
   const { user, status, logout } = useAuth();
   const [activePanel, setActivePanel] = useState<Panel>("main");
@@ -189,6 +190,9 @@ const Menu = () => {
               toggleMute={toggleMute}
               masterVolume={masterVolume}
               onVolumeChange={handleVolumeChange}
+              arenaId={arenaId}
+              arenaOptions={ARENA_OPTIONS}
+              onArenaSelect={setArenaId}
             />
             <FeatureGrid />
           </>

@@ -4,6 +4,7 @@ import { useControls } from './useControls';
 import { clamp } from '../clamp';
 import { useCustomization } from './useCustomization';
 import type { CoinAwardPayload } from './useCustomization';
+import { DEFAULT_ARENA_ID, ARENA_THEMES } from '../../game/arenas';
 
 export type GamePhase = 'menu' | 'lobby' | 'fighting' | 'round_end' | 'match_end';
 export type MatchMode = "single" | "local" | "online";
@@ -63,6 +64,7 @@ interface FightingState {
   roundTime: number;
   maxRoundTime: number;
   currentGameScore: number; // Total score for current game session
+  arenaId: string;
   
   // High score tracking
   submitScore: (finalScore: number) => Promise<void>;
@@ -113,6 +115,7 @@ interface FightingState {
   // Game time
   updateRoundTime: (delta: number) => void;
   setMatchMode: (mode: MatchMode) => void;
+  setArenaId: (arenaId: string) => void;
   setSlotType: (slot: PlayerSlot, type: "human" | "cpu") => void;
   setSlotReady: (slot: PlayerSlot, ready: boolean) => void;
   pauseGame: () => void;
@@ -268,6 +271,7 @@ export const useFighting = create<FightingState>((set, get) => ({
   roundTime: DEFAULT_ROUND_TIME,
   maxRoundTime: DEFAULT_ROUND_TIME,
   currentGameScore: 0,
+  arenaId: DEFAULT_ARENA_ID,
   
   startGame: (mode) => set((state) => {
     const targetMode = mode ?? state.matchMode;
@@ -940,6 +944,10 @@ export const useFighting = create<FightingState>((set, get) => ({
     matchMode: mode,
     slots: state.gamePhase === 'lobby' ? createDefaultSlots(mode) : state.slots,
   })),
+  setArenaId: (arenaId) =>
+    set(() => ({
+      arenaId: ARENA_THEMES[arenaId] ? arenaId : DEFAULT_ARENA_ID,
+    })),
   setSlotType: (slot, type) => set((state) => {
     if (slot === "player1") {
       return {

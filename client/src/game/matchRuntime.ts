@@ -10,6 +10,12 @@ import {
   applyHitLagTimer,
   ATTACK_RANGE,
   getPlatformHeight,
+  CPU_SPEED,
+  GROUND_ACCELERATION,
+  AIR_ACCELERATION,
+  GROUND_DECELERATION,
+  AIR_DECELERATION,
+  moveTowards,
 } from "./Physics";
 import {
   CombatStateMachine,
@@ -646,31 +652,29 @@ export class MatchRuntime {
     let cpuDirection = cpu.direction;
 
     if (cpuControlScale > 0 && (cpuCanAct || cpu.isJumping)) {
+      const accel = (cpu.isJumping ? AIR_ACCELERATION : GROUND_ACCELERATION) * delta;
+      const decel = (cpu.isJumping ? AIR_DECELERATION : GROUND_DECELERATION) * delta;
+      const maxSpeed = (cpu.isJumping ? CPU_SPEED * 0.85 : CPU_SPEED) * cpuControlScale;
+
+      let targetVX = 0;
       if (controlState.leftward) {
-        cpuVX = cpu.isJumping
-          ? Math.max(-PLAYER_SPEED * 0.7, cpuVX - 0.01) * cpuControlScale
-          : -PLAYER_SPEED * cpuControlScale;
+        targetVX = -maxSpeed;
         cpuDirection = -1;
       } else if (controlState.rightward) {
-        cpuVX = cpu.isJumping
-          ? Math.min(PLAYER_SPEED * 0.7, cpuVX + 0.01) * cpuControlScale
-          : PLAYER_SPEED * cpuControlScale;
+        targetVX = maxSpeed;
         cpuDirection = 1;
-      } else {
-        cpuVX *= cpu.isJumping ? 0.98 : 0.95;
       }
+      cpuVX = moveTowards(cpuVX, targetVX, targetVX === 0 ? decel : accel);
+      cpuVX = Math.max(-maxSpeed, Math.min(maxSpeed, cpuVX));
 
+      let targetVZ = 0;
       if (controlState.forward) {
-        cpuVZ = cpu.isJumping
-          ? Math.max(-PLAYER_SPEED * 0.7, cpuVZ - 0.01) * cpuControlScale
-          : -PLAYER_SPEED * cpuControlScale;
+        targetVZ = -maxSpeed;
       } else if (controlState.backward) {
-        cpuVZ = cpu.isJumping
-          ? Math.min(PLAYER_SPEED * 0.7, cpuVZ + 0.01) * cpuControlScale
-          : PLAYER_SPEED * cpuControlScale;
-      } else {
-        cpuVZ *= cpu.isJumping ? 0.98 : 0.95;
+        targetVZ = maxSpeed;
       }
+      cpuVZ = moveTowards(cpuVZ, targetVZ, targetVZ === 0 ? decel : accel);
+      cpuVZ = Math.max(-maxSpeed, Math.min(maxSpeed, cpuVZ));
     }
 
     if (controlState.jump && !cpu.isJumping && cpu.position[1] <= 0.01 && cpuCanAct) {
@@ -769,31 +773,29 @@ export class MatchRuntime {
 
     const controlScale = playerInHitLag ? 0 : 1;
     if (canAct || player.isJumping) {
+      const accel = (player.isJumping ? AIR_ACCELERATION : GROUND_ACCELERATION) * delta;
+      const decel = (player.isJumping ? AIR_DECELERATION : GROUND_DECELERATION) * delta;
+      const maxSpeed = (player.isJumping ? PLAYER_SPEED * 0.85 : PLAYER_SPEED) * controlScale;
+
+      let targetVX = 0;
       if (input.leftward) {
-        newVX =
-          controlScale *
-          (player.isJumping ? Math.max(-PLAYER_SPEED * 0.7, newVX - 0.01) : -PLAYER_SPEED);
+        targetVX = -maxSpeed;
         newDirection = -1;
       } else if (input.rightward) {
-        newVX =
-          controlScale *
-          (player.isJumping ? Math.min(PLAYER_SPEED * 0.7, newVX + 0.01) : PLAYER_SPEED);
+        targetVX = maxSpeed;
         newDirection = 1;
-      } else {
-        newVX *= player.isJumping ? 0.98 : 0.95;
       }
+      newVX = moveTowards(newVX, targetVX, targetVX === 0 ? decel : accel);
+      newVX = Math.max(-maxSpeed, Math.min(maxSpeed, newVX));
 
+      let targetVZ = 0;
       if (input.forward) {
-        newVZ =
-          controlScale *
-          (player.isJumping ? Math.max(-PLAYER_SPEED * 0.7, newVZ - 0.01) : -PLAYER_SPEED);
+        targetVZ = -maxSpeed;
       } else if (input.backward) {
-        newVZ =
-          controlScale *
-          (player.isJumping ? Math.min(PLAYER_SPEED * 0.7, newVZ + 0.01) : PLAYER_SPEED);
-      } else {
-        newVZ *= player.isJumping ? 0.98 : 0.95;
+        targetVZ = maxSpeed;
       }
+      newVZ = moveTowards(newVZ, targetVZ, targetVZ === 0 ? decel : accel);
+      newVZ = Math.max(-maxSpeed, Math.min(maxSpeed, newVZ));
     }
 
     if (input.jump && !player.isJumping && player.position[1] <= 0.01 && canAct) {

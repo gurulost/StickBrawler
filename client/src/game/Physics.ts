@@ -19,6 +19,10 @@ export const FLOOR_FRICTION = 0.82;
 export const AIR_FRICTION = 0.97;
 export const WALL_BOUNCE_RESTITUTION = 0.35;
 export const HIT_LAG_DECAY = 0.9;
+export const GROUND_ACCELERATION = 55;
+export const AIR_ACCELERATION = 28;
+export const GROUND_DECELERATION = 60;
+export const AIR_DECELERATION = 24;
 
 // Attack parameters (further reduced damage per hit for better balance)
 export const PUNCH_DAMAGE = 2; // Reduced from 3
@@ -215,6 +219,17 @@ export function applyHorizontalFriction(
   const friction = inAir ? AIR_FRICTION : FLOOR_FRICTION;
   const factor = 1 - (1 - friction) * delta;
   return velocity * factor;
+}
+
+export function moveTowards(
+  current: number,
+  target: number,
+  maxDelta: number,
+): number {
+  if (Math.abs(target - current) <= maxDelta) {
+    return target;
+  }
+  return current + Math.sign(target - current) * maxDelta;
 }
 
 export function resolveCapsuleBounds(

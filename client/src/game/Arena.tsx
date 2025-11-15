@@ -1,5 +1,6 @@
 import { useEffect, useMemo } from "react";
 import { ARENA_WIDTH, FLOOR_Y, PLATFORMS, ARENA_DEPTH } from "./Physics";
+import { getArenaTheme } from "./arenas";
 import * as THREE from "three";
 
 const createGradientTexture = (top: string, bottom: string) => {
@@ -19,14 +20,19 @@ const createGradientTexture = (top: string, bottom: string) => {
   return texture;
 };
 
-const Arena = () => {
+type ArenaProps = {
+  variant?: string;
+};
+
+const Arena = ({ variant }: ArenaProps) => {
+  const theme = getArenaTheme(variant);
   const gradientTexture = useMemo(
-    () => createGradientTexture("#fef6fb", "#f0f7ff"),
-    [],
+    () => createGradientTexture(theme.floorGradient[0], theme.floorGradient[1]),
+    [theme.floorGradient],
   );
   const skylineTexture = useMemo(
-    () => createGradientTexture("#d2efff", "#fef6ff"),
-    [],
+    () => createGradientTexture(theme.skyGradient[0], theme.skyGradient[1]),
+    [theme.skyGradient],
   );
   useEffect(() => {
     return () => {
@@ -59,7 +65,7 @@ const Arena = () => {
         <planeGeometry args={[ARENA_WIDTH, ARENA_DEPTH]} />
         <meshStandardMaterial
           map={gradientTexture ?? undefined}
-          color="#fff9f2"
+          color={theme.floorGradient[1]}
           roughness={0.8}
           metalness={0.05}
         />
@@ -83,7 +89,7 @@ const Arena = () => {
               receiveShadow
             >
               <boxGeometry args={[width, 0.3, depth]} />
-              <meshStandardMaterial color="#fee2f8" roughness={0.4} />
+              <meshStandardMaterial color={theme.platformColor} roughness={0.4} />
             </mesh>
             
             {/* Support columns for platforms */}
@@ -92,7 +98,7 @@ const Arena = () => {
               castShadow
             >
               <boxGeometry args={[0.5, platform.y, 0.5]} />
-              <meshStandardMaterial color="#f0abfc" />
+              <meshStandardMaterial color={theme.pillarColor} />
             </mesh>
             
             <mesh 
@@ -125,13 +131,13 @@ const Arena = () => {
       {/* Enhanced background sky - larger and higher quality */}
       <mesh position={[0, ARENA_WIDTH/2, -ARENA_WIDTH/2]}>
         <planeGeometry args={[ARENA_WIDTH * 3, ARENA_WIDTH * 1.5]} />
-        <meshBasicMaterial map={skylineTexture ?? undefined} color="#e0f2ff" />
+        <meshBasicMaterial map={skylineTexture ?? undefined} color={theme.skyGradient[0]} />
       </mesh>
       
       {/* Left boundary - taller and more detailed */}
       <mesh position={[-ARENA_WIDTH/2, wallHeight/2, 0]} castShadow>
         <boxGeometry args={[1.2, wallHeight, ARENA_WIDTH/2]} />
-        <meshStandardMaterial color="#fde68a" roughness={0.4} />
+        <meshStandardMaterial color={theme.pillarColor} roughness={0.4} />
       </mesh>
       
       {/* Right boundary - taller and more detailed */}
@@ -141,28 +147,53 @@ const Arena = () => {
       </mesh>
       
       {/* Decorative elements along the edges */}
-      {Array.from({ length: decorationCount }).map((_, i) => (
-        <group
-          key={`decor-arch-${i}`}
-          position={[
-            -ARENA_WIDTH / 2 + 0.5,
-            0,
-            -ARENA_WIDTH / 4 + (i * ARENA_WIDTH) / decorationCount,
-          ]}
-        >
-          <mesh castShadow position={[0, 2, 0]}>
-            <torusGeometry args={[1, 0.08, 16, 64, Math.PI]} />
-            <meshStandardMaterial emissive="#f0abfc" color="#fef3ff" />
-          </mesh>
-          <mesh castShadow position={[ARENA_WIDTH - 1, 2, 0]}>
-            <torusGeometry args={[1, 0.08, 16, 64, Math.PI]} />
-            <meshStandardMaterial emissive="#bae6fd" color="#ecfeff" />
-          </mesh>
-        </group>
-      ))}
+      {Array.from({ length: decorationCount }).map((_, i) => {
+        const offset = -ARENA_WIDTH / 4 + (i * ARENA_WIDTH) / decorationCount;
+        if (theme.id === "auroraFlux") {
+          return (
+            <group key={`decor-crystal-${i}`}>
+              <mesh
+                castShadow
+                position={[-ARENA_WIDTH / 2 + 1, 1.5, offset]}
+                rotation={[0, 0, Math.PI / 4]}
+              >
+                <coneGeometry args={[0.8, 3, 4]} />
+                <meshStandardMaterial color={theme.accentLeft} emissive={theme.accentLeft} />
+              </mesh>
+              <mesh
+                castShadow
+                position={[ARENA_WIDTH / 2 - 1, 1.5, -offset]}
+                rotation={[0, 0, -Math.PI / 4]}
+              >
+                <coneGeometry args={[0.8, 3, 4]} />
+                <meshStandardMaterial color={theme.accentRight} emissive={theme.accentRight} />
+              </mesh>
+            </group>
+          );
+        }
+        return (
+          <group
+            key={`decor-arch-${i}`}
+            position={[
+              -ARENA_WIDTH / 2 + 0.5,
+              0,
+              offset,
+            ]}
+          >
+            <mesh castShadow position={[0, 2, 0]}>
+              <torusGeometry args={[1, 0.08, 16, 64, Math.PI]} />
+              <meshStandardMaterial emissive={theme.accentLeft} color="#fef3ff" />
+            </mesh>
+            <mesh castShadow position={[ARENA_WIDTH - 1, 2, 0]}>
+              <torusGeometry args={[1, 0.08, 16, 64, Math.PI]} />
+              <meshStandardMaterial emissive={theme.accentRight} color="#ecfeff" />
+            </mesh>
+          </group>
+        );
+      })}
       
       {/* Enhanced lighting setup for the larger arena */}
-      <hemisphereLight skyColor="#f5f3ff" groundColor="#f0fdf4" intensity={0.8} />
+      <hemisphereLight skyColor={theme.ambientColor} groundColor="#f0fdf4" intensity={0.8} />
       <directionalLight 
         intensity={0.75} 
         position={[ARENA_WIDTH/2, ARENA_WIDTH/1.8, ARENA_WIDTH/2]} 
@@ -176,14 +207,22 @@ const Arena = () => {
       
       {/* Secondary lighting for better atmosphere */}
       <pointLight 
-        intensity={0.7} 
-        position={[-ARENA_WIDTH/3, ARENA_WIDTH/5, ARENA_WIDTH/4]} 
-        color="#fcd34d" 
+        intensity={theme.fillLight.intensity}
+        position={[
+          theme.fillLight.position[0],
+          theme.fillLight.position[1],
+          theme.fillLight.position[2],
+        ]}
+        color={theme.fillLight.color}
       />
       <pointLight 
-        intensity={0.5}
-        position={[ARENA_WIDTH/4, ARENA_WIDTH/3, -ARENA_WIDTH/4]}
-        color="#c4b5fd"
+        intensity={theme.rimLight.intensity}
+        position={[
+          theme.rimLight.position[0],
+          theme.rimLight.position[1],
+          theme.rimLight.position[2],
+        ]}
+        color={theme.rimLight.color}
       />
     </group>
   );

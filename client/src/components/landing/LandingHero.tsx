@@ -1,9 +1,8 @@
 import { useEffect, useRef, useState } from "react";
 import { CharacterPreview } from "../preview/CharacterPreview";
 import { heroBadges } from "../../data/landingContent";
-import { MatchMode, useFighting } from "../../lib/stores/useFighting";
+import { MatchMode } from "../../lib/stores/useFighting";
 import { motion } from "framer-motion";
-import { ARENA_THEMES } from "../../game/arenas";
 
 interface LandingHeroProps {
   onPlay: () => void;
@@ -38,7 +37,6 @@ export function LandingHero({
   arenaOptions,
   onArenaSelect,
 }: LandingHeroProps) {
-  const { arenaId, setArenaId } = useFighting();
   const sectionRef = useRef<HTMLElement | null>(null);
   const [heroInView, setHeroInView] = useState(false);
   const [secondPreviewReady, setSecondPreviewReady] = useState(false);
@@ -202,10 +200,10 @@ export function LandingHero({
               <span className="text-sm font-semibold text-white/90">Arena Selection</span>
             </div>
             <div className="mb-3 flex flex-wrap gap-2">
-              {Object.values(ARENA_THEMES).map((arena) => (
+              {arenaOptions.map((arena) => (
                 <button
                   key={arena.id}
-                  onClick={() => setArenaId(arena.id)}
+                  onClick={() => onArenaSelect(arena.id)}
                   className={`rounded-full px-4 py-2 text-xs font-semibold uppercase tracking-wide transition ${
                     arenaId === arena.id
                       ? "bg-emerald-500 text-white"
@@ -217,7 +215,7 @@ export function LandingHero({
               ))}
             </div>
             <p className="text-xs text-white/60">
-              {ARENA_THEMES[arenaId]?.description || "Select an arena to view details"}
+              {selectedArena?.description || "Select an arena to view details"}
             </p>
           </div>
           

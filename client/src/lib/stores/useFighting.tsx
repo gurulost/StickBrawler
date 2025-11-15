@@ -4,11 +4,12 @@ import { useControls } from './useControls';
 import { clamp } from '../clamp';
 import { useCustomization } from './useCustomization';
 import type { CoinAwardPayload } from './useCustomization';
-  import { DEFAULT_ARENA_ID, ARENA_THEMES } from '../../game/arenas';
+import { DEFAULT_ARENA_ID, ARENA_THEMES } from '../../game/arenas';
+
 export type GamePhase = 'menu' | 'lobby' | 'fighting' | 'round_end' | 'match_end';
 export type MatchMode = "single" | "local" | "online";
 export type Character = 'stick_hero' | 'stick_villain';
-
+export type PlayerSlot = "player1" | "player2";
 export interface CharacterState {
   health: number;
   position: [number, number, number]; // [x, y, z]
@@ -39,7 +40,6 @@ export interface CharacterState {
   velocity: [number, number, number];
 }
 
-export type PlayerSlot = "player1" | "player2";
 
 export type SlotAssignment = {
   type: "human" | "cpu";
@@ -121,9 +121,6 @@ interface FightingState {
   resumeGame: () => void;
   togglePause: () => void;
   
-  // Arena selection
-  arenaId: string;
-  setArenaId: (id: string) => void;
 }
 
 const DEFAULT_HEALTH = 100;
@@ -1001,9 +998,6 @@ export const useFighting = create<FightingState>((set, get) => ({
         : state,
     ),
 
-  // Arena selection
-  arenaId: DEFAULT_ARENA,
-  setArenaId: (id) => set({ arenaId: id }),
 
   // Score calculation and submission
   calculateFinalScore: () => {

@@ -1,6 +1,6 @@
 // Constants for physics calculations
 export const GRAVITY = 30; // Gravity acceleration per second² (brings player down)
-export const JUMP_FORCE = 10; // Jump velocity (units per second - initial upward velocity)
+export const JUMP_FORCE = 21; // Jump velocity (units per second - initial upward velocity)
 export const PLAYER_SPEED = 8; // Movement speed (units per second) - multiplied by delta in runtime
 export const CPU_SPEED = 7; // CPU movement speed (units per second)
 export const DRAG = 0.92; // Increased drag for smoother movement
@@ -33,8 +33,8 @@ export const ATTACK_RANGE = 1.5; // Kept the same for consistent hit detection
 // Combo system constants
 export const COMBO_WINDOW = 800; // Time window in ms to chain attacks for combos
 export const COMBO_MULTIPLIER = 1.2; // Damage multiplier for each hit in a combo
-export const FAST_FALL_MULTIPLIER = 1.7;
-export const MAX_FALL_SPEED = 0.9;
+export const FAST_FALL_MULTIPLIER = 1.5;
+export const MAX_FALL_SPEED = 1.2;
 
 // Platform system for multi-level combat
 export interface Platform {

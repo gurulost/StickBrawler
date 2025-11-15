@@ -681,7 +681,7 @@ export class MatchRuntime {
       cpuVY = JUMP_FORCE;
       fighting.setCPUJumping(true);
     } else if (controlState.jump && cpu.isJumping && cpu.airJumpsLeft > 0 && this.rng.nextBool(0.15)) {
-      cpuVY = JUMP_FORCE * 0.8;
+      cpuVY = JUMP_FORCE * 0.9;
       fighting.useCPUAirJump?.();
     }
 
@@ -804,7 +804,7 @@ export class MatchRuntime {
       audio.playJump();
       fighting.resetPlayerAirJumps();
     } else if (input.jump && player.isJumping && player.airJumpsLeft > 0 && canAct) {
-      newVY = JUMP_FORCE * 0.8;
+      newVY = JUMP_FORCE * 0.9;
       if (fighting.usePlayerAirJump?.()) {
         audio.playJump();
       }

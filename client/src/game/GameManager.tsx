@@ -7,7 +7,7 @@ import { useAudio } from "../lib/stores/useAudio";
 import { usePlayerControls } from "../hooks/use-player-controls";
 import { useControls } from "../lib/stores/useControls";
 import { MatchRuntime } from "./matchRuntime";
-import type { HitTelemetry } from "./combatTelemetry";
+import type { CombatTelemetryEvent } from "./combatTelemetry";
 import { useEffects } from "../lib/stores/useEffects";
 import { ARENA_THEMES } from "./arenas";
 
@@ -120,7 +120,7 @@ const GameManager = () => {
   const triggerCameraShake = useEffects((state) => state.triggerCameraShake);
   const triggerLandingBurst = useEffects((state) => state.triggerLandingBurst);
   const decayEffects = useEffects((state) => state.decayEffects);
-  const sendTelemetry = useCallback((entries: HitTelemetry[]) => {
+  const sendTelemetry = useCallback((entries: CombatTelemetryEvent[]) => {
     void fetch("/api/telemetry", {
       method: "POST",
       headers: {

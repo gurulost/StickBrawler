@@ -1,6 +1,6 @@
 import { MatchRuntime, createEmptyInputs, type DualInputState } from "../client/src/game/matchRuntime";
 import type { CharacterState, GamePhase } from "../client/src/lib/stores/useFighting";
-import type { HitTelemetry } from "../client/src/game/combatTelemetry";
+import type { CombatTelemetryEvent } from "../client/src/game/combatTelemetry";
 
 export { MatchRuntime } from "../client/src/game/matchRuntime";
 
@@ -57,7 +57,7 @@ export class ServerMatchRuntime {
   private player: CharacterState = createDefaultCharacterState(DEFAULT_POSITION_PLAYER, 1);
   private cpu: CharacterState = createDefaultCharacterState(DEFAULT_POSITION_CPU, -1);
   private gamePhase: GamePhase = "fighting";
-  private telemetryBuffer: HitTelemetry[] = [];
+  private telemetryBuffer: CombatTelemetryEvent[] = [];
   private inputs: DualInputState = createEmptyInputs();
 
   constructor() {

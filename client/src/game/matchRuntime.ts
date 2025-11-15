@@ -42,7 +42,7 @@ import {
 } from "./combatBridge";
 import type { CharacterState, GamePhase, MatchMode } from "../lib/stores/useFighting";
 import { Controls } from "../lib/stores/useControls";
-import { recordTelemetry, drainTelemetry, type HitTelemetry } from "./combatTelemetry";
+import { recordTelemetry, drainTelemetry, type CombatTelemetryEvent } from "./combatTelemetry";
 import { DeterministicRandom } from "./prng";
 
 interface FightingActions {
@@ -100,7 +100,7 @@ interface MatchRuntimeDeps {
   getDebugMode: () => boolean;
   getMatchMode: () => MatchMode;
   getArenaStyle: () => 'open' | 'contained';
-  sendTelemetry?: (entries: HitTelemetry[]) => void;
+  sendTelemetry?: (entries: CombatTelemetryEvent[]) => void;
   onImpact?: (intensity: number) => void;
 }
 
@@ -164,6 +164,11 @@ const GUARD_REGEN_RATE = 12;
 const GUARD_REGEN_DELAY = 0.75;
 const GUARD_HOLD_DRAIN = 12;
 const STAMINA_FLOOR_RESET = Number.NEGATIVE_INFINITY;
+const TECH_INPUT_WINDOW = 0.16;
+const TECH_FAIL_GRACE = 0.06;
+const TECH_SUCCESS_IFRAMES = 0.12;
+const TECH_ROLL_DISTANCE = 1.2;
+const HARD_KNOCKDOWN_LAG = 0.5;
 
 interface ActionTimers {
   dodge: number;
@@ -176,6 +181,10 @@ interface ActionTimers {
   tauntActive: boolean;
   guardBreak: number;
   landingLag: number;
+  techWindow: number;
+  techPending: boolean;
+  techDirection: number;
+  techInvuln: number;
   coyote: number;
   jumpBuffer: number;
   inputBuffer: number;
@@ -201,6 +210,10 @@ const createActionTimers = (): ActionTimers => ({
   tauntActive: false,
   guardBreak: 0,
   landingLag: 0,
+  techWindow: 0,
+  techPending: false,
+  techDirection: 0,
+  techInvuln: 0,
   coyote: 0,
   jumpBuffer: 0,
   inputBuffer: 0,
@@ -321,6 +334,7 @@ export class MatchRuntime {
     const { delta, inputs, player, cpu } = payload;
     const matchMode = getMatchMode();
     const isLocalMultiplayer = matchMode === "local";
+    const useCircularBounds = this.deps.getArenaStyle() === "contained";
     const opponentSlot = isLocalMultiplayer ? "player2" : "cpu";
     const opponentSource = isLocalMultiplayer ? "player" : "cpu";
     const playerControls = inputs.player1;
@@ -357,6 +371,10 @@ export class MatchRuntime {
       !!prevPlayerControls.forward ||
       !!prevPlayerControls.backward;
     const justPressedHorizontal = horizontalIntent && !prevHorizontalIntent;
+    const techPressed =
+      (!!dodge && !prevPlayerControls.dodge) ||
+      (!!shield && !prevPlayerControls.shield) ||
+      (!!grab && !prevPlayerControls.grab);
 
     const cpuControlState = isLocalMultiplayer
       ? snapshotToControlFrame(opponentControls)
@@ -374,6 +392,7 @@ export class MatchRuntime {
           },
           delta,
         );
+    const cpuTechPressed = !!cpuControlState.dodge || !!cpuControlState.shield;
 
     const playerInputs: PlayerInputState = {
       attack1,
@@ -516,7 +535,10 @@ export class MatchRuntime {
       if (newHits.length) {
         let maxDamage = 0;
         newHits.forEach((hit) => {
-          if (cpu.isDodging && this.cpuTimers.dodgeInvuln > 0) {
+          if (
+            (cpu.isDodging && this.cpuTimers.dodgeInvuln > 0) ||
+            this.cpuTimers.techInvuln > 0
+          ) {
             return;
           }
           const blocking = cpu.isBlocking;
@@ -532,6 +554,9 @@ export class MatchRuntime {
             this.cpuTimers.guardRegenDelay = GUARD_REGEN_DELAY;
           } else {
             fighting.damageCPU(baseDamage);
+            if (hit.causesTrip) {
+              this.scheduleTrip("cpu", hit.knockbackVector[0]);
+            }
           }
           let [vx, vy, vz] = applyKnockbackToVelocity(cpu, hit, cpuDirectionalInfluence);
           if (blocking) {
@@ -552,6 +577,7 @@ export class MatchRuntime {
           fighting.setCPUDirection(hit.knockbackVector[0] < 0 ? -1 : 1);
           this.playerHitRegistry.add(`${hit.moveId}:${hit.hitboxId}`);
           recordTelemetry({
+            type: "hit",
             source: "player",
             slot: "player1",
             hit,
@@ -654,6 +680,9 @@ export class MatchRuntime {
             audio.playBlock();
           } else {
             fighting.damagePlayer(baseDamage);
+            if (hit.causesTrip) {
+              this.scheduleTrip("player", hit.knockbackVector[0]);
+            }
           }
           let [vx, vy, vz] = applyKnockbackToVelocity(player, hit, playerDirectionalInfluence);
           if (blocking) {
@@ -674,6 +703,7 @@ export class MatchRuntime {
           fighting.setPlayerDirection(hit.knockbackVector[0] < 0 ? -1 : 1);
           this.cpuHitRegistry.add(`${hit.moveId}:${hit.hitboxId}`);
           recordTelemetry({
+            type: "hit",
             source: opponentSource,
             slot: opponentSlot,
             hit,
@@ -707,13 +737,23 @@ export class MatchRuntime {
       this.cpuTimers.grabPending = true;
     }
 
-    this.updateCpuMovement(cpuControlState, player, cpu, delta, cpuInHitLag, audio);
+    this.updateCpuMovement(
+      cpuControlState,
+      player,
+      cpu,
+      delta,
+      cpuInHitLag,
+      audio,
+      cpuTechPressed,
+      useCircularBounds,
+    );
     this.updatePlayerMovement(
       {
         jump,
         jumpPressed,
         jumpReleased,
         justPressedHorizontal,
+        techPressed,
         forward,
         backward,
         leftward,
@@ -729,6 +769,7 @@ export class MatchRuntime {
       delta,
       playerInHitLag,
       audio,
+      useCircularBounds,
     );
 
     fighting.updateRoundTime(delta);
@@ -755,6 +796,8 @@ export class MatchRuntime {
     delta: number,
     cpuInHitLag: boolean,
     audio: AudioActions,
+    techPressed: boolean,
+    useCircularBounds: boolean,
   ) {
     const { fighting } = this.deps;
     const cpuStunned =
@@ -784,11 +827,11 @@ export class MatchRuntime {
     const cpuJustPressedHorizontal =
       cpuHorizontalIntent && !this.cpuTimers.horizontalHeld;
     this.cpuTimers.horizontalHeld = cpuHorizontalIntent;
-    const cpuGrounded = cpu.position[1] <= cpuPlatformHeight + 0.02;
+    const cpuGroundedNow = cpu.position[1] <= cpuPlatformHeight + 0.02;
     if (
       cpuHorizontalIntent &&
       cpuJustPressedHorizontal &&
-      cpuGrounded &&
+      cpuGroundedNow &&
       cpuCanAct &&
       this.cpuTimers.dashCooldown <= 0
     ) {
@@ -896,14 +939,14 @@ export class MatchRuntime {
     );
 
     const cpuOnGround = cpuNewY <= getPlatformHeight(cpu.position[0], cpu.position[2]) + 0.01;
-    if (cpuOnGround && cpu.isJumping) {
+    const cpuLandedThisFrame = cpuOnGround && cpu.isJumping;
+    if (cpuLandedThisFrame) {
       fighting.setCPUJumping(false);
       fighting.resetCPUAirJumps();
       audio.playLand();
       this.applyLandingLag("cpu");
     }
 
-    const useCircularBounds = this.deps.getArenaStyle() === 'contained';
     const cpuBounds = resolveCapsuleBounds(
       [
         cpu.position[0] + cpuVX * delta,
@@ -914,8 +957,26 @@ export class MatchRuntime {
       undefined,
       useCircularBounds,
     );
-    const [boundedX, boundedY, boundedZ] = cpuBounds.position;
-    const [boundedVX, boundedVY, boundedVZ] = cpuBounds.velocity;
+    let [boundedX, boundedY, boundedZ] = cpuBounds.position;
+    let [boundedVX, boundedVY, boundedVZ] = cpuBounds.velocity;
+    const cpuGrounded = boundedY <= getPlatformHeight(boundedX, boundedZ) + 0.02;
+    if (cpuGrounded || this.cpuTimers.techPending) {
+      const techOutcome = this.resolveTechLandingOutcome(
+        "cpu",
+        {
+          grounded: cpuGrounded,
+          landedThisFrame: cpuLandedThisFrame,
+          techPressed,
+          leftward: controlState.leftward,
+          rightward: controlState.rightward,
+        },
+        [boundedX, boundedY, boundedZ],
+        [boundedVX, boundedVY, boundedVZ],
+        useCircularBounds,
+      );
+      [boundedX, boundedY, boundedZ] = techOutcome.position;
+      [boundedVX, boundedVY, boundedVZ] = techOutcome.velocity;
+    }
 
     fighting.moveCPU(boundedX, boundedY, boundedZ);
     fighting.updateCPUVelocity(boundedVX, boundedVY, boundedVZ);
@@ -928,6 +989,7 @@ export class MatchRuntime {
       jumpPressed: boolean;
       jumpReleased: boolean;
       justPressedHorizontal: boolean;
+      techPressed: boolean;
       forward: boolean;
       backward: boolean;
       leftward: boolean;
@@ -943,6 +1005,7 @@ export class MatchRuntime {
     delta: number,
     playerInHitLag: boolean,
     audio: AudioActions,
+    useCircularBounds: boolean,
   ) {
     const { fighting, getDebugMode } = this.deps;
     const playerStunned =
@@ -1071,10 +1134,10 @@ export class MatchRuntime {
     );
     newVY = gravityVY;
 
-    if (
+    const landedThisFrame =
       player.isJumping &&
-      (Math.abs(newY - platformHeight) < 0.1 || newY <= 0.01)
-    ) {
+      (Math.abs(newY - platformHeight) < 0.1 || newY <= 0.01);
+    if (landedThisFrame) {
       fighting.setPlayerJumping(false);
       fighting.resetPlayerAirJumps();
       audio.playLand();
@@ -1159,10 +1222,28 @@ export class MatchRuntime {
 
     const proposedX = playerX + newVX * delta;
     const proposedZ = playerZ + newVZ * delta;
-    const useCircularBounds = this.deps.getArenaStyle() === 'contained';
     const bounds = resolveCapsuleBounds([proposedX, newY, proposedZ], [newVX, newVY, newVZ], undefined, useCircularBounds);
-    const [boundedX, boundedY, boundedZ] = bounds.position;
-    const [boundedVX, boundedVY, boundedVZ] = bounds.velocity;
+    let [boundedX, boundedY, boundedZ] = bounds.position;
+    let [boundedVX, boundedVY, boundedVZ] = bounds.velocity;
+    const groundedAfterMove =
+      boundedY <= getPlatformHeight(boundedX, boundedZ) + 0.02;
+    if (groundedAfterMove || this.playerTimers.techPending) {
+      const techOutcome = this.resolveTechLandingOutcome(
+        "player",
+        {
+          grounded: groundedAfterMove,
+          landedThisFrame,
+          techPressed: input.techPressed,
+          leftward: input.leftward,
+          rightward: input.rightward,
+        },
+        [boundedX, boundedY, boundedZ],
+        [boundedVX, boundedVY, boundedVZ],
+        useCircularBounds,
+      );
+      [boundedX, boundedY, boundedZ] = techOutcome.position;
+      [boundedVX, boundedVY, boundedVZ] = techOutcome.velocity;
+    }
 
     fighting.movePlayer(boundedX, boundedY, boundedZ);
     fighting.updatePlayerVelocity(boundedVX, boundedVY, boundedVZ);
@@ -1204,6 +1285,15 @@ export class MatchRuntime {
 
     if (this.playerTimers.landingLag > 0) {
       this.playerTimers.landingLag = Math.max(0, this.playerTimers.landingLag - delta);
+    }
+    if (this.playerTimers.techInvuln > 0) {
+      this.playerTimers.techInvuln = Math.max(0, this.playerTimers.techInvuln - delta);
+    }
+    if (this.playerTimers.techWindow !== 0) {
+      this.playerTimers.techWindow = Math.max(
+        -TECH_FAIL_GRACE,
+        this.playerTimers.techWindow - delta,
+      );
     }
 
     if (this.playerTimers.grab > 0) {
@@ -1288,6 +1378,15 @@ export class MatchRuntime {
     if (this.cpuTimers.landingLag > 0) {
       this.cpuTimers.landingLag = Math.max(0, this.cpuTimers.landingLag - delta);
     }
+    if (this.cpuTimers.techInvuln > 0) {
+      this.cpuTimers.techInvuln = Math.max(0, this.cpuTimers.techInvuln - delta);
+    }
+    if (this.cpuTimers.techWindow !== 0) {
+      this.cpuTimers.techWindow = Math.max(
+        -TECH_FAIL_GRACE,
+        this.cpuTimers.techWindow - delta,
+      );
+    }
 
     if (this.cpuTimers.grab > 0) {
       this.cpuTimers.grab = Math.max(0, this.cpuTimers.grab - delta);
@@ -1359,6 +1458,83 @@ export class MatchRuntime {
   private frameWithinWindow(frame: number, window: { start: number; end: number }) {
     return frame >= window.start && frame <= window.end;
   }
+
+  private resolveTechLandingOutcome(
+    target: "player" | "cpu",
+    context: {
+      grounded: boolean;
+      techPressed: boolean;
+      leftward: boolean;
+      rightward: boolean;
+    },
+    position: [number, number, number],
+    velocity: [number, number, number],
+    useCircularBounds: boolean,
+  ): { position: [number, number, number]; velocity: [number, number, number] } {
+    const timers = target === "player" ? this.playerTimers : this.cpuTimers;
+    if (!timers.techPending || !context.grounded) {
+      return { position, velocity };
+    }
+    const withinWindow = timers.techWindow > -TECH_FAIL_GRACE;
+    if (context.techPressed && withinWindow) {
+      const preferredDir =
+        context.leftward ? -1 : context.rightward ? 1 : timers.techDirection;
+      const rollOffset = preferredDir * TECH_ROLL_DISTANCE;
+      const candidate: [number, number, number] = [
+        position[0] + rollOffset,
+        position[1],
+        position[2],
+      ];
+      const adjusted = resolveCapsuleBounds(
+        candidate,
+        velocity,
+        undefined,
+        useCircularBounds,
+      );
+      timers.techPending = false;
+      timers.techWindow = 0;
+      timers.landingLag = 0;
+      timers.techInvuln = TECH_SUCCESS_IFRAMES;
+      this.recordTechTelemetry(target, "success", 0);
+      return adjusted;
+    }
+    if (timers.techWindow <= 0) {
+      timers.techPending = false;
+      timers.techWindow = 0;
+      timers.landingLag = Math.max(timers.landingLag, HARD_KNOCKDOWN_LAG);
+      this.recordTechTelemetry(target, "fail", timers.landingLag);
+    }
+    return { position, velocity };
+  }
+
+  private scheduleTrip(target: "player" | "cpu", knockbackX: number) {
+    const timers = target === "player" ? this.playerTimers : this.cpuTimers;
+    timers.techWindow = TECH_INPUT_WINDOW;
+    timers.techPending = true;
+    timers.techDirection = Math.sign(knockbackX || 0);
+  }
+
+  private recordTechTelemetry(
+    target: "player" | "cpu",
+    result: "success" | "fail",
+    landingLag: number,
+  ) {
+    const slot =
+      target === "player"
+        ? "player1"
+        : this.deps.getMatchMode() === "local"
+          ? "player2"
+          : "cpu";
+    recordTelemetry({
+      type: "tech",
+      source: target,
+      slot,
+      result,
+      landingLag,
+      timestamp: performance.now(),
+    });
+  }
+
 }
 
 type InfluenceSnapshot = Partial<Record<"leftward" | "rightward" | "jump" | "backward", boolean>>;

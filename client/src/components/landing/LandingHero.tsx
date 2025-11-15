@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState } from "react";
 import { CharacterPreview } from "../preview/CharacterPreview";
 import { heroBadges } from "../../data/landingContent";
-import { MatchMode } from "../../lib/stores/useFighting";
+import { MatchMode, useFighting } from "../../lib/stores/useFighting";
 import { motion } from "framer-motion";
+import { ARENA_THEMES } from "../../game/arenas";
 
 interface LandingHeroProps {
   onPlay: () => void;
@@ -31,6 +32,7 @@ export function LandingHero({
   masterVolume,
   onVolumeChange,
 }: LandingHeroProps) {
+  const { arenaId, setArenaId } = useFighting();
   const sectionRef = useRef<HTMLElement | null>(null);
   const [heroInView, setHeroInView] = useState(false);
   const [secondPreviewReady, setSecondPreviewReady] = useState(false);
@@ -159,6 +161,33 @@ export function LandingHero({
               />
             </div>
           </div>
+          
+          {/* Arena Selection */}
+          <div className="rounded-2xl border border-white/10 bg-black/30 p-4 backdrop-blur">
+            <div className="mb-3 flex items-center gap-2">
+              <span className="text-lg">🏟️</span>
+              <span className="text-sm font-semibold text-white/90">Arena Selection</span>
+            </div>
+            <div className="mb-3 flex flex-wrap gap-2">
+              {Object.values(ARENA_THEMES).map((arena) => (
+                <button
+                  key={arena.id}
+                  onClick={() => setArenaId(arena.id)}
+                  className={`rounded-full px-4 py-2 text-xs font-semibold uppercase tracking-wide transition ${
+                    arenaId === arena.id
+                      ? "bg-emerald-500 text-white"
+                      : "border border-white/20 text-white/70 hover:bg-white/10 hover:text-white"
+                  }`}
+                >
+                  {arena.name}
+                </button>
+              ))}
+            </div>
+            <p className="text-xs text-white/60">
+              {ARENA_THEMES[arenaId]?.description || "Select an arena to view details"}
+            </p>
+          </div>
+          
           {showControllerPrompt && (
             <div className="rounded-xl border border-white/20 bg-white/10 px-3 py-2 text-xs font-semibold uppercase tracking-wide text-white/90">
               Press any button on your controller to add Player 2

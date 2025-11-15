@@ -1,19 +1,22 @@
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { useAudio } from '../lib/stores/useAudio';
 
 /**
- * Hook to automatically start music on first user interaction
- * This handles browser autoplay policies by waiting for any user gesture
+ * Hook to automatically start music on first user interaction (backup for autoplay blocking)
+ * This is a safety net - autoplay is attempted first, but if blocked, 
+ * this catches the first user gesture and starts music then.
  */
 export function useAutoStartMusic() {
-  const { ensureMusicPlaying, autoplayBlocked } = useAudio();
+  const { ensureMusicPlaying } = useAudio();
+  const hasStartedRef = useRef(false);
 
   useEffect(() => {
-    // Only set up listener if autoplay is blocked
-    if (!autoplayBlocked) return;
-
     const handleFirstInteraction = () => {
-      // Try to start music on first user interaction
+      // Only run once
+      if (hasStartedRef.current) return;
+      hasStartedRef.current = true;
+      
+      // Try to start music on first user interaction (backup for autoplay)
       ensureMusicPlaying();
       
       // Remove listeners after first interaction
@@ -22,7 +25,7 @@ export function useAutoStartMusic() {
       document.removeEventListener('touchstart', handleFirstInteraction);
     };
 
-    // Listen for any user interaction
+    // Always set up listeners as backup (autoplay is attempted separately in App.tsx)
     document.addEventListener('click', handleFirstInteraction);
     document.addEventListener('keydown', handleFirstInteraction);
     document.addEventListener('touchstart', handleFirstInteraction);
@@ -32,5 +35,5 @@ export function useAutoStartMusic() {
       document.removeEventListener('keydown', handleFirstInteraction);
       document.removeEventListener('touchstart', handleFirstInteraction);
     };
-  }, [autoplayBlocked, ensureMusicPlaying]);
+  }, [ensureMusicPlaying]);
 }

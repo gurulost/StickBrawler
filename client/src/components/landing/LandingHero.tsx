@@ -3,7 +3,6 @@ import { CharacterPreview } from "../preview/CharacterPreview";
 import { heroBadges } from "../../data/landingContent";
 import { MatchMode } from "../../lib/stores/useFighting";
 import { motion } from "framer-motion";
-import { useAudio } from "../../lib/stores/useAudio";
 
 interface LandingHeroProps {
   onPlay: () => void;
@@ -43,13 +42,6 @@ export function LandingHero({
   const [secondPreviewReady, setSecondPreviewReady] = useState(false);
   const [showControllerPrompt, setShowControllerPrompt] = useState(false);
   const selectedArena = arenaOptions.find((arena) => arena.id === arenaId);
-  const { ensureMusicPlaying } = useAudio();
-  
-  const handlePlay = () => {
-    // User gesture - perfect time to ensure music is playing
-    ensureMusicPlaying();
-    onPlay();
-  };
 
   useEffect(() => {
     const observer = new IntersectionObserver(
@@ -144,7 +136,7 @@ export function LandingHero({
           </div>
           <div className="flex flex-wrap gap-3 pt-2">
             <button
-              onClick={handlePlay}
+              onClick={onPlay}
               className="rounded-full bg-white px-6 py-3 text-sm font-semibold uppercase tracking-wide text-slate-950 transition hover:scale-[1.02]"
             >
               Enter Arena ({matchMode === "single" ? "Single" : "Local 2P"})

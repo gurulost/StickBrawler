@@ -1,6 +1,6 @@
 // Constants for physics calculations
 export const GRAVITY = 30; // Gravity acceleration per second² (brings player down)
-export const JUMP_FORCE = 10; // Jump velocity (units per second - initial upward velocity)
+export const JUMP_FORCE = 21; // Jump velocity (units per second - initial upward velocity)
 export const PLAYER_SPEED = 8; // Movement speed (units per second) - multiplied by delta in runtime
 export const CPU_SPEED = 7; // CPU movement speed (units per second)
 export const DRAG = 0.92; // Increased drag for smoother movement
@@ -19,6 +19,10 @@ export const FLOOR_FRICTION = 0.82;
 export const AIR_FRICTION = 0.97;
 export const WALL_BOUNCE_RESTITUTION = 0.35;
 export const HIT_LAG_DECAY = 0.9;
+export const GROUND_ACCELERATION = 55;
+export const AIR_ACCELERATION = 28;
+export const GROUND_DECELERATION = 60;
+export const AIR_DECELERATION = 24;
 
 // Attack parameters (further reduced damage per hit for better balance)
 export const PUNCH_DAMAGE = 2; // Reduced from 3
@@ -29,8 +33,8 @@ export const ATTACK_RANGE = 1.5; // Kept the same for consistent hit detection
 // Combo system constants
 export const COMBO_WINDOW = 800; // Time window in ms to chain attacks for combos
 export const COMBO_MULTIPLIER = 1.2; // Damage multiplier for each hit in a combo
-export const FAST_FALL_MULTIPLIER = 1.7;
-export const MAX_FALL_SPEED = 0.9;
+export const FAST_FALL_MULTIPLIER = 1.5;
+export const MAX_FALL_SPEED = 1.2;
 
 // Platform system for multi-level combat
 export interface Platform {
@@ -220,6 +224,16 @@ export function applyHorizontalFriction(
 // Containment arena constants
 export const CONTAINMENT_RADIUS = Math.min(ARENA_WIDTH, ARENA_DEPTH) * 0.47; // Match the arena visual radius
 
+export function moveTowards(
+  current: number,
+  target: number,
+  maxDelta: number,
+): number {
+  if (Math.abs(target - current) <= maxDelta) {
+    return target;
+  }
+  return current + Math.sign(target - current) * maxDelta;
+}
 export function resolveCapsuleBounds(
   position: [number, number, number],
   velocity: [number, number, number],

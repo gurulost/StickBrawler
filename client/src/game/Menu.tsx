@@ -7,12 +7,13 @@ import { Leaderboard } from "../components/ui/leaderboard";
 import { AuthModal } from "../components/ui/auth-modal";
 import { LandingHero } from "../components/landing/LandingHero";
 import { FeatureGrid } from "../components/landing/FeatureGrid";
+import { ARENA_OPTIONS } from "./arenas";
 import { OnlineMultiplayer } from "../components/online/OnlineMultiplayer";
 
 type Panel = "main" | "customization" | "leaderboard" | "controls" | "online";
 
 const Menu = () => {
-  const { startGame, matchMode, setMatchMode } = useFighting();
+  const { startGame, matchMode, setMatchMode, arenaId, setArenaId } = useFighting();
   const { playBackgroundMusic, toggleMute, isMuted, setMasterVolume, masterVolume } = useAudio();
   const { user, status, logout } = useAuth();
   const [activePanel, setActivePanel] = useState<Panel>("main");
@@ -139,21 +140,17 @@ const Menu = () => {
               <div className="rounded-2xl border border-white/10 bg-gradient-to-br from-slate-900/80 to-slate-950/80 p-6">
                 <h3 className="text-lg font-semibold text-white">Keyboard</h3>
                 <div className="mt-4 grid gap-4 md:grid-cols-2">
-                  <ControlCard title="Movement">
-                    <KeyRow keys={["W", "A", "S", "D"]} description="Move / strafe" />
-                    <KeyRow keys={["Space"]} description="Jump" />
-                    <KeyRow keys={["Shift"]} description="Dodge" />
-                  </ControlCard>
-                  <ControlCard title="Combat">
-                    <KeyRow keys={["J"]} description="Light attack" />
-                    <KeyRow keys={["K"]} description="Heavy attack" />
-                    <KeyRow keys={["L"]} description="Guard" />
-                    <KeyRow keys={["E"]} description="Air attack" />
-                  </ControlCard>
-                  <ControlCard title="Tech">
-                    <KeyRow keys={["G"]} description="Grab" />
-                    <KeyRow keys={["T"]} description="Taunt" />
-                  </ControlCard>
+                  {bindingSets.map((set) => (
+                    <ControlCard key={set.title} title={set.title} subtitle={set.subtitle}>
+                      {set.bindings.map((binding) => (
+                        <KeyRow
+                          key={`${set.title}-${binding.description}`}
+                          keys={binding.keys}
+                          description={binding.description}
+                        />
+                      ))}
+                    </ControlCard>
+                  ))}
                   <ControlCard title="Ink Tools">
                     <p className="text-sm text-white/70">Use HUD buttons to toggle Silhouette Overlay & cycle Ink Quality.</p>
                   </ControlCard>
@@ -189,6 +186,9 @@ const Menu = () => {
               toggleMute={toggleMute}
               masterVolume={masterVolume}
               onVolumeChange={handleVolumeChange}
+              arenaId={arenaId}
+              arenaOptions={ARENA_OPTIONS}
+              onArenaSelect={setArenaId}
             />
             <FeatureGrid />
           </>
@@ -278,11 +278,22 @@ const NavButton = ({
   </button>
 );
 
-const ControlCard = ({ title, children }: { title: string; children: ReactNode }) => (
-  <div className="rounded-2xl border border-white/10 bg-black/30 p-4 text-sm text-white/80">
-    <p className="mb-2 text-base font-semibold text-white">{title}</p>
-    <div className="space-y-1">{children}</div>
-  </div>
+const ControlCard = ({
+  title,
+  subtitle,
+  children,
+}: {
+  title: string;
+  subtitle?: string;
+  children: ReactNode;
+}) => (
+  <details className="rounded-2xl border border-white/10 bg-black/30 p-4 text-sm text-white/80" open>
+    <summary className="cursor-pointer list-none">
+      <p className="text-base font-semibold text-white">{title}</p>
+      {subtitle && <p className="text-xs text-white/60">{subtitle}</p>}
+    </summary>
+    <div className="mt-3 space-y-1">{children}</div>
+  </details>
 );
 
 const KeyRow = ({
@@ -312,3 +323,34 @@ const KeyRow = ({
 );
 
 export default Menu;
+const bindingSets = [
+  {
+    title: "Player 1",
+    subtitle: "WASD for movement · 1/2/3 for attacks",
+    bindings: [
+      { keys: ["W / S"], description: "Forward / Backward" },
+      { keys: ["A / D"], description: "Left / Right" },
+      { keys: ["Space"], description: "Jump" },
+      { keys: ["1 / 2 / 3"], description: "Light / Heavy / Guard" },
+      { keys: ["Q"], description: "Special" },
+      { keys: ["E"], description: "Air attack" },
+      { keys: ["Shift"], description: "Dodge" },
+      { keys: ["G"], description: "Grab" },
+      { keys: ["T"], description: "Taunt" },
+    ],
+  },
+  {
+    title: "Player 2",
+    subtitle: "Arrow keys for movement · J/K/L for attacks",
+    bindings: [
+      { keys: ["↑ / ↓"], description: "Forward / Backward" },
+      { keys: ["← / →"], description: "Left / Right" },
+      { keys: ["Right Ctrl"], description: "Jump" },
+      { keys: ["J / K / L"], description: "Light / Heavy / Guard" },
+      { keys: ["Enter"], description: "Special" },
+      { keys: ["Shift (Right)"], description: "Air attack" },
+      { keys: ["Slash"], description: "Dodge" },
+      { keys: ["[" , "]"], description: "Taunt / Grab" },
+    ],
+  },
+];

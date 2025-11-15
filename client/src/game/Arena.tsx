@@ -184,9 +184,7 @@ const OpenArena = ({ theme, gradientTexture, skylineTexture }: {
       
       {/* Lighting */}
       <hemisphereLight 
-        skyColor={theme.lighting.hemisphereTop} 
-        groundColor={theme.lighting.hemisphereBottom} 
-        intensity={theme.lighting.hemisphereIntensity} 
+        args={[theme.lighting.hemisphereTop, theme.lighting.hemisphereBottom, theme.lighting.hemisphereIntensity]} 
       />
       <directionalLight 
         intensity={theme.lighting.directionalIntensity} 
@@ -371,7 +369,9 @@ const ContainmentArena = ({ theme, gradientTexture, skylineTexture }: {
       ))}
 
       {/* Lighting */}
-      <hemisphereLight args={[theme.lighting.hemisphereTop, theme.lighting.hemisphereBottom, theme.lighting.hemisphereIntensity]} />
+      <hemisphereLight 
+        args={[theme.lighting.hemisphereTop, theme.lighting.hemisphereBottom, theme.lighting.hemisphereIntensity]} 
+      />
       <directionalLight
         intensity={theme.lighting.directionalIntensity}
         position={[ARENA_WIDTH * 0.35, Math.max(ARENA_WIDTH, ARENA_DEPTH) * 0.6, ARENA_DEPTH * 0.35]}

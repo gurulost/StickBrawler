@@ -9,6 +9,7 @@ import { useControls } from "../lib/stores/useControls";
 import { MatchRuntime } from "./matchRuntime";
 import type { HitTelemetry } from "./combatTelemetry";
 import { useEffects } from "../lib/stores/useEffects";
+import { ARENA_THEMES } from "./arenas";
 
 const GameManager = () => {
   const fighting = useFighting();
@@ -133,6 +134,9 @@ const GameManager = () => {
   }, []);
 
   const runtimeRef = useRef<MatchRuntime>();
+  const arenaStyleRef = useRef<'open' | 'contained'>(
+    ARENA_THEMES[fighting.arenaId]?.style || 'open'
+  );
   const cameraBaseRef = useRef<[number, number, number] | null>(null);
   const handleImpact = useCallback(
     (intensity: number) => {
@@ -151,6 +155,11 @@ const GameManager = () => {
     cpuSnapshotRef.current = fighting.cpu;
   }, [fighting.player, fighting.cpu]);
 
+  // Update arena style ref when arenaId changes
+  useEffect(() => {
+    arenaStyleRef.current = ARENA_THEMES[fighting.arenaId]?.style || 'open';
+  }, [fighting.arenaId]);
+
   useEffect(() => {
     if (runtimeRef.current) return;
     runtimeRef.current = new MatchRuntime(
@@ -159,6 +168,7 @@ const GameManager = () => {
         audio: audioActions,
         getDebugMode: () => useControls.getState().debugMode,
         getMatchMode: () => useFighting.getState().matchMode,
+        getArenaStyle: () => arenaStyleRef.current,
         onImpact: handleImpact,
         sendTelemetry,
       },

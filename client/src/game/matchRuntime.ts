@@ -85,6 +85,7 @@ interface MatchRuntimeDeps {
   audio: AudioActions;
   getDebugMode: () => boolean;
   getMatchMode: () => MatchMode;
+  getArenaStyle: () => 'open' | 'contained';
   sendTelemetry?: (entries: HitTelemetry[]) => void;
   onImpact?: (intensity: number) => void;
 }
@@ -715,6 +716,7 @@ export class MatchRuntime {
       audio.playLand();
     }
 
+    const useCircularBounds = this.deps.getArenaStyle() === 'contained';
     const cpuBounds = resolveCapsuleBounds(
       [
         cpu.position[0] + cpuVX * delta,
@@ -722,6 +724,8 @@ export class MatchRuntime {
         cpu.position[2] + cpuVZ * delta,
       ],
       [cpuVX, cpuNewVY, cpuVZ],
+      undefined,
+      useCircularBounds,
     );
     const [boundedX, boundedY, boundedZ] = cpuBounds.position;
     const [boundedVX, boundedVY, boundedVZ] = cpuBounds.velocity;
@@ -885,7 +889,8 @@ export class MatchRuntime {
 
     const proposedX = playerX + newVX * delta;
     const proposedZ = playerZ + newVZ * delta;
-    const bounds = resolveCapsuleBounds([proposedX, newY, proposedZ], [newVX, newVY, newVZ]);
+    const useCircularBounds = this.deps.getArenaStyle() === 'contained';
+    const bounds = resolveCapsuleBounds([proposedX, newY, proposedZ], [newVX, newVY, newVZ], undefined, useCircularBounds);
     const [boundedX, boundedY, boundedZ] = bounds.position;
     const [boundedVX, boundedVY, boundedVZ] = bounds.velocity;
 

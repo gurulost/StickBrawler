@@ -217,10 +217,14 @@ export function applyHorizontalFriction(
   return velocity * factor;
 }
 
+// Containment arena constants
+export const CONTAINMENT_RADIUS = Math.min(ARENA_WIDTH, ARENA_DEPTH) * 0.47; // Match the arena visual radius
+
 export function resolveCapsuleBounds(
   position: [number, number, number],
   velocity: [number, number, number],
   capsuleRadius: number = CAPSULE_RADIUS,
+  useCircularBounds: boolean = false,
 ): {
   position: [number, number, number];
   velocity: [number, number, number];
@@ -228,24 +232,47 @@ export function resolveCapsuleBounds(
   let [x, y, z] = position;
   let [vx, vy, vz] = velocity;
 
-  const minX = -ARENA_HALF_WIDTH + capsuleRadius;
-  const maxX = ARENA_HALF_WIDTH - capsuleRadius;
-  if (x < minX) {
-    x = minX;
-    vx = Math.abs(vx) * WALL_BOUNCE_RESTITUTION;
-  } else if (x > maxX) {
-    x = maxX;
-    vx = -Math.abs(vx) * WALL_BOUNCE_RESTITUTION;
-  }
+  if (useCircularBounds) {
+    // Circular boundary (for Containment Arena)
+    const distanceFromCenter = Math.sqrt(x * x + z * z);
+    const maxRadius = CONTAINMENT_RADIUS - capsuleRadius;
+    
+    if (distanceFromCenter > maxRadius) {
+      // Character is outside the circular boundary - push them back
+      // Calculate normal vector BEFORE clamping position
+      const normalX = x / distanceFromCenter;
+      const normalZ = z / distanceFromCenter;
+      
+      // Clamp position to the boundary
+      x = normalX * maxRadius;
+      z = normalZ * maxRadius;
+      
+      // Reflect velocity to bounce off the circular wall using the normalized normal
+      const dotProduct = vx * normalX + vz * normalZ;
+      vx = (vx - 2 * dotProduct * normalX) * WALL_BOUNCE_RESTITUTION;
+      vz = (vz - 2 * dotProduct * normalZ) * WALL_BOUNCE_RESTITUTION;
+    }
+  } else {
+    // Rectangular boundary (for open arenas)
+    const minX = -ARENA_HALF_WIDTH + capsuleRadius;
+    const maxX = ARENA_HALF_WIDTH - capsuleRadius;
+    if (x < minX) {
+      x = minX;
+      vx = Math.abs(vx) * WALL_BOUNCE_RESTITUTION;
+    } else if (x > maxX) {
+      x = maxX;
+      vx = -Math.abs(vx) * WALL_BOUNCE_RESTITUTION;
+    }
 
-  const minZ = -ARENA_HALF_DEPTH + capsuleRadius;
-  const maxZ = ARENA_HALF_DEPTH - capsuleRadius;
-  if (z < minZ) {
-    z = minZ;
-    vz = Math.abs(vz) * WALL_BOUNCE_RESTITUTION;
-  } else if (z > maxZ) {
-    z = maxZ;
-    vz = -Math.abs(vz) * WALL_BOUNCE_RESTITUTION;
+    const minZ = -ARENA_HALF_DEPTH + capsuleRadius;
+    const maxZ = ARENA_HALF_DEPTH - capsuleRadius;
+    if (z < minZ) {
+      z = minZ;
+      vz = Math.abs(vz) * WALL_BOUNCE_RESTITUTION;
+    } else if (z > maxZ) {
+      z = maxZ;
+      vz = -Math.abs(vz) * WALL_BOUNCE_RESTITUTION;
+    }
   }
 
   return {

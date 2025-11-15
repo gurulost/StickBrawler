@@ -210,9 +210,11 @@ export const useAudio = create<AudioState>((set, get) => ({
     let newTrack: HTMLAudioElement | null = null;
     
     if (context === 'menu') {
-      // Use current menu theme (cycles through all menu themes)
+      // Use current menu theme and advance to next one for next menu visit
       if (menuThemes.length > 0) {
         newTrack = menuThemes[currentMenuThemeIndex % menuThemes.length];
+        // Cycle to next menu theme (wraps around with modulo)
+        set({ currentMenuThemeIndex: (currentMenuThemeIndex + 1) % menuThemes.length });
       }
     } else if (context === 'fighting') {
       // Use current battle theme and advance to next one for next fight

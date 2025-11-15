@@ -3,7 +3,6 @@ import { ARENA_WIDTH, FLOOR_Y, PLATFORMS, ARENA_DEPTH } from "./Physics";
 import {
   getArenaTheme,
   ARENA_THEMES,
-  DEFAULT_ARENA,
   type ArenaTheme,
 } from "./arenas";
 import * as THREE from "three";

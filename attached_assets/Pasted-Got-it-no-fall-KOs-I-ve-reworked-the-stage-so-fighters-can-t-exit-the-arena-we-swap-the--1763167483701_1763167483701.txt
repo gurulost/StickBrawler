@@ -1,0 +1,236 @@
+Got it — **no fall KOs**. I’ve reworked the stage so fighters **can’t exit the arena**: we swap the “blast‑zone” idea for a **low‑occlusion containment shield** that keeps everyone in-bounds while preserving 3D combat readability. I also tightened lighting, depth cues, and platform clarity. (This replaces the decorative walls/columns and pastel props from your current file, which created occlusion and implied ring‑outs. )
+
+### What changed & why (combat-first)
+
+* **Containment, not ring‑outs:** A clear **energy shield** (circular, continuous) prevents leaving the arena. To make it robust for different physics setups, I also add **thin segmented collider rails** around the circumference (box segments). If your physics uses mesh colliders, these will block; if you use kill‑planes, just disable those in `Physics`.
+* **3D readability:** Keep the **polar grid** and a thin **octagonal ring** lip to read angles, distance, and edge play without occlusion.
+* **Platforms:** Still rendered directly from `PLATFORMS` with **no vertical posts** (nothing hides fighters).
+* **Camera & spawning:** Four spawn pads positioned for symmetric coverage; no tall props in the center.
+* **Visuals:** Clean sky/floor gradients, soft metals, subtle emissions; strong key + fill lighting for legibility.
+
+---
+
+## Drop‑in replacement — `Arena.tsx`
+
+Paste this over your file. No new deps; just `three` / R3F primitives. Comments flag fighter‑relevant choices.
+
+```tsx
+import { useEffect, useMemo } from "react";
+import { ARENA_WIDTH, ARENA_DEPTH, FLOOR_Y, PLATFORMS } from "./Physics";
+import * as THREE from "three";
+
+/** SSR-safe tiny gradient texture */
+const createGradientTexture = (top: string, bottom: string) => {
+  if (typeof document === "undefined") return null;
+  const canvas = document.createElement("canvas");
+  canvas.width = 256;
+  canvas.height = 256;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) return null;
+  const g = ctx.createLinearGradient(0, 0, 0, canvas.height);
+  g.addColorStop(0, top);
+  g.addColorStop(1, bottom);
+  ctx.fillStyle = g;
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  const tex = new THREE.CanvasTexture(canvas);
+  tex.needsUpdate = true;
+  return tex;
+};
+
+const Arena = () => {
+  // === Core layout (scaled to arena) ===
+  const baseSize = Math.min(ARENA_WIDTH, ARENA_DEPTH);
+  const ringRadius = baseSize * 0.34;            // main fighting zone
+  const wallRadius = baseSize * 0.47;            // containment wall center radius
+  const ringThickness = 0.08;                     // subtle lip for edge readability
+  const wallHeight = baseSize * 0.22;             // tall enough to prevent jump-outs
+  const wallSegments = 16;                        // segmented rails: good for physics + visuals
+  const railThickness = Math.max(0.15, baseSize * 0.006);
+
+  // === Textures ===
+  const skyTex = useMemo(() => createGradientTexture("#eaf2ff", "#f8fbff"), []);
+  const floorTex = useMemo(() => createGradientTexture("#fcfcff", "#f2f6fb"), []);
+  useEffect(() => () => { skyTex?.dispose(); floorTex?.dispose(); }, [skyTex, floorTex]);
+
+  // === Polar grid (depth/angle cues) ===
+  const polarGrid = useMemo(() => {
+    const g = new THREE.PolarGridHelper(wallRadius * 1.02, 16, 8, 96, 0x9fb3c8, 0xdee5ef);
+    (g.material as THREE.Material).transparent = true;
+    (g.material as THREE.Material).opacity = 0.35;
+    g.position.y = FLOOR_Y + 0.012;
+    return g;
+  }, [wallRadius]);
+  useEffect(() => () => { polarGrid.geometry.dispose(); }, [polarGrid]);
+
+  // === Shared bits ===
+  const spawnPadGeom = useMemo(() => new THREE.CylinderGeometry(0.9, 0.9, 0.04, 32), []);
+  const spawnPadMat = useMemo(
+    () => new THREE.MeshStandardMaterial({
+      color: "#b9d4ff",
+      roughness: 0.4,
+      metalness: 0.05,
+      emissive: "#d0e2ff",
+      emissiveIntensity: 0.2
+    }),
+    []
+  );
+  useEffect(() => () => { spawnPadGeom.dispose(); spawnPadMat.dispose?.(); }, [spawnPadGeom, spawnPadMat]);
+
+  const spawnPoints = useMemo<[number, number, number][]>(() => {
+    const r = ringRadius * 0.72;
+    return [
+      [-r, FLOOR_Y + 0.022, 0],
+      [ r, FLOOR_Y + 0.022, 0],
+      [0, FLOOR_Y + 0.022, -r],
+      [0, FLOOR_Y + 0.022,  r],
+    ];
+  }, [ringRadius]);
+
+  // === Containment rails (segmented boxes) ===
+  const railInstances = useMemo(() => {
+    const segAngle = (Math.PI * 2) / wallSegments;
+    const chord = 2 * wallRadius * Math.sin(segAngle / 2); // segment length along tangent
+    const pieces = [];
+    for (let i = 0; i < wallSegments; i++) {
+      const a = i * segAngle;
+      const x = wallRadius * Math.cos(a);
+      const z = wallRadius * Math.sin(a);
+      pieces.push({ x, z, rotY: a, chord });
+    }
+    return pieces;
+  }, [wallRadius, wallSegments]);
+
+  return (
+    <group>
+      {/* Sky dome */}
+      <mesh>
+        <sphereGeometry args={[Math.max(ARENA_WIDTH, ARENA_DEPTH) * 2.2, 32, 32]} />
+        <meshBasicMaterial map={skyTex ?? undefined} side={THREE.BackSide} />
+      </mesh>
+
+      {/* Ground plane (keep full size for your Physics bounds) */}
+      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, FLOOR_Y, 0]} receiveShadow>
+        <planeGeometry args={[ARENA_WIDTH, ARENA_DEPTH]} />
+        <meshStandardMaterial
+          map={floorTex ?? undefined}
+          color="#f8fafc"
+          roughness={0.9}
+          metalness={0.03}
+        />
+      </mesh>
+
+      {/* Depth and angle readability */}
+      <primitive object={polarGrid} />
+
+      {/* Central octagonal ring lip (visual only; tiny height) */}
+      <mesh position={[0, FLOOR_Y + ringThickness / 2, 0]} castShadow receiveShadow>
+        <cylinderGeometry args={[ringRadius, ringRadius, ringThickness, 8]} />
+        <meshStandardMaterial color="#e8edf5" roughness={0.55} metalness={0.05} />
+      </mesh>
+      {/* Inset highlight for edge read */}
+      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, FLOOR_Y + ringThickness + 0.005, 0]}>
+        <ringGeometry args={[ringRadius * 0.92, ringRadius * 0.98, 64]} />
+        <meshBasicMaterial color="#9fb3c8" transparent opacity={0.55} />
+      </mesh>
+
+      {/* ===== Containment wall: fighters cannot exit (no fall KOs) ===== */}
+      {/* Visual shield (low-occlusion "glass"); height chosen to stop jumps */}
+      <mesh position={[0, FLOOR_Y + wallHeight / 2, 0]}>
+        <cylinderGeometry args={[wallRadius, wallRadius, wallHeight, 64, 1, true]} />
+        {/* Physical-looking but light—if your physics uses mesh colliders, you may rely on the segments below for best results */}
+        <meshPhysicalMaterial
+          transparent
+          transmission={0.75}
+          thickness={0.15}
+          roughness={0.2}
+          metalness={0.0}
+          color="#cfe0ff"
+          side={THREE.DoubleSide}
+        />
+      </mesh>
+      {/* Slim top/bottom rails for silhouette clarity */}
+      <mesh position={[0, FLOOR_Y + wallHeight + 0.02, 0]}>
+        <torusGeometry args={[wallRadius, railThickness * 0.6, 8, 128]} />
+        <meshStandardMaterial color="#aebed3" roughness={0.4} metalness={0.6} />
+      </mesh>
+      <mesh position={[0, FLOOR_Y + 0.02, 0]}>
+        <torusGeometry args={[wallRadius, railThickness * 0.6, 8, 128]} />
+        <meshStandardMaterial color="#aebed3" roughness={0.4} metalness={0.6} />
+      </mesh>
+
+      {/* Segmented collider rails (box pieces) — reliable blockers in many physics setups */}
+      {railInstances.map(({ x, z, rotY, chord }, i) => (
+        <mesh
+          key={`rail-${i}`}
+          position={[x, FLOOR_Y + wallHeight / 2, z]}
+          rotation={[0, rotY, 0]}
+          castShadow
+          receiveShadow
+        >
+          {/* Thin radial thickness, tangent length, full height */}
+          <boxGeometry args={[railThickness, wallHeight, Math.max(chord * 0.98, railThickness * 2)]} />
+          <meshStandardMaterial color="#c7d4e6" transparent opacity={0.25} metalness={0.3} roughness={0.6} />
+        </mesh>
+      ))}
+
+      {/* Platforms from PLATFORMS (no occluding posts) */}
+      {PLATFORMS.map((p, i) => {
+        const w = p.x2 - p.x1;
+        const d = p.z2 - p.z1;
+        const cx = (p.x1 + p.x2) / 2;
+        const cz = (p.z1 + p.z2) / 2;
+        const y = p.y;
+        const haloR = Math.min(w, d) * 0.49;
+
+        return (
+          <group key={`platform-${i}`}>
+            <mesh position={[cx, y, cz]} castShadow receiveShadow>
+              <boxGeometry args={[w, 0.24, d]} />
+              <meshStandardMaterial color="#e9eef6" roughness={0.45} metalness={0.05} />
+            </mesh>
+            {/* Under‑glow halo: height legibility without blocking */}
+            <mesh rotation={[-Math.PI / 2, 0, 0]} position={[cx, y + 0.13, cz]}>
+              <ringGeometry args={[haloR * 0.93, haloR, 48]} />
+              <meshBasicMaterial color="#c7d3e5" transparent opacity={0.35} />
+            </mesh>
+          </group>
+        );
+      })}
+
+      {/* Spawn pads (symmetric & camera-safe) */}
+      {spawnPoints.map((pos, i) => (
+        <mesh key={`spawn-${i}`} position={pos} castShadow receiveShadow geometry={spawnPadGeom} material={spawnPadMat} />
+      ))}
+
+      {/* Lighting: strong key, hemisphere fill, cool kicker */}
+      <hemisphereLight args={["#eef4ff", "#f0f4f7", 0.9]} />
+      <directionalLight
+        intensity={0.95}
+        position={[ARENA_WIDTH * 0.35, Math.max(ARENA_WIDTH, ARENA_DEPTH) * 0.6, ARENA_DEPTH * 0.35]}
+        castShadow
+        shadow-mapSize={[2048, 2048]}
+        shadow-camera-left={-wallRadius}
+        shadow-camera-right={wallRadius}
+        shadow-camera-top={wallRadius}
+        shadow-camera-bottom={-wallRadius}
+      />
+      <pointLight intensity={0.5} position={[-wallRadius * 0.6, wallRadius * 0.5, -wallRadius * 0.6]} color="#bcd3ff" />
+    </group>
+  );
+};
+
+export default Arena;
+```
+
+### Integration notes (important)
+
+* **No fall KOs:** This stage **visually and physically** encloses the fight. If your physics currently has “kill planes” tied to `ARENA_WIDTH/DEPTH`, **disable those** so leaving bounds doesn’t trigger a KO. If your physics engine needs explicit colliders (not auto‑derived from meshes), mirror the **segmented rail ring** in `Physics` as static colliders at radius `wallRadius`.
+* **Performance:** Everything reuses simple materials, tiny canvas textures, and shared resources; rail segments are low‑poly box meshes.
+* **Tuning knobs** (top of file): `wallHeight`, `wallSegments`, `railThickness`, and `ringRadius`.
+
+---
+
+**Confidence**
+
+* **High** that this meets your “no fall KOs” requirement and improves 3D combat readability.
+* **Medium** that the segmented rails will act as colliders **without** any Physics changes (depends on how your engine binds colliders to meshes). If collisions are defined strictly in `Physics`, add ring colliders there at `wallRadius` & `wallHeight` and keep this visual setup.

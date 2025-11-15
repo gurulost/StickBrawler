@@ -16,6 +16,14 @@ import {
   GROUND_DECELERATION,
   AIR_DECELERATION,
   moveTowards,
+  COYOTE_TIME,
+  JUMP_BUFFER,
+  INPUT_BUFFER,
+  INITIAL_DASH_MULTIPLIER,
+  INITIAL_DASH_COOLDOWN,
+  INITIAL_DASH_TURN_LOCK,
+  SHORT_HOP_WINDOW,
+  SHORT_HOP_FORCE_SCALE,
 } from "./Physics";
 import {
   CombatStateMachine,
@@ -141,23 +149,70 @@ const DODGE_DURATION = 0.3;
 const GRAB_RESOLVE_DELAY = 0.4;
 const TAUNT_DURATION = 1.2;
 const GUARD_BREAK_STUN = 1.05;
+const DODGE_INVULN_DURATION = 0.18;
+const DODGE_TRAVEL_DURATION = 0.12;
+const DODGE_RECOVERY_DURATION = 0.1;
+const DODGE_BASE_STAMINA_COST = 20;
+const DODGE_CHAIN_COST = 5;
+const DODGE_CHAIN_WINDOW = 3;
+const DODGE_STAMINA_REGEN_DELAY = 0.6;
+const CHIP_DAMAGE_RATIO = 0.12;
+const MIN_CHIP_DAMAGE = 1;
+const BLOCK_PUSH_SCALE = 0.06;
+const BLOCK_PUSH_MAX = 5;
+const GUARD_REGEN_RATE = 12;
+const GUARD_REGEN_DELAY = 0.75;
+const GUARD_HOLD_DRAIN = 12;
+const STAMINA_FLOOR_RESET = Number.NEGATIVE_INFINITY;
 
 interface ActionTimers {
   dodge: number;
+  dodgeInvuln: number;
+  dodgeTravelPhase: number;
+  dodgeRecoveryPhase: number;
   grab: number;
   grabPending: boolean;
   taunt: number;
   tauntActive: boolean;
   guardBreak: number;
+  landingLag: number;
+  coyote: number;
+  jumpBuffer: number;
+  inputBuffer: number;
+  dashCooldown: number;
+  turnLock: number;
+  shortHopWindow: number;
+  horizontalHeld: boolean;
+  guardRegenDelay: number;
+  dodgeChainTimer: number;
+  dodgeChainCount: number;
+  staminaRegenDelay: number;
+  staminaFloor: number;
 }
 
 const createActionTimers = (): ActionTimers => ({
   dodge: 0,
+  dodgeInvuln: 0,
+  dodgeTravelPhase: 0,
+  dodgeRecoveryPhase: 0,
   grab: 0,
   grabPending: false,
   taunt: 0,
   tauntActive: false,
   guardBreak: 0,
+  landingLag: 0,
+  coyote: 0,
+  jumpBuffer: 0,
+  inputBuffer: 0,
+  dashCooldown: 0,
+  turnLock: 0,
+  shortHopWindow: 0,
+  horizontalHeld: false,
+  guardRegenDelay: 0,
+  dodgeChainTimer: 0,
+  dodgeChainCount: 0,
+  staminaRegenDelay: 0,
+  staminaFloor: STAMINA_FLOOR_RESET,
 });
 
 /**
@@ -183,6 +238,7 @@ export class MatchRuntime {
   private readonly cpuBrain = new CpuBrain({ style: CpuStyle.BALANCED });
   private playerTimers: ActionTimers = createActionTimers();
   private cpuTimers: ActionTimers = createActionTimers();
+  private previousInputs: DualInputState = createEmptyInputs();
   
   /** Deterministic RNG for gameplay decisions (air jumps, etc.) - seeded per match */
   private readonly rng: DeterministicRandom;
@@ -245,6 +301,7 @@ export class MatchRuntime {
     this.cpuHitLag = 0;
     this.playerTimers = createActionTimers();
     this.cpuTimers = createActionTimers();
+    this.previousInputs = createEmptyInputs();
     
     // Reset RNG with new deterministic seed for match consistency
     const seed = this.createMatchSeed(snapshot);
@@ -289,6 +346,17 @@ export class MatchRuntime {
       grab,
       taunt,
     } = playerControls;
+    const prevPlayerControls = this.previousInputs.player1;
+    const jumpPressed = !!jump && !prevPlayerControls.jump;
+    const jumpReleased = !!prevPlayerControls.jump && !jump;
+    const horizontalIntent =
+      !!leftward || !!rightward || !!forward || !!backward;
+    const prevHorizontalIntent =
+      !!prevPlayerControls.leftward ||
+      !!prevPlayerControls.rightward ||
+      !!prevPlayerControls.forward ||
+      !!prevPlayerControls.backward;
+    const justPressedHorizontal = horizontalIntent && !prevHorizontalIntent;
 
     const cpuControlState = isLocalMultiplayer
       ? snapshotToControlFrame(opponentControls)
@@ -346,6 +414,7 @@ export class MatchRuntime {
           audio.playHit();
           this.deps.onImpact?.(0.6);
         }
+        this.playerTimers.guardRegenDelay = GUARD_REGEN_DELAY;
       };
 
     const applyGuardDamageToCpu = (amount: number) => {
@@ -371,6 +440,7 @@ export class MatchRuntime {
           audio.playHit();
           this.deps.onImpact?.(0.6);
         }
+        this.cpuTimers.guardRegenDelay = GUARD_REGEN_DELAY;
       };
 
     const playerIsAirborne = player.position[1] > 0.15 || player.isJumping;
@@ -446,17 +516,38 @@ export class MatchRuntime {
       if (newHits.length) {
         let maxDamage = 0;
         newHits.forEach((hit) => {
+          if (cpu.isDodging && this.cpuTimers.dodgeInvuln > 0) {
+            return;
+          }
           const blocking = cpu.isBlocking;
           const baseDamage = Math.round(hit.damage);
           maxDamage = Math.max(maxDamage, baseDamage);
           if (blocking) {
-            const chip = Math.max(1, Math.round(baseDamage * 0.25));
+            const chip = Math.max(
+              MIN_CHIP_DAMAGE,
+              Math.round(baseDamage * CHIP_DAMAGE_RATIO),
+            );
             fighting.damageCPU(chip);
             applyGuardDamageToCpu(hit.guardDamage);
+            this.cpuTimers.guardRegenDelay = GUARD_REGEN_DELAY;
           } else {
             fighting.damageCPU(baseDamage);
           }
-          const [vx, vy, vz] = applyKnockbackToVelocity(cpu, hit, cpuDirectionalInfluence);
+          let [vx, vy, vz] = applyKnockbackToVelocity(cpu, hit, cpuDirectionalInfluence);
+          if (blocking) {
+            const push =
+              Math.min(
+                BLOCK_PUSH_MAX,
+                baseDamage * BLOCK_PUSH_SCALE + (hit.weight ?? 0),
+              ) || 0;
+            if (push > 0) {
+              const dx = cpu.position[0] - player.position[0];
+              const dz = cpu.position[2] - player.position[2];
+              const len = Math.hypot(dx, dz) || 1;
+              vx += (dx / len) * push;
+              vz += (dz / len) * push;
+            }
+          }
           fighting.updateCPUVelocity(vx, vy, vz);
           fighting.setCPUDirection(hit.knockbackVector[0] < 0 ? -1 : 1);
           this.playerHitRegistry.add(`${hit.moveId}:${hit.hitboxId}`);
@@ -528,7 +619,11 @@ export class MatchRuntime {
     const cpuBlocking = cpuControlState.shield && this.cpuCombatState.guardMeter > 0;
     fighting.setCPUBlocking(cpuBlocking);
     if (cpuBlocking) {
-      this.cpuCombatState.guardMeter = Math.max(0, this.cpuCombatState.guardMeter - 15 * delta);
+      this.cpuCombatState.guardMeter = Math.max(
+        0,
+        this.cpuCombatState.guardMeter - GUARD_HOLD_DRAIN * delta,
+      );
+      this.cpuTimers.guardRegenDelay = GUARD_REGEN_DELAY;
     }
     if (cpuUpdatedState.moveId) {
       const moveDef = coreMoves[cpuUpdatedState.moveId];
@@ -542,18 +637,39 @@ export class MatchRuntime {
       if (cpuNewHits.length) {
         let maxDamage = 0;
         cpuNewHits.forEach((hit) => {
+          if (player.isDodging && this.playerTimers.dodgeInvuln > 0) {
+            return;
+          }
           const blocking = player.isBlocking;
           const baseDamage = Math.round(hit.damage);
           maxDamage = Math.max(maxDamage, baseDamage);
           if (blocking) {
-            const chip = Math.max(1, Math.round(baseDamage * 0.25));
+            const chip = Math.max(
+              MIN_CHIP_DAMAGE,
+              Math.round(baseDamage * CHIP_DAMAGE_RATIO),
+            );
             fighting.damagePlayer(chip);
             applyGuardDamageToPlayer(hit.guardDamage);
+            this.playerTimers.guardRegenDelay = GUARD_REGEN_DELAY;
             audio.playBlock();
           } else {
             fighting.damagePlayer(baseDamage);
           }
-          const [vx, vy, vz] = applyKnockbackToVelocity(player, hit, playerDirectionalInfluence);
+          let [vx, vy, vz] = applyKnockbackToVelocity(player, hit, playerDirectionalInfluence);
+          if (blocking) {
+            const push =
+              Math.min(
+                BLOCK_PUSH_MAX,
+                baseDamage * BLOCK_PUSH_SCALE + (hit.weight ?? 0),
+              ) || 0;
+            if (push > 0) {
+              const dx = player.position[0] - cpu.position[0];
+              const dz = player.position[2] - cpu.position[2];
+              const len = Math.hypot(dx, dz) || 1;
+              vx += (dx / len) * push;
+              vz += (dz / len) * push;
+            }
+          }
           fighting.updatePlayerVelocity(vx, vy, vz);
           fighting.setPlayerDirection(hit.knockbackVector[0] < 0 ? -1 : 1);
           this.cpuHitRegistry.add(`${hit.moveId}:${hit.hitboxId}`);
@@ -595,6 +711,9 @@ export class MatchRuntime {
     this.updatePlayerMovement(
       {
         jump,
+        jumpPressed,
+        jumpReleased,
+        justPressedHorizontal,
         forward,
         backward,
         leftward,
@@ -625,6 +744,8 @@ export class MatchRuntime {
       stamina: this.cpuCombatState.staminaMeter,
       special: this.cpuCombatState.specialMeter,
     });
+    this.previousInputs.player1 = { ...playerControls };
+    this.previousInputs.player2 = { ...opponentControls };
   }
 
   private updateCpuMovement(
@@ -636,7 +757,8 @@ export class MatchRuntime {
     audio: AudioActions,
   ) {
     const { fighting } = this.deps;
-    const cpuStunned = this.cpuTimers.guardBreak > 0;
+    const cpuStunned =
+      this.cpuTimers.guardBreak > 0 || this.cpuTimers.landingLag > 0;
     const cpuCanAct =
       !cpuStunned &&
       !cpu.isAttacking &&
@@ -651,9 +773,38 @@ export class MatchRuntime {
     let cpuVY = cpu.velocity[1];
     let cpuVZ = cpu.velocity[2];
     let cpuDirection = cpu.direction;
+    this.cpuTimers.dashCooldown = Math.max(0, this.cpuTimers.dashCooldown - delta);
+    this.cpuTimers.turnLock = Math.max(0, this.cpuTimers.turnLock - delta);
+    const cpuPlatformHeight = getPlatformHeight(cpu.position[0], cpu.position[2]);
+    const cpuHorizontalIntent =
+      controlState.leftward ||
+      controlState.rightward ||
+      controlState.forward ||
+      controlState.backward;
+    const cpuJustPressedHorizontal =
+      cpuHorizontalIntent && !this.cpuTimers.horizontalHeld;
+    this.cpuTimers.horizontalHeld = cpuHorizontalIntent;
+    const cpuGrounded = cpu.position[1] <= cpuPlatformHeight + 0.02;
+    if (
+      cpuHorizontalIntent &&
+      cpuJustPressedHorizontal &&
+      cpuGrounded &&
+      cpuCanAct &&
+      this.cpuTimers.dashCooldown <= 0
+    ) {
+      const dirX = (controlState.rightward ? 1 : 0) - (controlState.leftward ? 1 : 0);
+      const dirZ = (controlState.backward ? 1 : 0) - (controlState.forward ? 1 : 0);
+      const magnitude = Math.hypot(dirX, dirZ) || 1;
+      cpuVX = (dirX / magnitude) * CPU_SPEED * INITIAL_DASH_MULTIPLIER;
+      cpuVZ = (dirZ / magnitude) * CPU_SPEED * INITIAL_DASH_MULTIPLIER;
+      this.cpuTimers.dashCooldown = INITIAL_DASH_COOLDOWN;
+      this.cpuTimers.turnLock = INITIAL_DASH_TURN_LOCK;
+    }
 
     if (cpuControlScale > 0 && (cpuCanAct || cpu.isJumping)) {
-      const accel = (cpu.isJumping ? AIR_ACCELERATION : GROUND_ACCELERATION) * delta;
+      const accelBase = cpu.isJumping ? AIR_ACCELERATION : GROUND_ACCELERATION;
+      const accelPenalty = this.cpuTimers.turnLock > 0 ? 0.55 : 1;
+      const accel = accelBase * accelPenalty * delta;
       const decel = (cpu.isJumping ? AIR_DECELERATION : GROUND_DECELERATION) * delta;
       const maxSpeed = (cpu.isJumping ? CPU_SPEED * 0.85 : CPU_SPEED) * cpuControlScale;
 
@@ -694,22 +845,53 @@ export class MatchRuntime {
     }
 
     if (controlState.dodge && cpuCanAct && cpu.dodgeCooldown <= 0) {
-      fighting.setCPUDodging(true);
-      cpuVX += cpuDirection * PLAYER_SPEED * 1.5;
-      this.cpuTimers.dodge = DODGE_DURATION;
+      const chainCost =
+        DODGE_BASE_STAMINA_COST +
+        Math.max(0, this.cpuTimers.dodgeChainCount) * DODGE_CHAIN_COST;
+      if (this.cpuCombatState.staminaMeter >= chainCost) {
+        fighting.setCPUDodging(true);
+        const dirX = (controlState.rightward ? 1 : 0) - (controlState.leftward ? 1 : 0);
+        const dirZ = (controlState.backward ? 1 : 0) - (controlState.forward ? 1 : 0);
+        const magnitude = Math.hypot(dirX, dirZ);
+        const dodgeSpeed = CPU_SPEED * 2;
+        if (magnitude === 0) {
+          cpuVX = cpuDirection * dodgeSpeed;
+        } else {
+          cpuVX = (dirX / magnitude) * dodgeSpeed;
+          cpuVZ = (dirZ / magnitude) * dodgeSpeed;
+        }
+        this.cpuTimers.dodgeInvuln = DODGE_INVULN_DURATION;
+        this.cpuTimers.dodgeTravelPhase = DODGE_TRAVEL_DURATION;
+        this.cpuTimers.dodgeRecoveryPhase = DODGE_RECOVERY_DURATION;
+        this.cpuTimers.dodge = DODGE_INVULN_DURATION + DODGE_TRAVEL_DURATION + DODGE_RECOVERY_DURATION;
+        this.cpuTimers.dodgeChainTimer = DODGE_CHAIN_WINDOW;
+        this.cpuTimers.dodgeChainCount = Math.min(this.cpuTimers.dodgeChainCount + 1, 4);
+        this.cpuTimers.staminaRegenDelay = DODGE_STAMINA_REGEN_DELAY;
+        this.cpuCombatState.staminaMeter = Math.max(
+          0,
+          this.cpuCombatState.staminaMeter - chainCost,
+        );
+        this.cpuTimers.staminaFloor = this.cpuCombatState.staminaMeter;
+      }
     }
 
     const cpuDrop =
       controlState.dropThrough &&
       cpu.position[1] > 0.5 &&
       cpu.position[1] > player.position[1];
+    const cpuHeightAbovePlatform = Math.max(0, cpu.position[1] - cpuPlatformHeight);
+    const cpuFastFallEligible =
+      cpu.isJumping &&
+      cpuHeightAbovePlatform > 0.45 &&
+      (cpuVY < 0 || cpu.velocity[1] <= 0);
+    const cpuFastFall = cpuFastFallEligible && controlState.backward;
     const [cpuNewY, cpuNewVY] = applyGravity(
       cpu.position[1],
       cpuVY,
       cpu.position[0],
       cpu.position[2],
       cpuDrop,
-      controlState.backward && cpu.isJumping,
+      cpuFastFall,
       delta,
     );
 
@@ -718,6 +900,7 @@ export class MatchRuntime {
       fighting.setCPUJumping(false);
       fighting.resetCPUAirJumps();
       audio.playLand();
+      this.applyLandingLag("cpu");
     }
 
     const useCircularBounds = this.deps.getArenaStyle() === 'contained';
@@ -742,6 +925,9 @@ export class MatchRuntime {
   private updatePlayerMovement(
     input: {
       jump: boolean;
+      jumpPressed: boolean;
+      jumpReleased: boolean;
+      justPressedHorizontal: boolean;
       forward: boolean;
       backward: boolean;
       leftward: boolean;
@@ -759,7 +945,8 @@ export class MatchRuntime {
     audio: AudioActions,
   ) {
     const { fighting, getDebugMode } = this.deps;
-    const playerStunned = this.playerTimers.guardBreak > 0;
+    const playerStunned =
+      this.playerTimers.guardBreak > 0 || this.playerTimers.landingLag > 0;
     const canAct =
       !playerStunned &&
       !player.isAttacking &&
@@ -774,10 +961,52 @@ export class MatchRuntime {
     let newVY = player.velocity[1];
     let newVZ = player.velocity[2];
     let newDirection = player.direction;
+    const platformHeight = getPlatformHeight(playerX, playerZ);
+    const groundedNow = playerY <= platformHeight + 0.02;
+    const horizontalIntent =
+      input.leftward || input.rightward || input.forward || input.backward;
+
+    this.playerTimers.dashCooldown = Math.max(0, this.playerTimers.dashCooldown - delta);
+    this.playerTimers.turnLock = Math.max(0, this.playerTimers.turnLock - delta);
+    this.playerTimers.shortHopWindow = Math.max(0, this.playerTimers.shortHopWindow - delta);
+
+    this.playerTimers.jumpBuffer = Math.max(0, this.playerTimers.jumpBuffer - delta);
+    this.playerTimers.inputBuffer = Math.max(0, this.playerTimers.inputBuffer - delta);
+    if (groundedNow) {
+      this.playerTimers.coyote = COYOTE_TIME;
+    } else {
+      this.playerTimers.coyote = Math.max(0, this.playerTimers.coyote - delta);
+    }
+    if (input.jumpPressed) {
+      this.playerTimers.jumpBuffer = JUMP_BUFFER;
+      this.playerTimers.inputBuffer = INPUT_BUFFER;
+    }
+    const justPressedHorizontal = input.justPressedHorizontal;
+    if (!horizontalIntent) {
+      this.playerTimers.horizontalHeld = false;
+    }
+    const dashEligible =
+      horizontalIntent &&
+      justPressedHorizontal &&
+      groundedNow &&
+      canAct &&
+      this.playerTimers.dashCooldown <= 0;
+    if (dashEligible) {
+      const dirX = (input.rightward ? 1 : 0) - (input.leftward ? 1 : 0);
+      const dirZ = (input.backward ? 1 : 0) - (input.forward ? 1 : 0);
+      const magnitude = Math.hypot(dirX, dirZ) || 1;
+      newVX = (dirX / magnitude) * PLAYER_SPEED * INITIAL_DASH_MULTIPLIER;
+      newVZ = (dirZ / magnitude) * PLAYER_SPEED * INITIAL_DASH_MULTIPLIER;
+      this.playerTimers.dashCooldown = INITIAL_DASH_COOLDOWN;
+      this.playerTimers.turnLock = INITIAL_DASH_TURN_LOCK;
+    }
+    this.playerTimers.horizontalHeld = horizontalIntent;
 
     const controlScale = playerInHitLag ? 0 : 1;
     if (canAct || player.isJumping) {
-      const accel = (player.isJumping ? AIR_ACCELERATION : GROUND_ACCELERATION) * delta;
+      const accelBase = player.isJumping ? AIR_ACCELERATION : GROUND_ACCELERATION;
+      const accelPenalty = this.playerTimers.turnLock > 0 ? 0.55 : 1;
+      const accel = accelBase * accelPenalty * delta;
       const decel = (player.isJumping ? AIR_DECELERATION : GROUND_DECELERATION) * delta;
       const maxSpeed = (player.isJumping ? PLAYER_SPEED * 0.85 : PLAYER_SPEED) * controlScale;
 
@@ -802,28 +1031,42 @@ export class MatchRuntime {
       newVZ = Math.max(-maxSpeed, Math.min(maxSpeed, newVZ));
     }
 
-    if (input.jump && !player.isJumping && player.position[1] <= 0.01 && canAct) {
+    const jumpBuffered = this.playerTimers.jumpBuffer > 0;
+    const canUseCoyote = groundedNow || this.playerTimers.coyote > 0;
+    if ((input.jumpPressed || jumpBuffered) && !player.isJumping && canUseCoyote && canAct) {
       newVY = JUMP_FORCE;
       fighting.setPlayerJumping(true);
       audio.playJump();
       fighting.resetPlayerAirJumps();
-    } else if (input.jump && player.isJumping && player.airJumpsLeft > 0 && canAct) {
+      this.playerTimers.jumpBuffer = 0;
+      this.playerTimers.coyote = 0;
+      this.playerTimers.shortHopWindow = SHORT_HOP_WINDOW;
+    } else if (input.jumpPressed && player.isJumping && player.airJumpsLeft > 0 && canAct) {
       newVY = JUMP_FORCE * 0.9;
       if (fighting.usePlayerAirJump?.()) {
         audio.playJump();
       }
     }
+    if (input.jumpReleased && this.playerTimers.shortHopWindow > 0 && newVY > 0) {
+      newVY *= SHORT_HOP_FORCE_SCALE;
+      this.playerTimers.shortHopWindow = 0;
+    }
 
-    const platformHeight = getPlatformHeight(playerX, playerZ);
     const dropThrough =
       input.backward && platformHeight > 0 && Math.abs(playerY - platformHeight) < 0.1;
+    const heightAbovePlatform = Math.max(0, playerY - platformHeight);
+    const fastFallEligible =
+      player.isJumping &&
+      heightAbovePlatform > 0.45 &&
+      (newVY < 0 || player.velocity[1] <= 0);
+    const fastFallActive = fastFallEligible && input.backward;
     const [newY, gravityVY] = applyGravity(
       playerY,
       newVY,
       playerX,
       playerZ,
       dropThrough,
-      input.backward && player.isJumping,
+      fastFallActive,
       delta,
     );
     newVY = gravityVY;
@@ -835,6 +1078,7 @@ export class MatchRuntime {
       fighting.setPlayerJumping(false);
       fighting.resetPlayerAirJumps();
       audio.playLand();
+      this.applyLandingLag("player");
       if (getDebugMode()) {
         console.log("Player landed on platform at height:", platformHeight);
       }
@@ -866,24 +1110,48 @@ export class MatchRuntime {
         audio.playBlock();
       }
       fighting.setPlayerBlocking(true);
-      this.playerCombatState.guardMeter = Math.max(0, this.playerCombatState.guardMeter - 15 * delta);
+      this.playerCombatState.guardMeter = Math.max(
+        0,
+        this.playerCombatState.guardMeter - GUARD_HOLD_DRAIN * delta,
+      );
+      this.playerTimers.guardRegenDelay = GUARD_REGEN_DELAY;
     } else if (player.isBlocking) {
       fighting.setPlayerBlocking(false);
     }
 
-    if (input.dodge && canAct && player.dodgeCooldown <= 0 && this.playerCombatState.staminaMeter > 20) {
-      if (getDebugMode()) {
-        console.log("Player DODGE");
+    if (input.dodge && canAct && player.dodgeCooldown <= 0) {
+      const chainCost =
+        DODGE_BASE_STAMINA_COST +
+        Math.max(0, this.playerTimers.dodgeChainCount) * DODGE_CHAIN_COST;
+      if (this.playerCombatState.staminaMeter >= chainCost) {
+        if (getDebugMode()) {
+          console.log("Player DODGE");
+        }
+        fighting.setPlayerDodging(true);
+        audio.playDodge();
+        const dirX = (input.rightward ? 1 : 0) - (input.leftward ? 1 : 0);
+        const dirZ = (input.backward ? 1 : 0) - (input.forward ? 1 : 0);
+        const magnitude = Math.hypot(dirX, dirZ);
+        const dodgeSpeed = PLAYER_SPEED * 2;
+        if (magnitude === 0) {
+          newVX = player.direction * dodgeSpeed;
+        } else {
+          newVX = (dirX / magnitude) * dodgeSpeed;
+          newVZ = (dirZ / magnitude) * dodgeSpeed;
+        }
+        this.playerTimers.dodgeInvuln = DODGE_INVULN_DURATION;
+        this.playerTimers.dodgeTravelPhase = DODGE_TRAVEL_DURATION;
+        this.playerTimers.dodgeRecoveryPhase = DODGE_RECOVERY_DURATION;
+        this.playerTimers.dodge = DODGE_INVULN_DURATION + DODGE_TRAVEL_DURATION + DODGE_RECOVERY_DURATION;
+        this.playerTimers.dodgeChainTimer = DODGE_CHAIN_WINDOW;
+        this.playerTimers.dodgeChainCount = Math.min(this.playerTimers.dodgeChainCount + 1, 4);
+        this.playerTimers.staminaRegenDelay = DODGE_STAMINA_REGEN_DELAY;
+        this.playerCombatState.staminaMeter = Math.max(
+          0,
+          this.playerCombatState.staminaMeter - chainCost,
+        );
+        this.playerTimers.staminaFloor = this.playerCombatState.staminaMeter;
       }
-      fighting.setPlayerDodging(true);
-      audio.playDodge();
-      if (input.leftward) {
-        newVX = -PLAYER_SPEED * 2;
-      } else if (input.rightward) {
-        newVX = PLAYER_SPEED * 2;
-      }
-      this.playerTimers.dodge = DODGE_DURATION;
-      this.playerCombatState.staminaMeter = Math.max(0, this.playerCombatState.staminaMeter - 25);
     }
 
     newVX = applyHorizontalFriction(newVX, player.isJumping, delta);
@@ -912,11 +1180,30 @@ export class MatchRuntime {
   private advancePlayerTimers(delta: number, player: CharacterState, cpu: CharacterState) {
     const { fighting, audio } = this.deps;
 
-    if (this.playerTimers.dodge > 0) {
-      this.playerTimers.dodge = Math.max(0, this.playerTimers.dodge - delta);
-      if (this.playerTimers.dodge === 0 && player.isDodging) {
+    const wasTraveling = this.playerTimers.dodgeTravelPhase > 0;
+    if (this.playerTimers.dodgeInvuln > 0) {
+      this.playerTimers.dodgeInvuln = Math.max(0, this.playerTimers.dodgeInvuln - delta);
+    }
+    if (this.playerTimers.dodgeTravelPhase > 0) {
+      this.playerTimers.dodgeTravelPhase = Math.max(0, this.playerTimers.dodgeTravelPhase - delta);
+      if (wasTraveling && this.playerTimers.dodgeTravelPhase === 0 && player.isDodging) {
         fighting.setPlayerDodging(false);
       }
+    } else if (this.playerTimers.dodgeInvuln <= 0 && player.isDodging) {
+      fighting.setPlayerDodging(false);
+    }
+    if (this.playerTimers.dodgeRecoveryPhase > 0) {
+      this.playerTimers.dodgeRecoveryPhase = Math.max(0, this.playerTimers.dodgeRecoveryPhase - delta);
+    }
+    if (this.playerTimers.dodgeChainTimer > 0) {
+      this.playerTimers.dodgeChainTimer = Math.max(0, this.playerTimers.dodgeChainTimer - delta);
+      if (this.playerTimers.dodgeChainTimer === 0) {
+        this.playerTimers.dodgeChainCount = 0;
+      }
+    }
+
+    if (this.playerTimers.landingLag > 0) {
+      this.playerTimers.landingLag = Math.max(0, this.playerTimers.landingLag - delta);
     }
 
     if (this.playerTimers.grab > 0) {
@@ -948,16 +1235,58 @@ export class MatchRuntime {
     if (this.playerTimers.guardBreak > 0) {
       this.playerTimers.guardBreak = Math.max(0, this.playerTimers.guardBreak - delta);
     }
+
+    if (this.playerTimers.staminaRegenDelay > 0) {
+      this.playerTimers.staminaRegenDelay = Math.max(0, this.playerTimers.staminaRegenDelay - delta);
+      this.playerTimers.staminaFloor =
+        this.playerTimers.staminaFloor === STAMINA_FLOOR_RESET
+          ? this.playerCombatState.staminaMeter
+          : Math.min(this.playerTimers.staminaFloor, this.playerCombatState.staminaMeter);
+      this.playerCombatState.staminaMeter = Math.min(
+        this.playerCombatState.staminaMeter,
+        this.playerTimers.staminaFloor,
+      );
+    } else if (this.playerTimers.staminaFloor !== STAMINA_FLOOR_RESET) {
+      this.playerTimers.staminaFloor = STAMINA_FLOOR_RESET;
+    }
+
+    if (this.playerTimers.guardRegenDelay > 0) {
+      this.playerTimers.guardRegenDelay = Math.max(0, this.playerTimers.guardRegenDelay - delta);
+    } else if (!player.isBlocking && this.playerCombatState.guardMeter < DEFAULT_GUARD_VALUE) {
+      this.playerCombatState.guardMeter = Math.min(
+        DEFAULT_GUARD_VALUE,
+        this.playerCombatState.guardMeter + GUARD_REGEN_RATE * delta,
+      );
+    }
   }
 
   private advanceCpuTimers(delta: number, player: CharacterState, cpu: CharacterState) {
     const { fighting, audio } = this.deps;
 
-    if (this.cpuTimers.dodge > 0) {
-      this.cpuTimers.dodge = Math.max(0, this.cpuTimers.dodge - delta);
-      if (this.cpuTimers.dodge === 0 && cpu.isDodging) {
+    const cpuWasTraveling = this.cpuTimers.dodgeTravelPhase > 0;
+    if (this.cpuTimers.dodgeInvuln > 0) {
+      this.cpuTimers.dodgeInvuln = Math.max(0, this.cpuTimers.dodgeInvuln - delta);
+    }
+    if (this.cpuTimers.dodgeTravelPhase > 0) {
+      this.cpuTimers.dodgeTravelPhase = Math.max(0, this.cpuTimers.dodgeTravelPhase - delta);
+      if (cpuWasTraveling && this.cpuTimers.dodgeTravelPhase === 0 && cpu.isDodging) {
         fighting.setCPUDodging(false);
       }
+    } else if (this.cpuTimers.dodgeInvuln <= 0 && cpu.isDodging) {
+      fighting.setCPUDodging(false);
+    }
+    if (this.cpuTimers.dodgeRecoveryPhase > 0) {
+      this.cpuTimers.dodgeRecoveryPhase = Math.max(0, this.cpuTimers.dodgeRecoveryPhase - delta);
+    }
+    if (this.cpuTimers.dodgeChainTimer > 0) {
+      this.cpuTimers.dodgeChainTimer = Math.max(0, this.cpuTimers.dodgeChainTimer - delta);
+      if (this.cpuTimers.dodgeChainTimer === 0) {
+        this.cpuTimers.dodgeChainCount = 0;
+      }
+    }
+
+    if (this.cpuTimers.landingLag > 0) {
+      this.cpuTimers.landingLag = Math.max(0, this.cpuTimers.landingLag - delta);
     }
 
     if (this.cpuTimers.grab > 0) {
@@ -987,6 +1316,48 @@ export class MatchRuntime {
     if (this.cpuTimers.guardBreak > 0) {
       this.cpuTimers.guardBreak = Math.max(0, this.cpuTimers.guardBreak - delta);
     }
+
+    if (this.cpuTimers.staminaRegenDelay > 0) {
+      this.cpuTimers.staminaRegenDelay = Math.max(0, this.cpuTimers.staminaRegenDelay - delta);
+      this.cpuTimers.staminaFloor =
+        this.cpuTimers.staminaFloor === STAMINA_FLOOR_RESET
+          ? this.cpuCombatState.staminaMeter
+          : Math.min(this.cpuTimers.staminaFloor, this.cpuCombatState.staminaMeter);
+      this.cpuCombatState.staminaMeter = Math.min(
+        this.cpuCombatState.staminaMeter,
+        this.cpuTimers.staminaFloor,
+      );
+    } else if (this.cpuTimers.staminaFloor !== STAMINA_FLOOR_RESET) {
+      this.cpuTimers.staminaFloor = STAMINA_FLOOR_RESET;
+    }
+
+    if (this.cpuTimers.guardRegenDelay > 0) {
+      this.cpuTimers.guardRegenDelay = Math.max(0, this.cpuTimers.guardRegenDelay - delta);
+    } else if (!cpu.isBlocking && this.cpuCombatState.guardMeter < DEFAULT_GUARD_VALUE) {
+      this.cpuCombatState.guardMeter = Math.min(
+        DEFAULT_GUARD_VALUE,
+        this.cpuCombatState.guardMeter + GUARD_REGEN_RATE * delta,
+      );
+    }
+  }
+
+  private applyLandingLag(target: "player" | "cpu") {
+    const combatState =
+      target === "player" ? this.playerCombatState : this.cpuCombatState;
+    const timers = target === "player" ? this.playerTimers : this.cpuTimers;
+    const moveId = combatState.moveId;
+    if (!moveId) return;
+    const moveDef = coreMoves[moveId];
+    if (!moveDef?.landingLagFrames) return;
+    const frame = combatState.moveFrame ?? 0;
+    if (moveDef.autoCancelWindow && this.frameWithinWindow(frame, moveDef.autoCancelWindow)) {
+      return;
+    }
+    timers.landingLag = moveDef.landingLagFrames / 60;
+  }
+
+  private frameWithinWindow(frame: number, window: { start: number; end: number }) {
+    return frame >= window.start && frame <= window.end;
   }
 }
 

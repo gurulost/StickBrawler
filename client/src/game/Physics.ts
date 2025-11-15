@@ -16,13 +16,16 @@ export const PLAYER_HEIGHT = 1.8;
 export const CAPSULE_RADIUS = PLAYER_WIDTH * 0.5;
 
 export const FLOOR_FRICTION = 0.82;
-export const AIR_FRICTION = 0.97;
-export const WALL_BOUNCE_RESTITUTION = 0.35;
+export const AIR_FRICTION = 0.985;
+export const WALL_BOUNCE_RESTITUTION = 0.08;
+export const CONTAINMENT_TANGENTIAL_DAMPING = 0.18;
+export const CONTAINMENT_WALL_ABSORB = 1;
 export const HIT_LAG_DECAY = 0.9;
 export const GROUND_ACCELERATION = 55;
 export const AIR_ACCELERATION = 28;
 export const GROUND_DECELERATION = 60;
-export const AIR_DECELERATION = 24;
+export const AIR_DECELERATION = 30;
+export const WALL_BOUNCE_TANGENTIAL_DAMPING = 0.2;
 
 // Attack parameters (further reduced damage per hit for better balance)
 export const PUNCH_DAMAGE = 2; // Reduced from 3
@@ -33,8 +36,16 @@ export const ATTACK_RANGE = 1.5; // Kept the same for consistent hit detection
 // Combo system constants
 export const COMBO_WINDOW = 800; // Time window in ms to chain attacks for combos
 export const COMBO_MULTIPLIER = 1.2; // Damage multiplier for each hit in a combo
-export const FAST_FALL_MULTIPLIER = 1.5;
-export const MAX_FALL_SPEED = 1.2;
+export const FAST_FALL_MULTIPLIER = 1.8;
+export const MAX_FALL_SPEED = 14;
+export const COYOTE_TIME = 0.083;
+export const JUMP_BUFFER = 0.1;
+export const INPUT_BUFFER = 0.083;
+export const SHORT_HOP_WINDOW = 0.08;
+export const SHORT_HOP_FORCE_SCALE = 0.7;
+export const INITIAL_DASH_MULTIPLIER = 1.6;
+export const INITIAL_DASH_COOLDOWN = 0.25;
+export const INITIAL_DASH_TURN_LOCK = 0.08;
 
 // Platform system for multi-level combat
 export interface Platform {
@@ -250,21 +261,32 @@ export function resolveCapsuleBounds(
     // Circular boundary (for Containment Arena)
     const distanceFromCenter = Math.sqrt(x * x + z * z);
     const maxRadius = CONTAINMENT_RADIUS - capsuleRadius;
-    
+
     if (distanceFromCenter > maxRadius) {
       // Character is outside the circular boundary - push them back
       // Calculate normal vector BEFORE clamping position
       const normalX = x / distanceFromCenter;
       const normalZ = z / distanceFromCenter;
-      
+
       // Clamp position to the boundary
       x = normalX * maxRadius;
       z = normalZ * maxRadius;
-      
-      // Reflect velocity to bounce off the circular wall using the normalized normal
-      const dotProduct = vx * normalX + vz * normalZ;
-      vx = (vx - 2 * dotProduct * normalX) * WALL_BOUNCE_RESTITUTION;
-      vz = (vz - 2 * dotProduct * normalZ) * WALL_BOUNCE_RESTITUTION;
+
+      // Absorb outward velocity so fighters can't bounce through the barrier
+      let radialVelocity = vx * normalX + vz * normalZ;
+      const tangentialVX = vx - radialVelocity * normalX;
+      const tangentialVZ = vz - radialVelocity * normalZ;
+
+      if (radialVelocity > 0) {
+        radialVelocity = Math.max(
+          0,
+          radialVelocity * (1 - CONTAINMENT_WALL_ABSORB),
+        );
+      }
+
+      const tangentialDamp = 1 - CONTAINMENT_TANGENTIAL_DAMPING;
+      vx = tangentialVX * tangentialDamp + radialVelocity * normalX;
+      vz = tangentialVZ * tangentialDamp + radialVelocity * normalZ;
     }
   } else {
     // Rectangular boundary (for open arenas)
@@ -273,9 +295,11 @@ export function resolveCapsuleBounds(
     if (x < minX) {
       x = minX;
       vx = Math.abs(vx) * WALL_BOUNCE_RESTITUTION;
+      vz *= 1 - WALL_BOUNCE_TANGENTIAL_DAMPING;
     } else if (x > maxX) {
       x = maxX;
       vx = -Math.abs(vx) * WALL_BOUNCE_RESTITUTION;
+      vz *= 1 - WALL_BOUNCE_TANGENTIAL_DAMPING;
     }
 
     const minZ = -ARENA_HALF_DEPTH + capsuleRadius;
@@ -283,9 +307,11 @@ export function resolveCapsuleBounds(
     if (z < minZ) {
       z = minZ;
       vz = Math.abs(vz) * WALL_BOUNCE_RESTITUTION;
+      vx *= 1 - WALL_BOUNCE_TANGENTIAL_DAMPING;
     } else if (z > maxZ) {
       z = maxZ;
       vz = -Math.abs(vz) * WALL_BOUNCE_RESTITUTION;
+      vx *= 1 - WALL_BOUNCE_TANGENTIAL_DAMPING;
     }
   }
 

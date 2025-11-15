@@ -110,6 +110,8 @@ export const coreMoves: Record<string, MoveDefinition> = {
     name: "Meteor Dive",
     category: "aerial",
     totalFrames: 35,
+    landingLagFrames: 18,
+    autoCancelWindow: { start: 1, end: 6 },
     windows: defaultWindows(4, 12, 19),
     hitboxes: [
       {

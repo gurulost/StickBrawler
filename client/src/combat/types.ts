@@ -72,6 +72,8 @@ export interface MoveDefinition {
   aerialOnly?: boolean;
   groundedOnly?: boolean;
   autoTurn?: boolean;
+  landingLagFrames?: number;
+  autoCancelWindow?: FrameWindow;
 }
 
 export type FighterActionState =

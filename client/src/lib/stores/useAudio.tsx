@@ -3,22 +3,45 @@ import { create } from "zustand";
 /**
  * Advanced audio system for an immersive fighting game experience
  * Includes dynamic sound effects with pitch variation and 3D positional audio
- * Enhanced music system with context-aware playback and alternating battle themes
+ * Enhanced music system with context-aware playback and cycling themes
+ * 
+ * ADDING NEW MUSIC TRACKS:
+ * ----------------------
+ * To add more menu or battle themes:
+ * 1. Load the audio file: const newTheme = new Audio("/sounds/your-track.mp3");
+ * 2. Add to menu themes: addMenuTheme(newTheme);
+ *    OR add to battle themes: addBattleTheme(newTheme);
+ * 3. The system automatically cycles through all tracks in the array
+ * 
+ * Example:
+ *   const menuTheme1 = new Audio("/sounds/menu-1.mp3");
+ *   const menuTheme2 = new Audio("/sounds/menu-2.mp3");
+ *   const battleTheme1 = new Audio("/sounds/battle-1.mp3");
+ *   const battleTheme2 = new Audio("/sounds/battle-2.mp3");
+ *   const battleTheme3 = new Audio("/sounds/battle-3.mp3");
+ *   
+ *   addMenuTheme(menuTheme1);
+ *   addMenuTheme(menuTheme2);
+ *   addBattleTheme(battleTheme1);
+ *   addBattleTheme(battleTheme2);
+ *   addBattleTheme(battleTheme3);
+ *   
+ *   // Battle themes will cycle: theme1 -> theme2 -> theme3 -> theme1...
  */
 
 export type MusicContext = 'menu' | 'fighting';
 
 interface AudioState {
-  // Music elements
-  menuTheme: HTMLAudioElement | null;
-  battleTheme1: HTMLAudioElement | null;
-  battleTheme2: HTMLAudioElement | null;
+  // Music elements - scalable arrays for unlimited tracks
+  menuThemes: HTMLAudioElement[];      // Array of menu music tracks
+  battleThemes: HTMLAudioElement[];    // Array of battle music tracks
   currentMusicTrack: HTMLAudioElement | null;
   
   // Music state management
   musicContext: MusicContext;
   musicEnabled: boolean;
-  battleThemeIndex: number; // 0 for theme 1, 1 for theme 2
+  currentMenuThemeIndex: number;       // Which menu theme is playing
+  currentBattleThemeIndex: number;     // Which battle theme is playing
   musicVolume: number;
   fadeIntervalId: NodeJS.Timeout | null;
   autoplayBlocked: boolean;
@@ -44,9 +67,8 @@ interface AudioState {
   
   // Music management functions
   ensureMusicPlaying: () => void;
-  setMenuTheme: (music: HTMLAudioElement) => void;
-  setBattleTheme1: (music: HTMLAudioElement) => void;
-  setBattleTheme2: (music: HTMLAudioElement) => void;
+  addMenuTheme: (music: HTMLAudioElement) => void;        // Add a menu theme to the collection
+  addBattleTheme: (music: HTMLAudioElement) => void;      // Add a battle theme to the collection
   switchMusicContext: (context: MusicContext) => void;
   toggleMusic: () => void;
   setMusicVolume: (volume: number) => void;
@@ -92,16 +114,16 @@ interface AudioState {
 }
 
 export const useAudio = create<AudioState>((set, get) => ({
-  // Initialize music elements
-  menuTheme: null,
-  battleTheme1: null,
-  battleTheme2: null,
+  // Initialize music elements as arrays
+  menuThemes: [],
+  battleThemes: [],
   currentMusicTrack: null,
   
   // Music state
   musicContext: 'menu',
   musicEnabled: true,
-  battleThemeIndex: 0,
+  currentMenuThemeIndex: 0,
+  currentBattleThemeIndex: 0,
   musicVolume: 0.35,
   fadeIntervalId: null as NodeJS.Timeout | null,
   autoplayBlocked: false,
@@ -137,26 +159,32 @@ export const useAudio = create<AudioState>((set, get) => ({
   },
   
   // Music management functions
-  setMenuTheme: (music) => {
+  addMenuTheme: (music) => {
     music.loop = true;
     music.volume = get().musicVolume;
-    set({ menuTheme: music });
+    set((state) => ({ menuThemes: [...state.menuThemes, music] }));
   },
   
-  setBattleTheme1: (music) => {
+  addBattleTheme: (music) => {
     music.loop = true;
     music.volume = get().musicVolume;
-    set({ battleTheme1: music });
-  },
-  
-  setBattleTheme2: (music) => {
-    music.loop = true;
-    music.volume = get().musicVolume;
-    set({ battleTheme2: music });
+    set((state) => ({ battleThemes: [...state.battleThemes, music] }));
   },
   
   switchMusicContext: (context) => {
-    const { musicContext, currentMusicTrack, menuTheme, battleTheme1, battleTheme2, battleThemeIndex, musicEnabled, isMuted, musicVolume, fadeIntervalId, backgroundMusic } = get();
+    const { 
+      musicContext, 
+      currentMusicTrack, 
+      menuThemes, 
+      battleThemes, 
+      currentMenuThemeIndex,
+      currentBattleThemeIndex, 
+      musicEnabled, 
+      isMuted, 
+      musicVolume, 
+      fadeIntervalId, 
+      backgroundMusic 
+    } = get();
     
     // Short-circuit only if switching to the same context and track is actively playing
     if (musicContext === context && currentMusicTrack && !currentMusicTrack.paused) {
@@ -182,15 +210,16 @@ export const useAudio = create<AudioState>((set, get) => ({
     let newTrack: HTMLAudioElement | null = null;
     
     if (context === 'menu') {
-      newTrack = menuTheme;
+      // Use current menu theme (cycles through all menu themes)
+      if (menuThemes.length > 0) {
+        newTrack = menuThemes[currentMenuThemeIndex % menuThemes.length];
+      }
     } else if (context === 'fighting') {
-      // Alternate between battle themes
-      if (battleThemeIndex === 0) {
-        newTrack = battleTheme1;
-        set({ battleThemeIndex: 1 }); // Next time use theme 2
-      } else {
-        newTrack = battleTheme2;
-        set({ battleThemeIndex: 0 }); // Next time use theme 1
+      // Use current battle theme and advance to next one for next fight
+      if (battleThemes.length > 0) {
+        newTrack = battleThemes[currentBattleThemeIndex % battleThemes.length];
+        // Cycle to next battle theme (wraps around with modulo)
+        set({ currentBattleThemeIndex: (currentBattleThemeIndex + 1) % battleThemes.length });
       }
     }
     

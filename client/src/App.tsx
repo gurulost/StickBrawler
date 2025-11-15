@@ -35,9 +35,8 @@ function App() {
     setThrowSound,
     setTauntSound,
     playBackgroundMusic,
-    setMenuTheme,
-    setBattleTheme1,
-    setBattleTheme2,
+    addMenuTheme,
+    addBattleTheme,
     switchMusicContext
   } = useAudio();
 
@@ -62,13 +61,15 @@ function App() {
     setBackgroundMusic(backgroundMusic);
 
     // Music system - Context-aware tracks
+    // Add menu theme(s) - you can add more by calling addMenuTheme multiple times
     const menuTheme = loadAudio("/sounds/menu-theme.mp3", 0.35);
+    addMenuTheme(menuTheme);
+    
+    // Add battle themes - you can add more by calling addBattleTheme multiple times
     const battleTheme1 = loadAudio("/sounds/battle-theme-1.mp3", 0.35);
     const battleTheme2 = loadAudio("/sounds/battle-theme-2.mp3", 0.35);
-    
-    setMenuTheme(menuTheme);
-    setBattleTheme1(battleTheme1);
-    setBattleTheme2(battleTheme2);
+    addBattleTheme(battleTheme1);
+    addBattleTheme(battleTheme2);
     
     // Start menu music after tracks are loaded
     setTimeout(() => {

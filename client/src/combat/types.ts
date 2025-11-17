@@ -90,9 +90,12 @@ export type FighterActionState =
   | "dodge"
   | "tech";
 
+import type { FighterId } from "./moveTable";
+
 export interface FighterCombatState {
   action: FighterActionState;
   facing: 1 | -1;
+  fighterId: FighterId;
   moveId?: string;
   moveFrame?: number;
   hitstunFrames: number;

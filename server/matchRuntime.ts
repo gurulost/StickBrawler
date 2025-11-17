@@ -11,11 +11,16 @@ const DEFAULT_SPECIAL = 0;
 const DEFAULT_POSITION_PLAYER: [number, number, number] = [-2, 0, 0];
 const DEFAULT_POSITION_CPU: [number, number, number] = [2, 0, 0];
 
-function createDefaultCharacterState(position: [number, number, number], direction: 1 | -1): CharacterState {
+function createDefaultCharacterState(
+  position: [number, number, number],
+  direction: 1 | -1,
+  fighterId: "stick_hero" | "stick_villain" = "stick_hero",
+): CharacterState {
   return {
     health: DEFAULT_HEALTH,
     position,
     direction,
+    fighterId,
     isJumping: false,
     isAttacking: false,
     isBlocking: false,
@@ -54,8 +59,8 @@ const noopAudio = {
 
 export class ServerMatchRuntime {
   private readonly runtime: MatchRuntime;
-  private player: CharacterState = createDefaultCharacterState(DEFAULT_POSITION_PLAYER, 1);
-  private cpu: CharacterState = createDefaultCharacterState(DEFAULT_POSITION_CPU, -1);
+  private player: CharacterState = createDefaultCharacterState(DEFAULT_POSITION_PLAYER, 1, "stick_hero");
+  private cpu: CharacterState = createDefaultCharacterState(DEFAULT_POSITION_CPU, -1, "stick_villain");
   private gamePhase: GamePhase = "fighting";
   private telemetryBuffer: CombatTelemetryEvent[] = [];
   private inputs: DualInputState = createEmptyInputs();
@@ -67,6 +72,7 @@ export class ServerMatchRuntime {
         audio: noopAudio,
         getDebugMode: () => false,
         getMatchMode: () => "single",
+        getArenaStyle: () => "open",
         sendTelemetry: (entries) => {
           this.telemetryBuffer.push(...entries);
         },
@@ -96,8 +102,8 @@ export class ServerMatchRuntime {
   }
 
   reset() {
-    this.player = createDefaultCharacterState(DEFAULT_POSITION_PLAYER, 1);
-    this.cpu = createDefaultCharacterState(DEFAULT_POSITION_CPU, -1);
+    this.player = createDefaultCharacterState(DEFAULT_POSITION_PLAYER, 1, "stick_hero");
+    this.cpu = createDefaultCharacterState(DEFAULT_POSITION_CPU, -1, "stick_villain");
     this.runtime.reset({ player: this.player, cpu: this.cpu });
   }
 

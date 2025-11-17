@@ -16,16 +16,19 @@ export const PLAYER_HEIGHT = 1.8;
 export const CAPSULE_RADIUS = PLAYER_WIDTH * 0.5;
 
 export const FLOOR_FRICTION = 0.82;
-export const AIR_FRICTION = 0.985;
+export const AIR_FRICTION = 0.973;
 export const WALL_BOUNCE_RESTITUTION = 0.08;
 export const CONTAINMENT_TANGENTIAL_DAMPING = 0.18;
 export const CONTAINMENT_WALL_ABSORB = 1;
 export const HIT_LAG_DECAY = 0.9;
 export const GROUND_ACCELERATION = 55;
-export const AIR_ACCELERATION = 28;
+export const AIR_ACCELERATION = 40;
 export const GROUND_DECELERATION = 60;
-export const AIR_DECELERATION = 30;
+export const AIR_DECELERATION = 42;
 export const WALL_BOUNCE_TANGENTIAL_DAMPING = 0.2;
+export const AIR_SPEED_MULTIPLIER = 1.05;
+export const AIR_TURN_LOCK_PENALTY = 0.4;
+export const AIR_STRAFE_IMPULSE = 0.65;
 
 // Attack parameters (further reduced damage per hit for better balance)
 export const PUNCH_DAMAGE = 2; // Reduced from 3

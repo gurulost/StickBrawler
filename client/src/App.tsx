@@ -7,6 +7,7 @@ import GameManager from "./game/GameManager";
 import Menu from "./game/Menu";
 import Lobby from "./game/Lobby";
 import UI from "./game/UI";
+import { InputOverlay } from "./game/InputOverlay";
 import { useFighting } from "./lib/stores/useFighting";
 import { useEconomySync } from "./hooks/use-economy-sync";
 import { useAutoStartMusic } from "./hooks/use-auto-start-music";
@@ -145,6 +146,7 @@ function App() {
 
               {/* UI is rendered outside of Canvas as an HTML overlay */}
               <UI />
+              <InputOverlay />
             </>
           )}
         </>

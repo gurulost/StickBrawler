@@ -67,6 +67,25 @@ type BrushStroke = {
   doubleSided?: boolean;
 };
 
+type AirThrust = {
+  id: number;
+  age: number;
+  life: number;
+  offset: [number, number, number];
+  width: number;
+  height: number;
+  color: string;
+  rimColor: string;
+  glow: number;
+  rotation: number;
+  opacity: number;
+  seed: number;
+  stretch: number;
+  tilt: number;
+  coreColor: string;
+  haloColor: string;
+};
+
 const readInput = (snapshot: PlayerInputSnapshot | undefined, control: Controls) =>
   snapshot?.[control] ?? false;
 
@@ -232,21 +251,21 @@ const StickFigure = ({
     comboCount
   } = characterState;
   const [x, y, z] = position;
-  const attack1Pressed = readInput(inputSnapshot, Controls.attack1);
-  const attack2Pressed = readInput(inputSnapshot, Controls.attack2);
+  const attackPressed = readInput(inputSnapshot, Controls.attack);
   const specialPressed = readInput(inputSnapshot, Controls.special);
-  const dodgePressed = readInput(inputSnapshot, Controls.dodge);
-  const airAttackPressed = readInput(inputSnapshot, Controls.airAttack);
-  const grabPressed = readInput(inputSnapshot, Controls.grab);
-  const tauntPressed = readInput(inputSnapshot, Controls.taunt);
+  const defendPressed = readInput(inputSnapshot, Controls.defend);
   const inferAttackAnimation = (): AttackAnimation => {
-    if (characterState.isAirAttacking || airAttackPressed) return "air_attack";
-    if (characterState.isDodging || dodgePressed) return "dodge";
-    if (characterState.isGrabbing || grabPressed) return "grab";
-    if (characterState.isTaunting || tauntPressed) return "taunt";
+    if (characterState.isAirAttacking) return "air_attack";
+    if (characterState.isDodging || defendPressed) return "dodge";
+    if (characterState.isGrabbing) return "grab";
+    if (characterState.isTaunting) return "taunt";
     if (specialPressed) return "special";
-    if (attack2Pressed) return "kick";
-    if (attack1Pressed) return "punch";
+    if (attackPressed) {
+      if (characterState.lastMoveType) {
+        return MOVE_TO_ANIMATION[characterState.lastMoveType] ?? "punch";
+      }
+      return "punch";
+    }
     if (characterState.lastMoveType) {
       return MOVE_TO_ANIMATION[characterState.lastMoveType] ?? null;
     }
@@ -316,10 +335,13 @@ const StickFigure = ({
   const [dustBursts, setDustBursts] = useState<DustBurst[]>([]);
   const [speedTrails, setSpeedTrails] = useState<SpeedTrail[]>([]);
   const [brushStrokes, setBrushStrokes] = useState<BrushStroke[]>([]);
+  const [airThrusts, setAirThrusts] = useState<AirThrust[]>([]);
   const dustIdRef = useRef(0);
   const trailIdRef = useRef(0);
   const brushIdRef = useRef(0);
+  const thrustIdRef = useRef(0);
   const trailCooldownRef = useRef(0);
+  const thrustCooldownRef = useRef(0);
   const lastAirVelocityRef = useRef<[number, number, number]>([...characterState.velocity]);
   const groundedIdle = !characterState.isJumping && speedRatio < 0.2;
   const plantedFoot = groundedIdle ? (Math.floor(timeRef.current * 0.8) % 2 === 0 ? "left" : "right") : null;
@@ -329,6 +351,7 @@ const StickFigure = ({
     leanRef.current += (targetLean - leanRef.current) * Math.min(1, delta * 10);
     landingScaleRef.current += (1 - landingScaleRef.current) * Math.min(1, delta * 12);
     trailCooldownRef.current = Math.max(0, trailCooldownRef.current - delta);
+    thrustCooldownRef.current = Math.max(0, thrustCooldownRef.current - delta);
 
     setDustBursts((bursts) => {
       if (!bursts.length) return bursts;
@@ -392,6 +415,26 @@ const StickFigure = ({
       return changed ? next : strokes;
     });
 
+    setAirThrusts((flames) => {
+      if (!flames.length) return flames;
+      let changed = false;
+      const next: AirThrust[] = [];
+      for (const flame of flames) {
+        const age = flame.age + delta;
+        if (age < flame.life) {
+          if (age !== flame.age) {
+            changed = true;
+            next.push({ ...flame, age });
+          } else {
+            next.push(flame);
+          }
+        } else {
+          changed = true;
+        }
+      }
+      return changed ? next : flames;
+    });
+
     const horizontalSpeed = Math.hypot(characterState.velocity[0], characterState.velocity[2]);
     const speedRatio = Math.min(1, horizontalSpeed / (PLAYER_SPEED * 1.4));
     if (!characterState.isJumping && speedRatio > 0.25 && trailCooldownRef.current <= 0) {
@@ -410,6 +453,59 @@ const StickFigure = ({
           intensity: (0.2 + intensity * 0.8) * inkPerfFactor,
         },
       ]);
+    }
+    if (characterState.isJumping) {
+      const planarSpeed = Math.hypot(characterState.velocity[0], characterState.velocity[2]);
+      const thrustIntensity = Math.min(1, planarSpeed / (PLAYER_SPEED * 1.5));
+      if (thrustIntensity > 0.2 && thrustCooldownRef.current <= 0) {
+        const directionVec = new THREE.Vector3(
+          characterState.velocity[0],
+          characterState.velocity[1] * 0.35,
+          characterState.velocity[2],
+        );
+        const magnitude = directionVec.length();
+        if (magnitude > 0.1) {
+          directionVec.normalize();
+          const backwardsOffset = 0.45 + thrustIntensity * 0.4;
+          const offset: [number, number, number] = [
+            (Math.random() - 0.5) * 0.12 - directionVec.x * backwardsOffset,
+            1.05 - directionVec.y * 0.15 + (Math.random() - 0.5) * 0.05,
+            (Math.random() - 0.5) * 0.12 - directionVec.z * backwardsOffset,
+          ];
+          const width = (0.22 + thrustIntensity * 0.35) * inkPerfFactor;
+          const height = (0.16 + thrustIntensity * 0.28) * inkPerfFactor;
+          const life = 0.18 + thrustIntensity * 0.15;
+          const opacity = 0.55 + thrustIntensity * 0.3;
+          const paletteCore =
+            characterColors.glow ??
+            (isPlayer ? "#fff4d3" : "#ffe1c4");
+          const paletteHalo =
+            characterColors.secondary ??
+            (isPlayer ? "#ff9f6e" : "#ffa94d");
+          setAirThrusts((flames) => [
+            ...flames,
+            {
+              id: thrustIdRef.current++,
+              age: 0,
+              life,
+              offset,
+              width,
+              height,
+              color: paletteHalo,
+              rimColor: paletteCore,
+              glow: 0.25 + thrustIntensity * 0.35,
+              rotation: Math.atan2(directionVec.x, directionVec.z),
+              opacity,
+              seed: Math.random() * Math.PI * 2,
+              stretch: 0.8 + thrustIntensity * 0.5,
+              tilt: (Math.random() - 0.5) * 0.35,
+              coreColor: paletteCore,
+              haloColor: paletteHalo,
+            },
+          ]);
+          thrustCooldownRef.current = Math.max(0.01, 0.045 - thrustIntensity * 0.02);
+        }
+      }
     }
   });
 
@@ -588,22 +684,66 @@ const StickFigure = ({
               opacity={opacity}
               glow={0.05 + burst.intensity * 0.2}
             />
-          </group>
-        );
-      })}
+      </group>
+    );
+  })}
+
+  {/* Air thrust flames */}
+  {airThrusts.map((flame) => {
+    const t = Math.min(1, flame.age / flame.life);
+    const flicker = 0.85 + Math.sin(flame.seed + flame.age * 24) * 0.15;
+    const opacity = Math.max(0, flame.opacity * (1 - t) * flicker);
+    if (opacity <= 0.02) return null;
+    const plumeScale = 1 + t * flame.stretch;
+    const wobble = Math.sin(flame.seed + flame.age * 18) * 0.2;
+    return (
+      <group
+        key={`thrust-${flame.id}`}
+        position={[
+          flame.offset[0] + Math.sin(flame.seed + flame.age * 12) * 0.05,
+          flame.offset[1] + wobble * 0.05,
+          flame.offset[2] + Math.cos(flame.seed + flame.age * 10) * 0.05,
+        ]}
+        rotation={[flame.tilt, flame.rotation, 0]}
+      >
+        <InkBillboard
+          width={flame.width * plumeScale * 1.3}
+          height={flame.height * plumeScale * 1.6}
+          color={flame.haloColor}
+          rimColor={flame.rimColor}
+          opacity={opacity * 0.6}
+          glow={flame.glow}
+          doubleSided
+          outlineOpacity={opacity * 0.4}
+        />
+        <group position={[0, -flame.height * 0.2, 0]}>
+          <InkBillboard
+            width={flame.width * (0.6 + t * 0.2)}
+            height={flame.height * (0.5 + t * 0.1)}
+            color={flame.coreColor}
+            rimColor="#ffffff"
+            opacity={opacity}
+            glow={flame.glow + 0.15}
+            doubleSided={false}
+            outlineOpacity={opacity * 0.5}
+          />
+        </group>
+      </group>
+    );
+  })}
 
       {/* Speed trails */}
       {speedTrails.map((trail) => {
         const life = 0.35 + trail.intensity * 0.2;
         const t = Math.min(1, trail.age / life);
         const fade = Math.max(0, (0.25 + trail.intensity * 0.3) * (1 - t));
-        const lateral = -trail.direction * (0.25 + trail.length * 0.4) * (1 - t * 0.2);
-        const width = trail.length;
-        const height = 0.12 + trail.intensity * 0.1;
+        const lateral = -trail.direction * (0.18 + trail.length * 0.25) * (1 - t * 0.15);
+        const width = trail.length * 1.35;
+        const height = 0.08 + trail.intensity * 0.06;
         return (
           <group
             key={`trail-${trail.id}`}
-            position={[lateral, trail.height, trail.offsetZ]}
+            position={[lateral, 0.25 + trail.intensity * 0.1, trail.offsetZ]}
             rotation={[0, 0, trail.direction * Math.PI / 12]}
           >
             <InkBillboard
@@ -611,10 +751,10 @@ const StickFigure = ({
               height={height}
               color={characterColors.secondary ?? "#c9f0ff"}
               rimColor={characterColors.glow ?? "#f0fdff"}
-              opacity={fade}
+              opacity={fade * 0.75}
               glow={0.1 + trail.intensity * 0.25}
               doubleSided={false}
-              outlineOpacity={fade * 0.7}
+              outlineOpacity={fade * 0.5}
             />
           </group>
         );

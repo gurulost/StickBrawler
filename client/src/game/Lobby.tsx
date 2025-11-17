@@ -1,10 +1,16 @@
 import { useEffect, useState } from "react";
 import { useFighting, type PlayerSlot } from "../lib/stores/useFighting";
+import type { FighterId } from "../combat/moveTable";
 
 const keyboardMapping = {
   player1: "Keyboard: WASD + J/K/L + Space",
   player2: "Keyboard: IJKL + U/O/P + Enter",
 };
+
+const fighterOptions: Array<{ value: FighterId; label: string }> = [
+  { value: "stick_hero", label: "Hero" },
+  { value: "stick_villain", label: "Villain" },
+];
 
 const SlotCard = ({
   slot,
@@ -14,6 +20,8 @@ const SlotCard = ({
   controllerConnected,
   onToggleType,
   onToggleReady,
+  fighterId,
+  onSelectFighter,
 }: {
   slot: PlayerSlot;
   label: string;
@@ -22,6 +30,8 @@ const SlotCard = ({
   controllerConnected: boolean;
   onToggleType?: () => void;
   onToggleReady?: () => void;
+  fighterId: FighterId;
+  onSelectFighter?: (fighter: FighterId) => void;
 }) => {
   const isPlayerTwo = slot === "player2";
   const isHuman = type === "human";
@@ -44,6 +54,25 @@ const SlotCard = ({
       </div>
 
       <p className="text-sm text-gray-200">{hint}</p>
+
+      <div className="space-y-2">
+        <p className="text-xs font-semibold tracking-widest text-indigo-200">Fighter</p>
+        <div className="flex gap-2">
+          {fighterOptions.map((option) => (
+            <button
+              key={option.value}
+              className={`flex-1 rounded-lg py-2 text-sm font-semibold transition ${
+                fighterId === option.value
+                  ? "bg-gradient-to-r from-cyan-500 to-blue-600 text-white shadow-lg"
+                  : "bg-white/10 text-white hover:bg-white/20"
+              }`}
+              onClick={() => onSelectFighter?.(option.value)}
+            >
+              {option.label}
+            </button>
+          ))}
+        </div>
+      </div>
 
       {isPlayerTwo && onToggleType && (
         <button
@@ -75,7 +104,7 @@ const SlotCard = ({
 };
 
 const Lobby = () => {
-  const { slots, setSlotType, setSlotReady, beginMatch, returnToMenu } = useFighting();
+  const { slots, setSlotType, setSlotReady, setSlotFighter, beginMatch, returnToMenu } = useFighting();
   const [controllerConnected, setControllerConnected] = useState(false);
 
   useEffect(() => {
@@ -116,6 +145,8 @@ const Lobby = () => {
           ready={slots.player1.ready}
           controllerConnected={false}
           onToggleReady={() => setSlotReady("player1", !slots.player1.ready)}
+          fighterId={slots.player1.fighterId}
+          onSelectFighter={(fighter) => setSlotFighter("player1", fighter)}
         />
         <SlotCard
           slot="player2"
@@ -131,6 +162,8 @@ const Lobby = () => {
               ? () => setSlotReady("player2", !slots.player2.ready)
               : undefined
           }
+          fighterId={slots.player2.fighterId}
+          onSelectFighter={(fighter) => setSlotFighter("player2", fighter)}
         />
       </div>
 

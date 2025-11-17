@@ -2,23 +2,16 @@ import { create } from 'zustand';
 
 export enum Controls {
   // Movement controls
-  jump = 'jump',        // Now W key
-  forward = 'forward',  // Up arrow key
-  backward = 'backward', // S key and Down arrow
-  leftward = 'leftward', // A key and Left arrow
-  rightward = 'rightward', // D key and Right arrow
-  
-  // Combat controls (separated from movement)
-  attack1 = 'attack1', // J key - quick attack
-  attack2 = 'attack2', // K key - strong attack
-  shield = 'shield',   // L key - block/defend
-  special = 'special', // Space - special move
-  
-  // Advanced techniques
-  dodge = 'dodge',     // Shift - dodge mechanic
-  airAttack = 'airAttack', // E key - aerial attack
-  taunt = 'taunt',     // T key - fun taunt move
-  grab = 'grab',       // G key - grab opponent
+  jump = "jump",
+  forward = "forward",
+  backward = "backward",
+  leftward = "leftward",
+  rightward = "rightward",
+
+  // Core verbs
+  attack = "attack",
+  special = "special",
+  defend = "defend",
 }
 
 type ControlsState = {

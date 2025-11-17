@@ -1,4 +1,3 @@
-import { PlayerInputState } from "./combatBridge";
 import { useControls } from "../lib/stores/useControls";
 
 export enum CpuAction {
@@ -26,9 +25,20 @@ interface CpuBrainOptions {
 }
 
 export interface CpuControlFrame
-  extends PlayerInputState,
-    Record<
-      "jump" | "forward" | "backward" | "leftward" | "rightward" | "dropThrough" | "shield",
+  extends Record<
+      | "jump"
+      | "forward"
+      | "backward"
+      | "leftward"
+      | "rightward"
+      | "dropThrough"
+      | "shield"
+      | "attack1"
+      | "attack2"
+      | "special"
+      | "airAttack"
+      | "dodge"
+      | "grab",
       boolean
     > {}
 

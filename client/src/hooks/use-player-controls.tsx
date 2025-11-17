@@ -63,34 +63,24 @@ const clearSource = (slot: PlayerSlot, source: keyof InputSources) => {
 
 const defaultBindings: Record<PlayerSlot, Record<Controls, string[]>> = {
   player1: {
+    [Controls.jump]: ["ShiftRight"],
+    [Controls.forward]: ["ArrowUp"],
+    [Controls.backward]: ["ArrowDown"],
+    [Controls.leftward]: ["ArrowLeft"],
+    [Controls.rightward]: ["ArrowRight"],
+    [Controls.attack]: ["KeyJ"],
+    [Controls.special]: ["KeyK"],
+    [Controls.defend]: ["KeyL"],
+  },
+  player2: {
     [Controls.jump]: ["Space"],
     [Controls.forward]: ["KeyW"],
     [Controls.backward]: ["KeyS"],
     [Controls.leftward]: ["KeyA"],
     [Controls.rightward]: ["KeyD"],
-    [Controls.attack1]: ["Digit1"],
-    [Controls.attack2]: ["Digit2"],
-    [Controls.shield]: ["Digit3"],
-    [Controls.special]: ["KeyQ"],
-    [Controls.dodge]: ["ShiftLeft"],
-    [Controls.airAttack]: ["KeyE"],
-    [Controls.grab]: ["KeyG"],
-    [Controls.taunt]: ["KeyT"],
-  },
-  player2: {
-    [Controls.jump]: ["ControlRight"],
-    [Controls.forward]: ["ArrowUp"],
-    [Controls.backward]: ["ArrowDown"],
-    [Controls.leftward]: ["ArrowLeft"],
-    [Controls.rightward]: ["ArrowRight"],
-    [Controls.attack1]: ["KeyJ"],
-    [Controls.attack2]: ["KeyK"],
-    [Controls.shield]: ["KeyL"],
-    [Controls.special]: ["Enter"],
-    [Controls.dodge]: ["Slash"],
-    [Controls.airAttack]: ["ShiftRight"],
-    [Controls.grab]: ["BracketRight"],
-    [Controls.taunt]: ["BracketLeft"],
+    [Controls.attack]: ["KeyF"],
+    [Controls.special]: ["KeyG"],
+    [Controls.defend]: ["KeyH"],
   },
 };
 
@@ -181,15 +171,10 @@ const mapGamepadSnapshot = (pad: Gamepad): PlayerInputSnapshot => {
     snapshot.backward = true;
   }
 
-  snapshot.jump = buttonPressed(pad.buttons[0]);
-  snapshot.special = buttonPressed(pad.buttons[1]);
-  snapshot.attack1 = buttonPressed(pad.buttons[2]);
-  snapshot.attack2 = buttonPressed(pad.buttons[3]);
-  snapshot.shield = buttonPressed(pad.buttons[4]);
-  snapshot.dodge = buttonPressed(pad.buttons[5]);
-  snapshot.grab = buttonPressed(pad.buttons[6]);
-  snapshot.taunt = buttonPressed(pad.buttons[9]);
-  snapshot.airAttack = buttonPressed(pad.buttons[8]);
+  snapshot.jump = buttonPressed(pad.buttons[0]); // South
+  snapshot.attack = buttonPressed(pad.buttons[2]); // West
+  snapshot.special = buttonPressed(pad.buttons[1]); // East
+  snapshot.defend = buttonPressed(pad.buttons[4]) || buttonPressed(pad.buttons[5]); // LB/L1 or RB/R1 fallback
   return snapshot;
 };
 

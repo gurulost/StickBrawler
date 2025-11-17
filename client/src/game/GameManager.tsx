@@ -5,11 +5,14 @@ import StickFigure from "./StickFigure";
 import { useFighting, type GamePhase } from "../lib/stores/useFighting";
 import { useAudio } from "../lib/stores/useAudio";
 import { usePlayerControls } from "../hooks/use-player-controls";
+import { usePlayerIntents } from "../hooks/use-player-intents";
 import { useControls } from "../lib/stores/useControls";
 import { MatchRuntime } from "./matchRuntime";
 import type { CombatTelemetryEvent } from "./combatTelemetry";
 import { useEffects } from "../lib/stores/useEffects";
 import { ARENA_THEMES } from "./arenas";
+import type { CharacterState } from "../lib/stores/useFighting";
+import type { IntentContext } from "../input/intentTypes";
 
 const GameManager = () => {
   const fighting = useFighting();
@@ -200,11 +203,20 @@ const GameManager = () => {
   useFrame((state, delta) => {
     if (!runtimeRef.current) return;
     const inputs = getInputState();
+    const intents = resolveIntents(
+      inputs,
+      {
+        player1: buildIntentContext(fighting.player),
+        player2: buildIntentContext(fighting.cpu),
+      },
+      delta,
+    );
     const activeCombat = fighting.gamePhase === "fighting" && !fighting.paused;
     if (activeCombat) {
       runtimeRef.current.update({
         delta,
         inputs,
+        intents,
         player: fighting.player,
         cpu: fighting.cpu,
         gamePhase: fighting.gamePhase,
@@ -268,3 +280,13 @@ const GameManager = () => {
 };
 
 export default GameManager;
+const buildIntentContext = (state: CharacterState): IntentContext => {
+  const grounded = state.position[1] <= 0.05;
+  return {
+    grounded,
+    airborne: !grounded || state.isJumping,
+    facing: state.direction,
+    velocity: state.velocity,
+    allowTech: false,
+  };
+};

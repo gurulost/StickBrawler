@@ -24,6 +24,9 @@ import {
   INITIAL_DASH_TURN_LOCK,
   SHORT_HOP_WINDOW,
   SHORT_HOP_FORCE_SCALE,
+  AIR_SPEED_MULTIPLIER,
+  AIR_TURN_LOCK_PENALTY,
+  AIR_STRAFE_IMPULSE,
 } from "./Physics";
 import {
   CombatStateMachine,
@@ -32,18 +35,35 @@ import {
   type FighterCombatState,
   type MoveDefinition,
 } from "../combat";
-import {
-  applyKnockbackToVelocity,
-  comboScale,
-  selectMoveFromInputs,
-  toCombatState,
-  type PlayerInputState,
-  type DirectionalInfluence,
-} from "./combatBridge";
+import { applyKnockbackToVelocity, comboScale, toCombatState, type DirectionalInfluence } from "./combatBridge";
 import type { CharacterState, GamePhase, MatchMode } from "../lib/stores/useFighting";
 import { Controls } from "../lib/stores/useControls";
-import { recordTelemetry, drainTelemetry, type CombatTelemetryEvent } from "./combatTelemetry";
+import {
+  recordTelemetry,
+  drainTelemetry,
+  type CombatTelemetryEvent,
+  type TelemetrySlot,
+  type TelemetrySource,
+} from "./combatTelemetry";
 import { DeterministicRandom } from "./prng";
+import type {
+  DualPlayerIntentFrame,
+  PlayerIntentFrame,
+  Direction,
+  PressStyle,
+  DefendIntent,
+} from "../input/intentTypes";
+import {
+  getMoveTableFor,
+  resolveMoveFromIntent,
+  pressToStrength,
+  normalizeAttackDirection,
+  toSpecialSlot,
+  type FighterMoveTable,
+} from "../combat/moveTable";
+import type { PlayerInputSnapshot } from "../hooks/use-player-controls";
+import type { PlayerSlot } from "../hooks/use-player-controls";
+import { useInputDebug } from "../lib/stores/useInputDebug";
 
 interface FightingActions {
   movePlayer: (x: number, y: number, z: number) => void;
@@ -130,18 +150,12 @@ export const createEmptyInputs = (): DualInputState => ({
 interface FramePayload {
   delta: number;
   inputs: DualInputState;
+  intents?: DualPlayerIntentFrame;
   player: CharacterState;
   cpu: CharacterState;
   gamePhase: GamePhase;
 }
 
-const PLAYER_MOVE_ORDER: Array<keyof PlayerInputState> = [
-  "special",
-  "attack2",
-  "attack1",
-  "airAttack",
-  "grab",
-];
 const DEFAULT_GUARD_VALUE = 80;
 const GUARD_BREAK_THRESHOLD = 5;
 const GUARD_BREAK_RECOVERY_RATIO = 0.35;
@@ -227,6 +241,83 @@ const createActionTimers = (): ActionTimers => ({
   staminaRegenDelay: 0,
   staminaFloor: STAMINA_FLOOR_RESET,
 });
+
+type DefendResolution = {
+  guard: boolean;
+  parry: boolean;
+  roll: boolean;
+  rollDir?: Direction;
+  grab: boolean;
+  tech: boolean;
+};
+
+const resolveDefendResolution = (
+  snapshot: ControlSnapshot,
+  frame?: PlayerIntentFrame,
+): DefendResolution => {
+  const intents = frame?.defend ?? [];
+  const state: DefendResolution = {
+    guard: false,
+    parry: false,
+    roll: false,
+    rollDir: undefined,
+    grab: false,
+    tech: false,
+  };
+  for (const intent of intents) {
+    switch (intent.mode) {
+      case "guard":
+        state.guard = true;
+        break;
+      case "parry":
+        state.guard = true;
+        state.parry = true;
+        break;
+      case "roll":
+        state.roll = true;
+        state.rollDir = intent.dir;
+        break;
+      case "grab":
+        state.grab = true;
+        break;
+      case "tech":
+        state.tech = true;
+        break;
+      default:
+        break;
+    }
+  }
+  return state;
+};
+
+const resolveIntentMoveId = (
+  frame: PlayerIntentFrame | undefined,
+  table: FighterMoveTable,
+): string | undefined => {
+  if (!frame) return undefined;
+  if (frame.attack) {
+    const dir = normalizeAttackDirection(frame.attack.dir);
+    const strength = pressToStrength(frame.attack.press);
+    const altitude = frame.attack.airborne ? "air" : "ground";
+    const key = `attack:${dir}:${strength}:${altitude}` as MoveKey;
+    const move = resolveMoveFromIntent(table, key);
+    if (move) return move;
+  }
+  if (frame.special) {
+    const slot = toSpecialSlot(frame.special.dir);
+    const altitude = frame.special.airborne ? "air" : "ground";
+    const key = `special:${slot}:${altitude}` as MoveKey;
+    const move = resolveMoveFromIntent(table, key);
+    if (move) return move;
+  }
+  const defendIntent = frame.defend?.find((intent) => intent.mode === "parry");
+  if (defendIntent) {
+    const key = `defend:${defendIntent.mode}` as MoveKey;
+    const move = resolveMoveFromIntent(table, key);
+    if (move) return move;
+  }
+  return undefined;
+};
 
 /**
  * MatchRuntime manages the deterministic game state for a single fight.
@@ -332,6 +423,9 @@ export class MatchRuntime {
   private processFrame(payload: FramePayload) {
     const { fighting, audio, getDebugMode, getMatchMode } = this.deps;
     const { delta, inputs, player, cpu } = payload;
+    const intentFrame = payload.intents;
+    const playerIntentFrame = intentFrame?.player1;
+    const rawOpponentIntentFrame = intentFrame?.player2;
     const matchMode = getMatchMode();
     const isLocalMultiplayer = matchMode === "local";
     const useCircularBounds = this.deps.getArenaStyle() === "contained";
@@ -339,27 +433,21 @@ export class MatchRuntime {
     const opponentSource = isLocalMultiplayer ? "player" : "cpu";
     const playerControls = inputs.player1;
     const opponentControls = inputs.player2;
+    const playerDefendState = resolveDefendResolution(playerControls, playerIntentFrame);
+    const localOpponentDefendState = resolveDefendResolution(opponentControls, rawOpponentIntentFrame);
+    const playerMoveTable = getMoveTableFor(player.fighterId);
+    const cpuMoveTable = getMoveTableFor(cpu.fighterId);
 
     this.playerHitLag = applyHitLagTimer(this.playerHitLag, delta);
     this.cpuHitLag = applyHitLagTimer(this.cpuHitLag, delta);
     const playerInHitLag = this.playerHitLag > 0;
     const cpuInHitLag = this.cpuHitLag > 0;
 
-    const {
-      jump,
-      forward,
-      backward,
-      leftward,
-      rightward,
-      attack1,
-      attack2,
-      shield,
-      special,
-      dodge,
-      airAttack,
-      grab,
-      taunt,
-    } = playerControls;
+    let jump = !!playerControls.jump;
+    let forward = !!playerControls.forward;
+    let backward = !!playerControls.backward;
+    let leftward = !!playerControls.leftward;
+    let rightward = !!playerControls.rightward;
     const prevPlayerControls = this.previousInputs.player1;
     const jumpPressed = !!jump && !prevPlayerControls.jump;
     const jumpReleased = !!prevPlayerControls.jump && !jump;
@@ -371,13 +459,17 @@ export class MatchRuntime {
       !!prevPlayerControls.forward ||
       !!prevPlayerControls.backward;
     const justPressedHorizontal = horizontalIntent && !prevHorizontalIntent;
+    const guardActive = playerDefendState.guard || playerDefendState.parry;
+    const dodgeActive = playerDefendState.roll;
+    const grabActive = playerDefendState.grab;
+    const taunt = false; // taunt no longer mapped to a verb; keep placeholder for future emotes
+    const intentTech = playerDefendState.tech;
     const techPressed =
-      (!!dodge && !prevPlayerControls.dodge) ||
-      (!!shield && !prevPlayerControls.shield) ||
-      (!!grab && !prevPlayerControls.grab);
+      intentTech ||
+      (!!playerControls.attack && !prevPlayerControls.attack);
 
     const cpuControlState = isLocalMultiplayer
-      ? snapshotToControlFrame(opponentControls)
+      ? snapshotToControlFrame(opponentControls, rawOpponentIntentFrame, localOpponentDefendState)
       : this.cpuBrain.tick(
           {
             position: cpu.position,
@@ -392,23 +484,12 @@ export class MatchRuntime {
           },
           delta,
         );
-    const cpuTechPressed = !!cpuControlState.dodge || !!cpuControlState.shield;
-
-    const playerInputs: PlayerInputState = {
-      attack1,
-      attack2,
-      special,
-      airAttack,
-      grab,
-      dodge,
-    };
-    if (playerInHitLag) {
-      playerInputs.attack1 = false;
-      playerInputs.attack2 = false;
-      playerInputs.special = false;
-      playerInputs.airAttack = false;
-      playerInputs.grab = false;
-    }
+    const cpuDefendState = isLocalMultiplayer
+      ? localOpponentDefendState
+      : deriveCpuDefendState(cpuControlState);
+    const cpuTechIntent = cpuDefendState.tech;
+    const cpuTechPressed =
+      cpuTechIntent || !!cpuControlState.dodge || !!cpuControlState.shield;
 
     const applyGuardDamageToPlayer = (amount: number) => {
       if (amount <= 0) return;
@@ -464,22 +545,37 @@ export class MatchRuntime {
 
     const playerIsAirborne = player.position[1] > 0.15 || player.isJumping;
     const cpuIsAirborne = cpu.position[1] > 0.15 || cpu.isJumping;
+    const cpuIntentFrame = isLocalMultiplayer
+      ? rawOpponentIntentFrame
+      : buildCpuIntentFrame(cpuControlState, cpuIsAirborne);
     const playerDirectionalInfluence = deriveDirectionalInfluence(playerControls, playerIsAirborne);
     const cpuDirectionalInfluence = deriveDirectionalInfluence(cpuControlState, cpuIsAirborne);
     this.advancePlayerTimers(delta, player, cpu);
     this.advanceCpuTimers(delta, player, cpu);
 
-    const requestedMove = selectMoveFromInputs(
-      playerInputs,
-      PLAYER_MOVE_ORDER,
-      coreMoves,
-      playerIsAirborne,
-    );
+    const intentMoveId = resolveIntentMoveId(playerIntentFrame, playerMoveTable);
+    const requestedMove = intentMoveId ? coreMoves[intentMoveId] : undefined;
 
-    const machineInputs = {
-      ...playerInputs,
-      ...(requestedMove ? { [requestedMove.id]: true } : {}),
-    };
+    const machineInputs: Record<string, boolean> = requestedMove ? { [requestedMove.id]: true } : {};
+    if (playerDefendState.roll) {
+      machineInputs.dodge = true;
+    }
+    const playerMoveLabel = intentMoveId ?? this.playerCombatState.moveId;
+    this.updateInputDebugOverlay(
+      "player1",
+      playerIntentFrame,
+      playerDefendState,
+      playerMoveLabel,
+      !playerIsAirborne,
+    );
+    this.recordInputTelemetry(
+      "player1",
+      "player",
+      playerIntentFrame,
+      playerDefendState,
+      playerMoveLabel,
+      !playerIsAirborne,
+    );
 
     const cpuStateSnapshot: FighterCombatState = {
       ...this.cpuCombatState,
@@ -595,24 +691,33 @@ export class MatchRuntime {
       this.playerHitRegistry.clear();
     }
 
-    const cpuInputs: PlayerInputState = {
-      attack1: cpuControlState.attack1,
-      attack2: cpuControlState.attack2,
-      special: cpuControlState.special,
-      airAttack: cpuControlState.airAttack,
-      dodge: cpuControlState.dodge,
-      grab: cpuControlState.grab,
-    };
-    const cpuRequestedMove = selectMoveFromInputs(
-      { ...cpuInputs, grab: false },
-      PLAYER_MOVE_ORDER,
-      coreMoves,
-      cpuIsAirborne,
+    const cpuIntentMoveId = resolveIntentMoveId(cpuIntentFrame, cpuMoveTable);
+    const cpuRequestedMove = cpuIntentMoveId ? coreMoves[cpuIntentMoveId] : undefined;
+    const cpuMachineInputs: Record<string, boolean> = cpuRequestedMove ? { [cpuRequestedMove.id]: true } : {};
+    const cpuRollActive = cpuDefendState.roll;
+    if (cpuRollActive) {
+      cpuMachineInputs.dodge = true;
+    }
+    const opponentMoveLabel = cpuIntentMoveId ?? this.cpuCombatState.moveId;
+    if (isLocalMultiplayer) {
+      this.updateInputDebugOverlay(
+        "player2",
+        cpuIntentFrame,
+        cpuDefendState,
+        opponentMoveLabel,
+        !cpuIsAirborne,
+      );
+    } else {
+      useInputDebug.getState().clearSlot("player2");
+    }
+    this.recordInputTelemetry(
+      isLocalMultiplayer ? "player2" : "cpu",
+      isLocalMultiplayer ? "player" : "cpu",
+      cpuIntentFrame,
+      cpuDefendState,
+      opponentMoveLabel,
+      !cpuIsAirborne,
     );
-    const cpuMachineInputs = {
-      ...cpuInputs,
-      ...(cpuRequestedMove ? { [cpuRequestedMove.id]: true } : {}),
-    };
     const cpuUpdatedState = this.cpuMachine.update({
       state: {
         ...this.cpuCombatState,
@@ -758,11 +863,10 @@ export class MatchRuntime {
         backward,
         leftward,
         rightward,
-        shield,
-        dodge,
-        grab,
+        shield: guardActive,
+        dodge: dodgeActive,
+        grab: grabActive,
         taunt,
-        airAttack,
       },
       player,
       cpu,
@@ -846,10 +950,16 @@ export class MatchRuntime {
 
     if (cpuControlScale > 0 && (cpuCanAct || cpu.isJumping)) {
       const accelBase = cpu.isJumping ? AIR_ACCELERATION : GROUND_ACCELERATION;
-      const accelPenalty = this.cpuTimers.turnLock > 0 ? 0.55 : 1;
-      const accel = accelBase * accelPenalty * delta;
+      const turnPenalty =
+        this.cpuTimers.turnLock > 0
+          ? cpu.isJumping
+            ? AIR_TURN_LOCK_PENALTY
+            : 0.55
+          : 1;
+      const accel = accelBase * turnPenalty * delta;
       const decel = (cpu.isJumping ? AIR_DECELERATION : GROUND_DECELERATION) * delta;
-      const maxSpeed = (cpu.isJumping ? CPU_SPEED * 0.85 : CPU_SPEED) * cpuControlScale;
+      const maxSpeed =
+        (cpu.isJumping ? CPU_SPEED * AIR_SPEED_MULTIPLIER : CPU_SPEED) * cpuControlScale;
 
       let targetVX = 0;
       if (controlState.leftward) {
@@ -860,6 +970,9 @@ export class MatchRuntime {
         cpuDirection = 1;
       }
       cpuVX = moveTowards(cpuVX, targetVX, targetVX === 0 ? decel : accel);
+      if (cpu.isJumping && !controlState.leftward && !controlState.rightward) {
+        cpuVX *= 0.9;
+      }
       cpuVX = Math.max(-maxSpeed, Math.min(maxSpeed, cpuVX));
 
       let targetVZ = 0;
@@ -869,7 +982,23 @@ export class MatchRuntime {
         targetVZ = maxSpeed;
       }
       cpuVZ = moveTowards(cpuVZ, targetVZ, targetVZ === 0 ? decel : accel);
+      if (cpu.isJumping && !controlState.forward && !controlState.backward) {
+        cpuVZ *= 0.9;
+      }
       cpuVZ = Math.max(-maxSpeed, Math.min(maxSpeed, cpuVZ));
+
+      if (cpu.isJumping && cpuJustPressedHorizontal) {
+        if (controlState.leftward) {
+          cpuVX -= AIR_STRAFE_IMPULSE;
+        } else if (controlState.rightward) {
+          cpuVX += AIR_STRAFE_IMPULSE;
+        }
+        if (controlState.forward) {
+          cpuVZ -= AIR_STRAFE_IMPULSE;
+        } else if (controlState.backward) {
+          cpuVZ += AIR_STRAFE_IMPULSE;
+        }
+      }
     }
 
     if (controlState.jump && !cpu.isJumping && cpu.position[1] <= 0.01 && cpuCanAct) {
@@ -998,7 +1127,6 @@ export class MatchRuntime {
       dodge: boolean;
       grab: boolean;
       taunt: boolean;
-      airAttack: boolean;
     },
     player: CharacterState,
     cpu: CharacterState,
@@ -1068,10 +1196,16 @@ export class MatchRuntime {
     const controlScale = playerInHitLag ? 0 : 1;
     if (canAct || player.isJumping) {
       const accelBase = player.isJumping ? AIR_ACCELERATION : GROUND_ACCELERATION;
-      const accelPenalty = this.playerTimers.turnLock > 0 ? 0.55 : 1;
-      const accel = accelBase * accelPenalty * delta;
+      const turnPenalty =
+        this.playerTimers.turnLock > 0
+          ? player.isJumping
+            ? AIR_TURN_LOCK_PENALTY
+            : 0.55
+          : 1;
+      const accel = accelBase * turnPenalty * delta;
       const decel = (player.isJumping ? AIR_DECELERATION : GROUND_DECELERATION) * delta;
-      const maxSpeed = (player.isJumping ? PLAYER_SPEED * 0.85 : PLAYER_SPEED) * controlScale;
+      const maxSpeed =
+        (player.isJumping ? PLAYER_SPEED * AIR_SPEED_MULTIPLIER : PLAYER_SPEED) * controlScale;
 
       let targetVX = 0;
       if (input.leftward) {
@@ -1082,6 +1216,9 @@ export class MatchRuntime {
         newDirection = 1;
       }
       newVX = moveTowards(newVX, targetVX, targetVX === 0 ? decel : accel);
+      if (player.isJumping && !input.leftward && !input.rightward) {
+        newVX *= 0.9;
+      }
       newVX = Math.max(-maxSpeed, Math.min(maxSpeed, newVX));
 
       let targetVZ = 0;
@@ -1091,7 +1228,23 @@ export class MatchRuntime {
         targetVZ = maxSpeed;
       }
       newVZ = moveTowards(newVZ, targetVZ, targetVZ === 0 ? decel : accel);
+      if (player.isJumping && !input.forward && !input.backward) {
+        newVZ *= 0.9;
+      }
       newVZ = Math.max(-maxSpeed, Math.min(maxSpeed, newVZ));
+
+      if (player.isJumping && input.justPressedHorizontal) {
+        if (input.leftward) {
+          newVX -= AIR_STRAFE_IMPULSE;
+        } else if (input.rightward) {
+          newVX += AIR_STRAFE_IMPULSE;
+        }
+        if (input.forward) {
+          newVZ -= AIR_STRAFE_IMPULSE;
+        } else if (input.backward) {
+          newVZ += AIR_STRAFE_IMPULSE;
+        }
+      }
     }
 
     const jumpBuffered = this.playerTimers.jumpBuffer > 0;
@@ -1535,11 +1688,75 @@ export class MatchRuntime {
     });
   }
 
+  private updateInputDebugOverlay(
+    slot: PlayerSlot,
+    frame: PlayerIntentFrame | undefined,
+    defend: DefendResolution,
+    moveId: string | undefined,
+    grounded: boolean,
+  ) {
+    const store = useInputDebug.getState();
+    if (!frame) {
+      store.updateSlot(slot, null);
+      return;
+    }
+    const defendModes = summarizeDefendModes(defend);
+    store.updateSlot(slot, {
+      direction: frame.direction,
+      grounded,
+      attack: frame.attack
+        ? {
+            dir: frame.attack.dir,
+            strength: pressToStrength(frame.attack.press),
+            altitude: frame.attack.airborne ? "air" : "ground",
+          }
+        : undefined,
+      special: frame.special
+        ? {
+            slot: toSpecialSlot(frame.special.dir),
+            altitude: frame.special.airborne ? "air" : "ground",
+          }
+        : undefined,
+      defendModes,
+      moveId,
+    });
+  }
+
+  private recordInputTelemetry(
+    slot: TelemetrySlot,
+    source: TelemetrySource,
+    frame: PlayerIntentFrame | undefined,
+    defend: DefendResolution,
+    moveId: string | undefined,
+    grounded: boolean,
+  ) {
+    if (!this.deps.getDebugMode()) return;
+    const defendModes = summarizeDefendModes(defend);
+    recordTelemetry({
+      type: "input",
+      source,
+      slot,
+      direction: frame?.direction ?? "neutral",
+      attackStrength: frame?.attack ? pressToStrength(frame.attack.press) : undefined,
+      attackAltitude: frame?.attack ? (frame.attack.airborne ? "air" : "ground") : undefined,
+      specialSlot: frame?.special ? toSpecialSlot(frame.special.dir) : undefined,
+      specialAltitude: frame?.special ? (frame.special.airborne ? "air" : "ground") : undefined,
+      defendModes,
+      moveId,
+      grounded,
+      timestamp: performance.now(),
+    });
+  }
+
 }
 
 type InfluenceSnapshot = Partial<Record<"leftward" | "rightward" | "jump" | "backward", boolean>>;
 
-function snapshotToControlFrame(snapshot?: ControlSnapshot): CpuControlFrame {
+function snapshotToControlFrame(
+  snapshot?: ControlSnapshot,
+  intentFrame?: PlayerIntentFrame,
+  defend?: DefendResolution,
+): CpuControlFrame {
   const base: CpuControlFrame = {
     jump: false,
     forward: false,
@@ -1561,13 +1778,20 @@ function snapshotToControlFrame(snapshot?: ControlSnapshot): CpuControlFrame {
   base.backward = !!snapshot.backward;
   base.leftward = !!snapshot.leftward;
   base.rightward = !!snapshot.rightward;
-  base.attack1 = !!snapshot.attack1;
-  base.attack2 = !!snapshot.attack2;
-  base.special = !!snapshot.special;
-  base.airAttack = !!snapshot.airAttack;
-  base.dodge = !!snapshot.dodge;
-  base.grab = !!snapshot.grab;
-  base.shield = !!snapshot.shield;
+  if (intentFrame?.attack) {
+    const heavy = intentFrame.attack.press.heavy || intentFrame.attack.press.charged;
+    base.attack2 = heavy;
+    base.attack1 = !heavy;
+    base.airAttack = intentFrame.attack.airborne;
+  } else {
+    base.attack1 = !!snapshot.attack;
+    base.attack2 = false;
+    base.airAttack = false;
+  }
+  base.special = intentFrame?.special ? true : !!snapshot.special;
+  base.dodge = defend?.roll ?? false;
+  base.grab = defend?.grab ?? false;
+  base.shield = defend?.guard || defend?.parry || false;
   base.dropThrough = !!snapshot.backward && !!snapshot.jump;
   return base;
 }
@@ -1607,4 +1831,82 @@ function playMoveStartAudio(
       audio.playSpecial();
       break;
   }
+}
+
+function summarizeDefendModes(defend: DefendResolution): string[] {
+  const modes: string[] = [];
+  if (defend.guard) modes.push("guard");
+  if (defend.parry) modes.push("parry");
+  if (defend.roll) modes.push(defend.rollDir ? `roll:${defend.rollDir}` : "roll");
+  if (defend.grab) modes.push("grab");
+  if (defend.tech) modes.push("tech");
+  return modes;
+}
+
+function buildCpuIntentFrame(controlState: CpuControlFrame, airborne: boolean): PlayerIntentFrame {
+  const direction: Direction = controlState.leftward
+    ? "left"
+    : controlState.rightward
+      ? "right"
+      : controlState.backward
+        ? "back"
+        : controlState.forward
+          ? "forward"
+          : "neutral";
+  const attackPress: PressStyle = {
+    heldMs: controlState.attack2 ? 320 : 90,
+    tapped: !controlState.attack2,
+    heavy: !!controlState.attack2,
+    charged: !!controlState.attack2,
+    flickedDir: undefined,
+    justPressed: true,
+  };
+  const attackIntent = controlState.attack1 || controlState.attack2 || controlState.airAttack
+    ? {
+        kind: "attack" as const,
+        dir: direction,
+        airborne: controlState.airAttack || airborne,
+        press: attackPress,
+      }
+    : undefined;
+  const specialIntent = controlState.special
+    ? {
+        kind: "special" as const,
+        dir: direction,
+        airborne,
+        press: {
+          heldMs: 90,
+          tapped: true,
+          heavy: false,
+          charged: false,
+          flickedDir: undefined,
+          justPressed: true,
+        } as PressStyle,
+      }
+    : undefined;
+  return {
+    attack: attackIntent,
+    special: specialIntent,
+    defend: [],
+    jump: controlState.jump
+      ? { kind: "jump", shortHopCandidate: false, justPressed: true }
+      : undefined,
+    dash: undefined,
+    direction,
+  };
+}
+
+function deriveCpuDefendState(controlState: CpuControlFrame): DefendResolution {
+  let rollDir: Direction | undefined;
+  if (controlState.leftward) rollDir = "left";
+  else if (controlState.rightward) rollDir = "right";
+  else if (controlState.backward) rollDir = "back";
+  return {
+    guard: !!controlState.shield,
+    parry: false,
+    roll: !!controlState.dodge,
+    rollDir: controlState.dodge ? rollDir : undefined,
+    grab: !!controlState.grab,
+    tech: false,
+  };
 }

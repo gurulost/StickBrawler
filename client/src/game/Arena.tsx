@@ -5,6 +5,8 @@ import {
   getArenaTheme,
   ARENA_THEMES,
   type ArenaTheme,
+  type OpenArenaPresentationTuning,
+  type ContainedArenaPresentationTuning,
 } from "./arenas";
 import * as THREE from "three";
 import { useFighting } from "../lib/stores/useFighting";
@@ -31,14 +33,38 @@ type ArenaProps = {
 };
 
 const OPEN_PLATFORM_TOP_THICKNESS = 0.3;
-const OPEN_PLATFORM_TOP_DEFAULT_OPACITY = 0.9;
-const OPEN_PLATFORM_TOP_OCCLUDED_OPACITY = 0.28;
-const OPEN_SUPPORT_DEFAULT_OPACITY = 0.68;
-const OPEN_SUPPORT_OCCLUDED_OPACITY = 0.06;
 const OPEN_PLATFORM_OCCLUSION_BLEND = 7.5;
-const OPEN_COMBAT_LANE_WIDTH = 3.2;
-const OPEN_DECORATION_COUNT = 4;
 const FIGHT_PRESENTATION_PHASES = new Set(["fighting", "round_end", "match_end"]);
+
+const DEFAULT_OPEN_PRESENTATION_TUNING: OpenArenaPresentationTuning = {
+  laneWidth: 3.2,
+  laneOpacity: 0.12,
+  gridOpacity: 0.18,
+  backdropOpacity: 0.08,
+  focusBackdropOpacity: 0.05,
+  decorationCount: 4,
+  decorationScale: 1,
+  decorationOpacity: 0.55,
+  pillarOpacity: 0.74,
+  pillarWidthScale: 1,
+  pillarDepthScale: 1,
+  platformGlowOpacity: 0.09,
+  undersideGlowOpacity: 0.16,
+  supportOpacity: 0.68,
+  supportOccludedOpacity: 0.06,
+  topOpacity: 0.9,
+  topOccludedOpacity: 0.28,
+};
+
+const DEFAULT_CONTAINED_PRESENTATION_TUNING: ContainedArenaPresentationTuning = {
+  gridOpacity: 0.35,
+  ringGlowOpacity: 0.55,
+  wallOpacity: 0.92,
+  wallTransmission: 0.75,
+  railOpacity: 0.25,
+  platformHaloOpacity: 0.35,
+  spawnPadGlow: 0.2,
+};
 
 const clampValue = (value: number, min: number, max: number) =>
   Math.max(min, Math.min(max, value));
@@ -57,6 +83,7 @@ type OpenArenaPlatformProps = {
     y: number;
   };
   theme: ArenaTheme;
+  tuning: OpenArenaPresentationTuning;
 };
 
 const Arena = ({ variant }: ArenaProps) => {
@@ -108,8 +135,9 @@ const OpenArena = ({
   gradientTexture: THREE.CanvasTexture | null;
   skylineTexture: THREE.CanvasTexture | null;
 }) => {
+  const tuning = theme.openPresentation ?? DEFAULT_OPEN_PRESENTATION_TUNING;
   const wallHeight = ARENA_WIDTH / 3;
-  const decorationCount = OPEN_DECORATION_COUNT;
+  const decorationCount = tuning.decorationCount;
   const decorationOffsets = Array.from({ length: decorationCount }).map((_, index) => {
     const spread = index / (decorationCount - 1) - 0.5;
     return spread * ARENA_WIDTH * 0.62;
@@ -123,10 +151,10 @@ const OpenArena = ({
       theme.colors.gridColor2,
     );
     (helper.material as THREE.Material).transparent = true;
-    (helper.material as THREE.Material).opacity = 0.18;
+    (helper.material as THREE.Material).opacity = tuning.gridOpacity;
     helper.position.y = FLOOR_Y + 0.01;
     return helper;
-  }, [theme.colors.gridColor1, theme.colors.gridColor2]);
+  }, [theme.colors.gridColor1, theme.colors.gridColor2, tuning.gridOpacity]);
 
   useEffect(() => {
     return () => {
@@ -153,11 +181,11 @@ const OpenArena = ({
       <primitive object={gridHelper} />
 
       <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, FLOOR_Y + 0.025, 0]}>
-        <planeGeometry args={[ARENA_WIDTH * 0.88, OPEN_COMBAT_LANE_WIDTH]} />
+        <planeGeometry args={[ARENA_WIDTH * 0.88, tuning.laneWidth]} />
         <meshBasicMaterial
           color={theme.accentLeft}
           transparent
-          opacity={0.12}
+          opacity={tuning.laneOpacity}
           depthWrite={false}
         />
       </mesh>
@@ -166,7 +194,7 @@ const OpenArena = ({
         <meshBasicMaterial
           color={theme.accentRight}
           transparent
-          opacity={0.08}
+          opacity={tuning.backdropOpacity}
           depthWrite={false}
         />
       </mesh>
@@ -175,7 +203,7 @@ const OpenArena = ({
         <meshBasicMaterial
           color="#ffffff"
           transparent
-          opacity={0.05}
+          opacity={tuning.focusBackdropOpacity}
           depthWrite={false}
         />
       </mesh>
@@ -186,6 +214,7 @@ const OpenArena = ({
           key={`platform-${index}`}
           platform={platform}
           theme={theme}
+          tuning={tuning}
         />
       ))}
 
@@ -200,13 +229,13 @@ const OpenArena = ({
 
       {/* Boundaries */}
       <mesh position={[-ARENA_WIDTH / 2 + 0.25, wallHeight * 0.42, 0]} castShadow>
-        <boxGeometry args={[0.75, wallHeight * 0.84, ARENA_WIDTH / 3.6]} />
-        <meshStandardMaterial color={theme.pillarColor} roughness={0.48} transparent opacity={0.74} />
+        <boxGeometry args={[0.75 * tuning.pillarWidthScale, wallHeight * 0.84, (ARENA_WIDTH / 3.6) * tuning.pillarDepthScale]} />
+        <meshStandardMaterial color={theme.pillarColor} roughness={0.48} transparent opacity={tuning.pillarOpacity} />
       </mesh>
 
       <mesh position={[ARENA_WIDTH / 2 - 0.25, wallHeight * 0.42, 0]} castShadow>
-        <boxGeometry args={[0.75, wallHeight * 0.84, ARENA_WIDTH / 3.6]} />
-        <meshStandardMaterial color={theme.pillarColor} roughness={0.58} transparent opacity={0.74} />
+        <boxGeometry args={[0.75 * tuning.pillarWidthScale, wallHeight * 0.84, (ARENA_WIDTH / 3.6) * tuning.pillarDepthScale]} />
+        <meshStandardMaterial color={theme.pillarColor} roughness={0.58} transparent opacity={tuning.pillarOpacity} />
       </mesh>
 
       {/* Decorative elements along the edges */}
@@ -218,6 +247,7 @@ const OpenArena = ({
                 castShadow
                 position={[-ARENA_WIDTH / 2 + 0.85, 1.3, offset]}
                 rotation={[0, 0, Math.PI / 4]}
+                scale={tuning.decorationScale}
               >
                 <coneGeometry args={[0.52, 2.2, 4]} />
                 <meshStandardMaterial
@@ -225,13 +255,14 @@ const OpenArena = ({
                   emissive={theme.accentLeft}
                   emissiveIntensity={0.42}
                   transparent
-                  opacity={0.55}
+                  opacity={tuning.decorationOpacity}
                 />
               </mesh>
               <mesh
                 castShadow
                 position={[ARENA_WIDTH / 2 - 0.85, 1.3, -offset]}
                 rotation={[0, 0, -Math.PI / 4]}
+                scale={tuning.decorationScale}
               >
                 <coneGeometry args={[0.52, 2.2, 4]} />
                 <meshStandardMaterial
@@ -239,7 +270,7 @@ const OpenArena = ({
                   emissive={theme.accentRight}
                   emissiveIntensity={0.42}
                   transparent
-                  opacity={0.55}
+                  opacity={tuning.decorationOpacity}
                 />
               </mesh>
             </group>
@@ -249,6 +280,7 @@ const OpenArena = ({
           <group
             key={`decor-arch-${i}`}
             position={[-ARENA_WIDTH / 2 + 0.25, 0, offset]}
+            scale={tuning.decorationScale}
           >
             <mesh castShadow position={[0, 1.9, 0]}>
               <torusGeometry args={[0.86, 0.06, 16, 64, Math.PI]} />
@@ -257,7 +289,7 @@ const OpenArena = ({
                 color="#fef3ff"
                 emissiveIntensity={0.34}
                 transparent
-                opacity={0.5}
+                opacity={tuning.decorationOpacity}
               />
             </mesh>
             <mesh castShadow position={[ARENA_WIDTH - 0.5, 1.9, 0]}>
@@ -267,7 +299,7 @@ const OpenArena = ({
                 color="#ecfeff"
                 emissiveIntensity={0.34}
                 transparent
-                opacity={0.5}
+                opacity={tuning.decorationOpacity}
               />
             </mesh>
           </group>
@@ -312,6 +344,7 @@ const OpenArena = ({
 const ReadableOpenArenaPlatform = ({
   platform,
   theme,
+  tuning,
 }: OpenArenaPlatformProps) => {
   const { camera } = useThree();
   const topMaterialRef = useRef<THREE.MeshStandardMaterial | null>(null);
@@ -416,13 +449,13 @@ const ReadableOpenArenaPlatform = ({
       (nextTopOcclusion - occlusionStateRef.current.top) * blend;
 
     const topOpacity = THREE.MathUtils.lerp(
-      OPEN_PLATFORM_TOP_DEFAULT_OPACITY,
-      OPEN_PLATFORM_TOP_OCCLUDED_OPACITY,
+      tuning.topOpacity,
+      tuning.topOccludedOpacity,
       occlusionStateRef.current.top,
     );
     const supportOpacity = THREE.MathUtils.lerp(
-      OPEN_SUPPORT_DEFAULT_OPACITY,
-      OPEN_SUPPORT_OCCLUDED_OPACITY,
+      tuning.supportOpacity,
+      tuning.supportOccludedOpacity,
       occlusionStateRef.current.support,
     );
 
@@ -450,7 +483,7 @@ const ReadableOpenArenaPlatform = ({
         <meshBasicMaterial
           color={theme.accentRight}
           transparent
-          opacity={reducedSupports ? 0.16 : 0.09}
+          opacity={reducedSupports ? tuning.undersideGlowOpacity : tuning.platformGlowOpacity}
           depthWrite={false}
         />
       </mesh>
@@ -467,7 +500,7 @@ const ReadableOpenArenaPlatform = ({
           emissive={theme.accentLeft}
           emissiveIntensity={0.08}
           transparent
-          opacity={OPEN_PLATFORM_TOP_DEFAULT_OPACITY}
+          opacity={tuning.topOpacity}
         />
       </mesh>
 
@@ -487,7 +520,7 @@ const ReadableOpenArenaPlatform = ({
             emissive={theme.accentRight}
             emissiveIntensity={0.04}
             transparent
-            opacity={OPEN_SUPPORT_DEFAULT_OPACITY}
+            opacity={tuning.supportOpacity}
           />
         </mesh>
       ))}
@@ -505,6 +538,7 @@ const ContainmentArena = ({
   gradientTexture: THREE.CanvasTexture | null;
   skylineTexture: THREE.CanvasTexture | null;
 }) => {
+  const tuning = theme.containedPresentation ?? DEFAULT_CONTAINED_PRESENTATION_TUNING;
   const baseSize = Math.min(ARENA_WIDTH, ARENA_DEPTH);
   const ringRadius = baseSize * 0.34;
   const wallRadius = baseSize * 0.47;
@@ -523,10 +557,10 @@ const ContainmentArena = ({
       theme.colors.gridColor2,
     );
     (g.material as THREE.Material).transparent = true;
-    (g.material as THREE.Material).opacity = 0.35;
+    (g.material as THREE.Material).opacity = tuning.gridOpacity;
     g.position.y = FLOOR_Y + 0.012;
     return g;
-  }, [wallRadius, theme.colors.gridColor1, theme.colors.gridColor2]);
+  }, [wallRadius, theme.colors.gridColor1, theme.colors.gridColor2, tuning.gridOpacity]);
 
   useEffect(
     () => () => {
@@ -546,9 +580,9 @@ const ContainmentArena = ({
         roughness: 0.4,
         metalness: 0.05,
         emissive: theme.colors.decorEmissive1,
-        emissiveIntensity: 0.2,
+        emissiveIntensity: tuning.spawnPadGlow,
       }),
-    [theme.colors.decorBase1, theme.colors.decorEmissive1],
+    [theme.colors.decorBase1, theme.colors.decorEmissive1, tuning.spawnPadGlow],
   );
   useEffect(
     () => () => {
@@ -632,7 +666,7 @@ const ContainmentArena = ({
         <meshBasicMaterial
           color={theme.colors.gridColor1}
           transparent
-          opacity={0.55}
+          opacity={tuning.ringGlowOpacity}
         />
       </mesh>
 
@@ -643,11 +677,12 @@ const ContainmentArena = ({
         />
         <meshPhysicalMaterial
           transparent
-          transmission={0.75}
+          transmission={tuning.wallTransmission}
           thickness={0.15}
           roughness={0.2}
           metalness={0.0}
           color="#cfe0ff"
+          opacity={tuning.wallOpacity}
           side={THREE.DoubleSide}
         />
       </mesh>
@@ -689,7 +724,7 @@ const ContainmentArena = ({
           <meshStandardMaterial
             color={theme.pillarColor}
             transparent
-            opacity={0.25}
+            opacity={tuning.railOpacity}
             metalness={0.3}
             roughness={0.6}
           />
@@ -723,7 +758,7 @@ const ContainmentArena = ({
               <meshBasicMaterial
                 color={theme.colors.decorEmissive2}
                 transparent
-                opacity={0.35}
+                opacity={tuning.platformHaloOpacity}
               />
             </mesh>
           </group>

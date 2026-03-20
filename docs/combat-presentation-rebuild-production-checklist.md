@@ -4,12 +4,12 @@ Source of truth checklist for a large/intense task.
 
 ## Metadata
 - Created: 2026-03-19T22:52:28
-- Last Updated: 2026-03-20T02:25:00
+- Last Updated: 2026-03-20T02:53:00
 - Workspace: /Users/davedixon/Documents/GitHub/StickBrawler
 - Checklist Doc: /Users/davedixon/Documents/GitHub/StickBrawler/docs/combat-presentation-rebuild-production-checklist.md
 
 ## Scope
-- [x] Q-000 [status:verified] Rebuild the combat runtime/store/render boundary around authoritative `moveId` + `moveFrame`, add active-frame/body-region hit resolution, tighten the fight to a 2.5D presentation band, and ship a pose-driven vertical slice for locomotion plus core authored moves without restarting the whole game.
+- [x] Q-000 [status:verified] Rebuild the combat runtime/store/render boundary around authoritative `moveId` + `moveFrame`, add active-frame/body-region hit resolution, tighten the fight to a 2.5D presentation band, and finish the roster/stage polish pass so the current authored move table and arena themes read clearly without restarting the whole game.
 
 ## Sign-off Gate
 - [x] G-001 [status:verified] All queued work, findings, fixes, and validations are complete.
@@ -50,6 +50,10 @@ Source of truth checklist for a large/intense task.
   - Evidence: 2026-03-20 follow-up audit across `client/src/combat/moves.ts`, `client/src/combat/hitResolver.ts`, `client/src/game/Arena.tsx`, `client/src/game/GameManager.tsx`, `server/routes.ts`, and live Playwright smoke showed root/inferred hitbox anchors in authored content, no in-scene combat box overlay, cluttered open-platform supports/decor relative to fighter scale, a hit-only telemetry schema on the server, and per-frame debug input telemetry overwhelming local validation.
   - Owner: Codex
   - Linked Fix: P-005
+- [x] F-006 [status:verified] [P3] [confidence:0.9] After the seam rebuild, the current move table and arena roster still had two content-level polish gaps: several authored move IDs still depended on generic/shared presentation clips, and stage readability tuning was still mostly a single baseline instead of something distinct per arena theme.
+  - Evidence: 2026-03-20 follow-up audit across `client/src/game/stickfigure/movePresentation.ts`, `client/src/combat/moves.ts`, `client/src/game/Arena.tsx`, and `client/src/game/arenas/index.ts` showed a small bespoke clip set with broad aliasing, plus shared open/contained material behavior that did not yet materially differentiate Sunset Bloom, Aurora Flux, and Containment under the closer 2.5D camera.
+  - Owner: Codex
+  - Linked Fix: P-006
 
 ## Fix Log
 - [x] P-001 [status:verified] Reworked the runtime/store boundary so `matchRuntime` now owns authoritative combat state, publishes `RuntimeFrameSnapshot` + `CombatEvent` payloads, and `useFighting` ingests them as a mirror/HUD store via `applyRuntimeFrame` and `applyCombatEvents`.
@@ -67,28 +71,31 @@ Source of truth checklist for a large/intense task.
 - [x] P-005 [status:verified] Finished the requested content/polish slice: all authored move hitboxes now declare explicit sockets, collision and rendering share exported combat spatial samples, a live `CombatDebugOverlay` renders sockets/hurtboxes/hitboxes in-match, the open arena was stripped back around a clearer combat lane, and debug telemetry was repaired and throttled so local validation no longer drowns in 422/flood noise.
   - Addresses: F-005
   - Evidence: `client/src/combat/types.ts`, `client/src/combat/moves.ts`, `client/src/combat/hitResolver.ts`, `client/src/game/CombatDebugOverlay.tsx`, `client/src/game/GameManager.tsx`, `client/src/game/Arena.tsx`, `client/src/game/matchRuntime.ts`, `server/telemetry.ts`, `server/routes.ts`, `tests/client/hit-resolver.test.ts`, `tests/server/telemetry-routes.test.ts`; `npm run check`; `npm test -- --runInBand`; Playwright smoke on 2026-03-20 around 02:23-02:24 EDT.
+- [x] P-006 [status:verified] Finished the residual content pass by giving the remaining authored hero/villain moves bespoke presentation clips, exporting clip-resolution helpers so clip coverage is testable, and adding per-theme stage readability tuning for Sunset Bloom, Aurora Flux, and Containment instead of one shared arena baseline.
+  - Addresses: F-006
+  - Evidence: `client/src/game/stickfigure/movePresentation.ts`, `client/src/game/Arena.tsx`, `client/src/game/arenas/index.ts`, `tests/client/presentation-polish.test.ts`; `npm run check`; `npm test -- --runInBand`; Playwright smoke across all three arena themes on 2026-03-20 around 02:50-02:52 EDT.
 
 ## Validation Log
 - [x] V-001 [status:verified] `npm run check`
-  - Evidence: 2026-03-20 02:24 EDT final pass after the final telemetry sampling adjustment
+  - Evidence: 2026-03-20 02:49 EDT pass after the move-clip expansion and per-arena tuning additions
 - [x] V-002 [status:verified] No dedicated lint script exists in `package.json`; typecheck is the repository’s static-analysis gate.
   - Evidence: 2026-03-19 23:20 EDT pass; verified by `package.json` audit that no lint script exists, so no runnable lint command was skipped
 - [x] V-003 [status:verified] `npm test -- --runInBand`
-  - Evidence: 2026-03-20 02:24 EDT final pass, 17/17 tests green including socket-anchor coverage and mixed telemetry-route coverage
+  - Evidence: 2026-03-20 02:49 EDT final pass, 21/21 tests green including new authored-move clip coverage and arena-theme tuning coverage
 - [x] V-004 [status:verified] Added focused smoke coverage for the rebuilt seam instead of a browser e2e harness that does not exist in the repo.
-  - Evidence: 2026-03-20 02:19 EDT pass; `tests/client/fighting-store.test.ts`, `tests/client/hit-resolver.test.ts`, and `tests/server/telemetry-routes.test.ts` cover runtime snapshot ingest, raw mirror-store helpers, slot-scoped tech events, active-frame gating, explicit socket anchors, spatial sampling, and mixed telemetry payload validation in the final `npm test -- --runInBand` run
-- [x] V-005 [status:verified] Playwright smoke on the local dev server validated the open-arena readability pass and live debug overlay after the final telemetry fixes.
-  - Evidence: 2026-03-20 02:23-02:24 EDT browser pass on `http://127.0.0.1:3000` showed the debug HUD active with no new console errors beyond the pre-existing unsigned-in `401 /api/auth/me` and guest `404 /api/economy/:profileId`, telemetry summary updating without `422 /api/telemetry`, and the dev server reduced to coarse `204 /api/telemetry` sampling instead of the prior frame-by-frame failure flood while the viewport remained readable with lighter supports and visible combat-box markers.
+  - Evidence: 2026-03-20 02:49 EDT pass; `tests/client/fighting-store.test.ts`, `tests/client/hit-resolver.test.ts`, `tests/server/telemetry-routes.test.ts`, and `tests/client/presentation-polish.test.ts` cover runtime snapshot ingest, raw mirror-store helpers, slot-scoped tech events, active-frame gating, explicit socket anchors, full authored-move presentation mapping across the current roster, and stage-specific arena tuning in the final `npm test -- --runInBand` run
+- [x] V-005 [status:verified] Playwright smoke on the local dev server validated the three arena themes and the richer move-presentation path after the content pass.
+  - Evidence: 2026-03-20 02:50-02:52 EDT browser pass on `http://127.0.0.1:3000` exercised Sunset Bloom, Aurora Flux, and Containment Arena in live matches with debug HUD enabled, captured readable screenshots for each tuned stage, confirmed `hero_jab_1` still surfaced through live move state after an input burst, and showed no new console/network failures beyond the pre-existing unsigned-in `401 /api/auth/me`, guest `404 /api/economy/:profileId`, and repeated scene-swap `THREE.WebGLRenderer: Context Lost.` logs.
 
 ## Residual Risks
-- [x] R-001 [status:accepted_risk] The pose-driven presentation layer currently covers a strong vertical slice plus aliases, not a fully bespoke clip for every authored move in the roster.
-  - Rationale: The rebuild intentionally prioritized the runtime/store/render seam and the 8-12 core verbs path first. Additional authored clips can now land on a stable contract instead of a broken one.
+- [x] R-001 [status:accepted_risk] Unsigned-in browser smoke still produces the pre-existing `401 /api/auth/me` and guest `404 /api/economy/:profileId` noise.
+  - Rationale: These requests are unrelated to the combat presentation/content path and did not block validation, but they still lower the signal-to-noise ratio of frontend smoke runs.
   - Owner: Dave/Codex follow-up
-  - Follow-up trigger/date: When expanding roster polish beyond the current hero/villain core verbs
-- [x] R-002 [status:accepted_risk] The open arena has now had a dedicated readability pass, but arena art still is not bespoke per stage and the contained arena has not had the same composition tuning depth.
-  - Rationale: The biggest live readability problem was the open-platform clutter around the 2.5D lane, and that has been materially reduced. Further arena work is now diminishing returns rather than a blocker.
+  - Follow-up trigger/date: Next auth/economy guest-mode cleanup sprint
+- [x] R-002 [status:accepted_risk] Menu/lobby-to-match scene swaps still log repeated `THREE.WebGLRenderer: Context Lost.` messages during browser smoke.
+  - Rationale: The logs appear when the menu preview renderers are torn down and replaced by the gameplay scene. They are noisy but do not break the match flow or the new combat presentation path.
   - Owner: Dave/Codex follow-up
-  - Follow-up trigger/date: Next per-arena art/presentation sprint if the team wants stage-specific polish beyond the current gameplay readability baseline
+  - Follow-up trigger/date: Next rendering lifecycle cleanup pass if scene-transition noise becomes worth the engineering cost
 
 ## Change Log
 - 2026-03-19T22:52:28: Checklist initialized.
@@ -96,3 +103,4 @@ Source of truth checklist for a large/intense task.
 - 2026-03-20T01:55:00: Reopened the seam audit; finished socket-driven collision, surfaced runtime tech events to presentation, simplified legacy store helper behavior, and reran the full validation suite.
 - 2026-03-20T02:20:00: Completed the requested polish/readability sprint: authored explicit hitbox sockets, added live combat box overlays, cleaned up the open arena composition, repaired the mixed-event telemetry API, throttled debug input telemetry, and reran static, test, and Playwright validation.
 - 2026-03-20T02:25:00: Finalized the telemetry polish by making input telemetry change-driven plus rate-limited, reran static/tests, and reran the live browser smoke on the true final code state.
+- 2026-03-20T02:53:00: Closed the remaining content residuals by adding bespoke clips for the rest of the current authored move table, introducing per-theme arena tuning for Sunset Bloom/Aurora Flux/Containment, adding focused coverage in `tests/client/presentation-polish.test.ts`, and rerunning static, automated, and browser validation.

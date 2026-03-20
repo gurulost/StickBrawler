@@ -1,3 +1,33 @@
+  export type OpenArenaPresentationTuning = {
+    laneWidth: number;
+    laneOpacity: number;
+    gridOpacity: number;
+    backdropOpacity: number;
+    focusBackdropOpacity: number;
+    decorationCount: number;
+    decorationScale: number;
+    decorationOpacity: number;
+    pillarOpacity: number;
+    pillarWidthScale: number;
+    pillarDepthScale: number;
+    platformGlowOpacity: number;
+    undersideGlowOpacity: number;
+    supportOpacity: number;
+    supportOccludedOpacity: number;
+    topOpacity: number;
+    topOccludedOpacity: number;
+  };
+
+  export type ContainedArenaPresentationTuning = {
+    gridOpacity: number;
+    ringGlowOpacity: number;
+    wallOpacity: number;
+    wallTransmission: number;
+    railOpacity: number;
+    platformHaloOpacity: number;
+    spawnPadGlow: number;
+  };
+
   export type ArenaTheme = {
     id: string;
     name: string;
@@ -22,6 +52,8 @@
       intensity: number;
       position: [number, number, number];
     };
+    openPresentation?: OpenArenaPresentationTuning;
+    containedPresentation?: ContainedArenaPresentationTuning;
 
     // --- Old nested properties (from HEAD, for backward compatibility) ---
     colors: {
@@ -70,6 +102,25 @@
       ambientColor: "#f5f3ff",
       fillLight: { color: "#fcd34d", intensity: 0.7, position: [-10, 8, 6] },
       rimLight: { color: "#c4b5fd", intensity: 0.45, position: [8, 10, -6] },
+      openPresentation: {
+        laneWidth: 3.45,
+        laneOpacity: 0.13,
+        gridOpacity: 0.13,
+        backdropOpacity: 0.09,
+        focusBackdropOpacity: 0.06,
+        decorationCount: 4,
+        decorationScale: 0.88,
+        decorationOpacity: 0.44,
+        pillarOpacity: 0.62,
+        pillarWidthScale: 0.9,
+        pillarDepthScale: 0.85,
+        platformGlowOpacity: 0.14,
+        undersideGlowOpacity: 0.17,
+        supportOpacity: 0.52,
+        supportOccludedOpacity: 0.04,
+        topOpacity: 0.88,
+        topOccludedOpacity: 0.24,
+      },
       // Old props (for compatibility, from HEAD 'sunset')
       colors: {
         skyTop: "#d2efff",
@@ -116,6 +167,25 @@
       ambientColor: "#dbeafe",
       fillLight: { color: "#34d399", intensity: 0.75, position: [-12, 6, 4] },
       rimLight: { color: "#38bdf8", intensity: 0.55, position: [10, 9, -5] },
+      openPresentation: {
+        laneWidth: 2.9,
+        laneOpacity: 0.18,
+        gridOpacity: 0.16,
+        backdropOpacity: 0.14,
+        focusBackdropOpacity: 0.08,
+        decorationCount: 3,
+        decorationScale: 1.06,
+        decorationOpacity: 0.62,
+        pillarOpacity: 0.7,
+        pillarWidthScale: 0.82,
+        pillarDepthScale: 0.76,
+        platformGlowOpacity: 0.18,
+        undersideGlowOpacity: 0.22,
+        supportOpacity: 0.58,
+        supportOccludedOpacity: 0.05,
+        topOpacity: 0.92,
+        topOccludedOpacity: 0.22,
+      },
       // Old props (for compatibility, from HEAD 'aurora' & new values)
       colors: {
         skyTop: "#1e3a8a", // Use new sky
@@ -161,6 +231,15 @@
       ambientColor: "#eef4ff", // Mapped from hemisphereTop
       fillLight: { color: "#bcd3ff", intensity: 0.5, position: [-10, 8, -10] }, // Mapped from pointLight1
       rimLight: { color: "#c7d4e6", intensity: 0.4, position: [8, 10, -6] }, // Mapped from pointLight2
+      containedPresentation: {
+        gridOpacity: 0.24,
+        ringGlowOpacity: 0.64,
+        wallOpacity: 0.52,
+        wallTransmission: 0.68,
+        railOpacity: 0.2,
+        platformHaloOpacity: 0.16,
+        spawnPadGlow: 0.28,
+      },
       // Old props (from HEAD)
       colors: {
         skyTop: "#eaf2ff",

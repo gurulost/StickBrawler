@@ -9,19 +9,22 @@ interface TorsoProps {
   colors: ColorThemeValues;
   style: FigureStyleValues;
   lean: number;
+  inkWeight: number;
+  emphasis: number;
   isPlayer: boolean;
 }
 
-const Torso: FC<TorsoProps> = ({ colors, style, lean, isPlayer }) => {
+const Torso: FC<TorsoProps> = ({ colors, style, lean, inkWeight, emphasis, isPlayer }) => {
   const { getPlayerInkParams, getCPUInkParams } = useCustomization();
   const inkParams = isPlayer ? getPlayerInkParams() : getCPUInkParams();
   const scale = style.bodyScale;
-  const outlineScale = 1 + inkParams.lineWidth;
+  const inkPulse = Math.max(0, inkWeight - 1);
+  const outlineScale = 1 + inkParams.lineWidth + inkPulse * 0.08;
   const rimColor = colors.glow ?? inkParams.rimColor;
   const accentColor = colors.tertiary ?? colors.secondary;
   const shoulderWidth = Math.max(0.34, style.shoulderWidth);
   const shoulderY = style.bodyLength * 0.22;
-  const bodyGlow = inkParams.glow + style.glowIntensity * 0.08;
+  const bodyGlow = inkParams.glow + style.glowIntensity * 0.08 + inkPulse * 0.18 + emphasis * 0.06;
 
   return (
     <group position={[lean * 0.1, 1.0, 0]} rotation={[0, 0, lean * 0.2]} scale={[scale, scale, scale]}>

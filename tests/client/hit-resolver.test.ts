@@ -98,3 +98,29 @@ test("combat spatial samples expose authored socket-driven hitboxes", () => {
   assert.equal(frame.hitboxes[0]?.active, true);
   assert.ok(frame.sockets.some((socket) => socket.id === "rightFoot"));
 });
+
+test("combat spatial samples inherit rendered root offset and body scale from the authored pose", () => {
+  const move = coreMoves.hero_launcher;
+  const frame = sampleCombatSpatialFrame({
+    fighter: createCombatState({
+      moveId: move.id,
+      moveFrame: 12,
+      position: [0, 0, 0],
+    }),
+    move,
+  });
+
+  const torso = frame.sockets.find((socket) => socket.id === "torso");
+  const head = frame.sockets.find((socket) => socket.id === "head");
+
+  assert.ok(torso, "expected torso socket to exist");
+  assert.ok(head, "expected head socket to exist");
+  assert.ok(
+    (torso?.world[1] ?? 0) > 1.2,
+    `expected torso height to include authored lift/compression, got ${torso?.world[1] ?? 0}`,
+  );
+  assert.ok(
+    (head?.world[1] ?? 0) > 1.95,
+    `expected head height to include authored lift/compression, got ${head?.world[1] ?? 0}`,
+  );
+});

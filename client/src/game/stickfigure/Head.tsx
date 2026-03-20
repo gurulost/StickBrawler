@@ -9,17 +9,19 @@ interface HeadProps {
   style: FigureStyleValues;
   isAttacking: boolean;
   lean: number;
+  inkWeight: number;
   isPlayer: boolean;
 }
 
-const Head: FC<HeadProps> = ({ colors, style, isAttacking, lean, isPlayer }) => {
+const Head: FC<HeadProps> = ({ colors, style, isAttacking, lean, inkWeight, isPlayer }) => {
   const { getPlayerInkParams, getCPUInkParams } = useCustomization();
   const inkParams = isPlayer ? getPlayerInkParams() : getCPUInkParams();
 
   const headScale = style.headSize;
   const styleVariant = style.specialGeometry;
-  const glow = isAttacking ? inkParams.glow + 0.15 : inkParams.glow;
-  const outlineScale = 1 + inkParams.lineWidth;
+  const inkPulse = Math.max(0, inkWeight - 1);
+  const glow = (isAttacking ? inkParams.glow + 0.15 : inkParams.glow) + inkPulse * 0.22;
+  const outlineScale = 1 + inkParams.lineWidth + inkPulse * 0.08;
   const accentColor = colors.emissive ?? colors.secondary;
   const rimColor = colors.glow ?? inkParams.rimColor;
 

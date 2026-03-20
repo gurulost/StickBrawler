@@ -37,32 +37,32 @@ const OPEN_PLATFORM_OCCLUSION_BLEND = 7.5;
 const FIGHT_PRESENTATION_PHASES = new Set(["fighting", "round_end", "match_end"]);
 
 const DEFAULT_OPEN_PRESENTATION_TUNING: OpenArenaPresentationTuning = {
-  laneWidth: 3.2,
-  laneOpacity: 0.12,
-  gridOpacity: 0.18,
-  backdropOpacity: 0.08,
-  focusBackdropOpacity: 0.05,
-  decorationCount: 4,
-  decorationScale: 1,
-  decorationOpacity: 0.55,
-  pillarOpacity: 0.74,
-  pillarWidthScale: 1,
-  pillarDepthScale: 1,
+  laneWidth: 2.1,
+  laneOpacity: 0.16,
+  gridOpacity: 0.1,
+  backdropOpacity: 0.05,
+  focusBackdropOpacity: 0.03,
+  decorationCount: 2,
+  decorationScale: 0.8,
+  decorationOpacity: 0.18,
+  pillarOpacity: 0.34,
+  pillarWidthScale: 0.82,
+  pillarDepthScale: 0.74,
   platformGlowOpacity: 0.09,
-  undersideGlowOpacity: 0.16,
-  supportOpacity: 0.68,
-  supportOccludedOpacity: 0.06,
-  topOpacity: 0.9,
-  topOccludedOpacity: 0.28,
+  undersideGlowOpacity: 0.12,
+  supportOpacity: 0.24,
+  supportOccludedOpacity: 0.02,
+  topOpacity: 0.58,
+  topOccludedOpacity: 0.12,
 };
 
 const DEFAULT_CONTAINED_PRESENTATION_TUNING: ContainedArenaPresentationTuning = {
-  gridOpacity: 0.35,
-  ringGlowOpacity: 0.55,
-  wallOpacity: 0.92,
-  wallTransmission: 0.75,
-  railOpacity: 0.25,
-  platformHaloOpacity: 0.35,
+  gridOpacity: 0.18,
+  ringGlowOpacity: 0.48,
+  wallOpacity: 0.34,
+  wallTransmission: 0.8,
+  railOpacity: 0.1,
+  platformHaloOpacity: 0.12,
   spawnPadGlow: 0.2,
 };
 
@@ -138,10 +138,12 @@ const OpenArena = ({
   const tuning = theme.openPresentation ?? DEFAULT_OPEN_PRESENTATION_TUNING;
   const wallHeight = ARENA_WIDTH / 3;
   const decorationCount = tuning.decorationCount;
-  const decorationOffsets = Array.from({ length: decorationCount }).map((_, index) => {
-    const spread = index / (decorationCount - 1) - 0.5;
-    return spread * ARENA_WIDTH * 0.62;
+  const decorationDepthOffsets = Array.from({ length: decorationCount }).map((_, index) => {
+    const pairIndex = Math.floor(index / 2);
+    const sign = index % 2 === 0 ? -1 : 1;
+    return sign * (ARENA_DEPTH * (0.31 + pairIndex * 0.08));
   });
+  const laneCoreWidth = Math.max(1.12, tuning.laneWidth * 0.48);
 
   const gridHelper = useMemo(() => {
     const helper = new THREE.GridHelper(
@@ -189,7 +191,16 @@ const OpenArena = ({
           depthWrite={false}
         />
       </mesh>
-      <mesh position={[0, wallHeight * 0.42, -ARENA_WIDTH * 0.38]}>
+      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, FLOOR_Y + 0.032, 0]}>
+        <planeGeometry args={[ARENA_WIDTH * 0.78, laneCoreWidth]} />
+        <meshBasicMaterial
+          color="#ffffff"
+          transparent
+          opacity={tuning.focusBackdropOpacity * 1.8}
+          depthWrite={false}
+        />
+      </mesh>
+      <mesh position={[0, wallHeight * 0.42, -ARENA_WIDTH * 0.44]}>
         <planeGeometry args={[ARENA_WIDTH * 1.18, wallHeight * 0.82]} />
         <meshBasicMaterial
           color={theme.accentRight}
@@ -198,7 +209,7 @@ const OpenArena = ({
           depthWrite={false}
         />
       </mesh>
-      <mesh position={[0, wallHeight * 0.42, -ARENA_WIDTH * 0.379]}>
+      <mesh position={[0, wallHeight * 0.42, -ARENA_WIDTH * 0.439]}>
         <planeGeometry args={[ARENA_WIDTH * 0.42, wallHeight * 0.56]} />
         <meshBasicMaterial
           color="#ffffff"
@@ -239,12 +250,11 @@ const OpenArena = ({
       </mesh>
 
       {/* Decorative elements along the edges */}
-      {decorationOffsets.map((offset, i) => {
+      {decorationDepthOffsets.map((offset, i) => {
         if (theme.id === "auroraFlux") {
           return (
             <group key={`decor-crystal-${i}`}>
               <mesh
-                castShadow
                 position={[-ARENA_WIDTH / 2 + 0.85, 1.3, offset]}
                 rotation={[0, 0, Math.PI / 4]}
                 scale={tuning.decorationScale}
@@ -259,7 +269,6 @@ const OpenArena = ({
                 />
               </mesh>
               <mesh
-                castShadow
                 position={[ARENA_WIDTH / 2 - 0.85, 1.3, -offset]}
                 rotation={[0, 0, -Math.PI / 4]}
                 scale={tuning.decorationScale}
@@ -282,7 +291,7 @@ const OpenArena = ({
             position={[-ARENA_WIDTH / 2 + 0.25, 0, offset]}
             scale={tuning.decorationScale}
           >
-            <mesh castShadow position={[0, 1.9, 0]}>
+            <mesh position={[0, 1.9, 0]}>
               <torusGeometry args={[0.86, 0.06, 16, 64, Math.PI]} />
               <meshStandardMaterial
                 emissive={theme.accentLeft}
@@ -292,7 +301,7 @@ const OpenArena = ({
                 opacity={tuning.decorationOpacity}
               />
             </mesh>
-            <mesh castShadow position={[ARENA_WIDTH - 0.5, 1.9, 0]}>
+            <mesh position={[ARENA_WIDTH - 0.5, 1.9, 0]}>
               <torusGeometry args={[0.86, 0.06, 16, 64, Math.PI]} />
               <meshStandardMaterial
                 emissive={theme.accentRight}
@@ -644,6 +653,25 @@ const ContainmentArena = ({
       </mesh>
 
       <primitive object={polarGrid} />
+
+      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, FLOOR_Y + 0.024, 0]}>
+        <planeGeometry args={[wallRadius * 1.58, 1.88]} />
+        <meshBasicMaterial
+          color={theme.colors.decorEmissive1}
+          transparent
+          opacity={tuning.platformHaloOpacity * 0.9}
+          depthWrite={false}
+        />
+      </mesh>
+      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, FLOOR_Y + 0.03, 0]}>
+        <planeGeometry args={[wallRadius * 1.32, 0.92]} />
+        <meshBasicMaterial
+          color="#ffffff"
+          transparent
+          opacity={tuning.platformHaloOpacity * 0.72}
+          depthWrite={false}
+        />
+      </mesh>
 
       {/* Central octagonal ring lip */}
       <mesh

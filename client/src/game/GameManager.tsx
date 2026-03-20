@@ -9,27 +9,20 @@ import { usePlayerControls } from "../hooks/use-player-controls";
 import { usePlayerIntents } from "../hooks/use-player-intents";
 import { useControls } from "../lib/stores/useControls";
 import { MatchRuntime } from "./matchRuntime";
-import { ARENA_HALF_DEPTH, ARENA_HALF_WIDTH } from "./Physics";
 import type { CombatTelemetryEvent } from "./combatTelemetry";
 import { useEffects } from "../lib/stores/useEffects";
 import { ARENA_THEMES } from "./arenas";
 import type { CharacterState } from "../lib/stores/useFighting";
 import type { IntentContext } from "../input/intentTypes";
+import { resolveCombatDebugReviewRecord, useCombatDebug } from "../lib/stores/useCombatDebug";
+import {
+  CAMERA_LOOK_HEIGHT_BASE,
+  CAMERA_TRACK_SMOOTHING,
+  resolveCombatCameraRig,
+} from "./combatReadability";
 
-const CAMERA_TRACK_SMOOTHING = 5.2;
-const CAMERA_LOOK_HEIGHT_BASE = 2.2;
-const CAMERA_MIN_HEIGHT = 5.9;
-const CAMERA_MAX_HEIGHT = 8.9;
-const CAMERA_MIN_DEPTH = 8.1;
-const CAMERA_MAX_DEPTH = 12.8;
-const CAMERA_X_TRACK_LIMIT = ARENA_HALF_WIDTH * 0.28;
-const CAMERA_TARGET_Z_LIMIT = ARENA_HALF_DEPTH * 0.12;
-const CAMERA_POSITION_Z_LIMIT = ARENA_HALF_DEPTH * 0.24;
 const TELEMETRY_FLUSH_INTERVAL_MS = 250;
 const TELEMETRY_IMMEDIATE_FLUSH_SIZE = 48;
-
-const clampValue = (value: number, min: number, max: number) =>
-  Math.max(min, Math.min(max, value));
 
 const blendToward = (from: number, to: number, factor: number) =>
   from + (to - from) * factor;
@@ -39,17 +32,20 @@ const GameManager = () => {
   const audio = useAudio();
   const getInputState = usePlayerControls();
   const resolveIntents = usePlayerIntents();
+  const combatPlaybackPaused = useControls((state) => state.combatPlaybackPaused);
+  const combatPlaybackRate = useControls((state) => state.combatPlaybackRate);
+  const resetCombatPlayback = useControls((state) => state.resetCombatPlayback);
+  const debugHistory = useCombatDebug((state) => state.history);
+  const reviewFrameId = useCombatDebug((state) => state.reviewFrameId);
 
   const fightingActions = useMemo(
     () => ({
       applyRuntimeFrame: fighting.applyRuntimeFrame,
       applyCombatEvents: fighting.applyCombatEvents,
-      updateRoundTime: fighting.updateRoundTime,
     }),
     [
       fighting.applyRuntimeFrame,
       fighting.applyCombatEvents,
-      fighting.updateRoundTime,
     ],
   );
 
@@ -129,11 +125,45 @@ const GameManager = () => {
   const prevPhaseRef = useRef<GamePhase>(fighting.gamePhase);
   const playerSnapshotRef = useRef(fighting.player);
   const cpuSnapshotRef = useRef(fighting.cpu);
+  const reviewRecord = useMemo(
+    () => resolveCombatDebugReviewRecord(debugHistory, reviewFrameId),
+    [debugHistory, reviewFrameId],
+  );
+  const presentedPlayer = reviewRecord?.player ?? fighting.player;
+  const presentedCpu = reviewRecord?.cpu ?? fighting.cpu;
+  const presentedPlayerEvents = reviewRecord?.playerEvents ?? fighting.playerEvents;
+  const presentedCpuEvents = reviewRecord?.cpuEvents ?? fighting.cpuEvents;
 
   useEffect(() => {
     playerSnapshotRef.current = fighting.player;
     cpuSnapshotRef.current = fighting.cpu;
   }, [fighting.player, fighting.cpu]);
+
+  const advanceRuntimeFrames = useCallback(
+    (frames: number) => {
+      if (!runtimeRef.current || frames <= 0) return;
+      for (let index = 0; index < frames; index += 1) {
+        const inputState = getInputState();
+        const latest = useFighting.getState();
+        if (latest.gamePhase !== "fighting" || latest.paused) return;
+        const intents = resolveIntents(
+          inputState,
+          {
+            player1: buildIntentContext(latest.player),
+            player2: buildIntentContext(latest.cpu),
+          },
+          1 / 60,
+        );
+        runtimeRef.current.update({
+          delta: 1 / 60,
+          inputs: inputState,
+          intents,
+          gamePhase: latest.gamePhase,
+        });
+      }
+    },
+    [getInputState, resolveIntents],
+  );
 
   // Update arena style ref when arenaId changes
   useEffect(() => {
@@ -179,8 +209,11 @@ const GameManager = () => {
         cpu: cpuSnapshotRef.current,
       });
     }
+    if (fighting.gamePhase !== "fighting" && prevPhaseRef.current === "fighting") {
+      resetCombatPlayback();
+    }
     prevPhaseRef.current = fighting.gamePhase;
-  }, [fighting.gamePhase]);
+  }, [fighting.gamePhase, resetCombatPlayback]);
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
@@ -191,6 +224,57 @@ const GameManager = () => {
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [fighting]);
+
+  useEffect(() => {
+    const win = window as Window & {
+      advanceTime?: (ms: number) => void;
+      render_game_to_text?: () => string;
+    };
+    win.advanceTime = (ms: number) => {
+      useCombatDebug.getState().clearReviewFrame();
+      const frames = Math.max(1, Math.round(ms / (1000 / 60)));
+      advanceRuntimeFrames(frames);
+    };
+    win.render_game_to_text = () =>
+      JSON.stringify({
+        mode: fighting.gamePhase,
+        debug: {
+          reviewFrameId,
+          historyFrames: debugHistory.length,
+          combatPlaybackPaused,
+          combatPlaybackRate,
+        },
+        player: {
+          x: presentedPlayer.position[0],
+          y: presentedPlayer.position[1],
+          z: presentedPlayer.position[2],
+          moveId: presentedPlayer.moveId ?? null,
+          moveFrame: presentedPlayer.moveFrame ?? 0,
+          movePhase: presentedPlayer.movePhase ?? "none",
+        },
+        cpu: {
+          x: presentedCpu.position[0],
+          y: presentedCpu.position[1],
+          z: presentedCpu.position[2],
+          moveId: presentedCpu.moveId ?? null,
+          moveFrame: presentedCpu.moveFrame ?? 0,
+          movePhase: presentedCpu.movePhase ?? "none",
+        },
+      });
+    return () => {
+      delete win.advanceTime;
+      delete win.render_game_to_text;
+    };
+  }, [
+    advanceRuntimeFrames,
+    combatPlaybackPaused,
+    combatPlaybackRate,
+    debugHistory.length,
+    fighting.gamePhase,
+    presentedCpu,
+    presentedPlayer,
+    reviewFrameId,
+  ]);
 
   useFrame((state, delta) => {
     if (!runtimeRef.current) return;
@@ -204,60 +288,52 @@ const GameManager = () => {
       delta,
     );
     const activeCombat = fighting.gamePhase === "fighting" && !fighting.paused;
+    const queuedStepFrames = activeCombat
+      ? useControls.getState().consumeCombatFrameSteps()
+      : 0;
+    const simulatedDeltaSeconds =
+      activeCombat && (queuedStepFrames > 0 || !combatPlaybackPaused)
+        ? queuedStepFrames > 0
+          ? queuedStepFrames / 60
+          : delta * combatPlaybackRate
+        : 0;
     const presentationActive =
       fighting.gamePhase === "fighting" ||
       fighting.gamePhase === "round_end" ||
       fighting.gamePhase === "match_end";
     if (activeCombat) {
-      runtimeRef.current.update({
-        delta,
-        inputs,
-        intents,
-        player: fighting.player,
-        cpu: fighting.cpu,
-        gamePhase: fighting.gamePhase,
-      });
+      if (queuedStepFrames > 0) {
+        for (let index = 0; index < queuedStepFrames; index += 1) {
+          runtimeRef.current.update({
+            delta: 1 / 60,
+            inputs,
+            intents,
+            gamePhase: fighting.gamePhase,
+          });
+        }
+      } else if (!combatPlaybackPaused) {
+        runtimeRef.current.update({
+          delta: simulatedDeltaSeconds,
+          inputs,
+          intents,
+          gamePhase: fighting.gamePhase,
+        });
+      }
     }
 
-    decayEffects(delta);
+    decayEffects(simulatedDeltaSeconds);
 
-    const playerPos = fighting.player.position;
-    const cpuPos = fighting.cpu.position;
-    const midpointX = (playerPos[0] + cpuPos[0]) / 2;
-    const midpointZ = (playerPos[2] + cpuPos[2]) / 2;
-    const maxHeight = Math.max(playerPos[1], cpuPos[1]);
-    const horizontalSpread = Math.hypot(
-      playerPos[0] - cpuPos[0],
-      (playerPos[2] - cpuPos[2]) * 0.9,
-    );
-    const verticalSpread = Math.abs(playerPos[1] - cpuPos[1]);
-    const combinedSpread = horizontalSpread + verticalSpread * 0.55;
-
-    const desiredCameraPosition: [number, number, number] = [
-      clampValue(midpointX * 0.28, -CAMERA_X_TRACK_LIMIT, CAMERA_X_TRACK_LIMIT),
-      clampValue(
-        CAMERA_MIN_HEIGHT + combinedSpread * 0.24 + maxHeight * 0.18,
-        CAMERA_MIN_HEIGHT,
-        CAMERA_MAX_HEIGHT,
-      ),
-      clampValue(
-        midpointZ + CAMERA_MIN_DEPTH + combinedSpread * 0.52,
-        CAMERA_MIN_DEPTH - CAMERA_POSITION_Z_LIMIT,
-        CAMERA_MAX_DEPTH + CAMERA_POSITION_Z_LIMIT,
-      ),
-    ];
-    const desiredCameraTarget: [number, number, number] = [
-      clampValue(midpointX, -CAMERA_X_TRACK_LIMIT, CAMERA_X_TRACK_LIMIT),
-      clampValue(CAMERA_LOOK_HEIGHT_BASE + maxHeight * 0.4, CAMERA_LOOK_HEIGHT_BASE, 6.1),
-      clampValue(midpointZ, -CAMERA_TARGET_Z_LIMIT, CAMERA_TARGET_Z_LIMIT),
-    ];
+    const playerPos = presentedPlayer.position;
+    const cpuPos = presentedCpu.position;
+    const { position: desiredCameraPosition, target: desiredCameraTarget } =
+      resolveCombatCameraRig(playerPos, cpuPos);
 
     const effectsState = useEffects.getState();
     if (!cameraBaseRef.current) {
       cameraBaseRef.current = desiredCameraPosition;
       cameraTargetRef.current = desiredCameraTarget;
     } else if (presentationActive) {
-      const blend = 1 - Math.exp(-delta * CAMERA_TRACK_SMOOTHING);
+      const blend = 1 - Math.exp(-simulatedDeltaSeconds * CAMERA_TRACK_SMOOTHING);
       cameraBaseRef.current = [
         blendToward(cameraBaseRef.current[0], desiredCameraPosition[0], blend),
         blendToward(cameraBaseRef.current[1], desiredCameraPosition[1], blend),
@@ -288,20 +364,20 @@ const GameManager = () => {
       <Arena variant={fighting.arenaId} />
       <StickFigure
         isPlayer={true}
-        characterState={fighting.player}
-        events={fighting.playerEvents}
+        characterState={presentedPlayer}
+        events={presentedPlayerEvents}
       />
       <StickFigure
         isPlayer={false}
-        characterState={fighting.cpu}
-        events={fighting.cpuEvents}
+        characterState={presentedCpu}
+        events={presentedCpuEvents}
       />
       <CombatDebugOverlay
-        characterState={fighting.player}
+        characterState={presentedPlayer}
         accent="#60a5fa"
       />
       <CombatDebugOverlay
-        characterState={fighting.cpu}
+        characterState={presentedCpu}
         accent="#f97316"
       />
     </>

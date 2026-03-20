@@ -1,4 +1,5 @@
 import { coreMoves } from "../../combat/moves";
+import type { CombatSocketId, MoveDefinition } from "../../combat/types";
 import type { CharacterState } from "../../lib/stores/useFighting";
 
 export type PresentationAttackStyle =
@@ -43,6 +44,8 @@ export interface PoseSampleState {
   moveFrame?: number;
   justLanded?: boolean;
   hitstunFrames?: number;
+  blockstunFrames?: number;
+  landingLagFrames?: number;
   isDodging?: boolean;
   isBlocking?: boolean;
   inAir?: boolean;
@@ -180,9 +183,10 @@ const MOVE_ALIASES: Record<string, string> = {
 
 const MOVE_CLIPS: Record<string, PoseKeyframe[]> = {
   hero_jab_1: [
-    { at: 0, pose: { lean: -0.08, torsoLean: -0.12, rightArm: limb([-0.42, 0.05, -0.84]), rightLeg: limb([0.18, 0, -0.12]), plantedFoot: "left", lineWeight: 1.08 } },
-    { at: 0.32, pose: { lean: 0.12, torsoLean: 0.18, rightArm: limb([0.12, 0, -1.44], 0.26), leftArm: limb([0.06, 0.02, 0.42]), rightLeg: limb([0.08, 0, -0.04]), emphasis: 0.72, attackStyle: "punch", smear: 0.85, trailIntensity: 0.5, animationPhase: 0.38, lineWeight: 1.32 } },
-    { at: 0.56, pose: { lean: 0.06, torsoLean: 0.08, rightArm: limb([0.18, 0, -1.12], 0.18), attackStyle: "punch", animationPhase: 0.62, emphasis: 0.4, lineWeight: 1.18 } },
+    { at: 0, pose: { lean: -0.14, torsoLean: -0.2, rootOffset: [-0.04, -0.02, 0], bodyScale: [1.04, 0.9, 1], bodyRotation: [0, 0, 0.04], rightArm: limb([-0.52, 0.06, -0.96]), leftArm: limb([0.24, 0.04, 0.54]), leftLeg: limb([-0.24, 0, 0.08]), rightLeg: limb([0.26, 0, -0.14]), plantedFoot: "left", lineWeight: 1.1 } },
+    { at: 0.18, pose: { lean: -0.28, torsoLean: -0.36, headLean: 0.04, rootOffset: [-0.1, -0.06, 0], bodyScale: [1.08, 0.8, 1], bodyRotation: [0, 0, 0.18], rightArm: limb([-0.94, 0.08, -1.36]), leftArm: limb([0.44, 0.06, 0.84]), leftLeg: limb([-0.32, 0, 0.1]), rightLeg: limb([0.46, 0, -0.24]), plantedFoot: "left", lineWeight: 1.18 } },
+    { at: 0.34, pose: { lean: 0.24, torsoLean: 0.3, headLean: -0.08, rootOffset: [0.14, 0.04, 0], bodyScale: [0.96, 1.1, 1], bodyRotation: [0, 0, -0.18], rightArm: limb([0.18, 0.02, -1.94], 0.42), leftArm: limb([-0.08, 0, 0.14]), leftLeg: limb([0.02, 0, 0.02]), rightLeg: limb([-0.1, 0, -0.04]), emphasis: 1, attackStyle: "punch", smear: 0.98, trailIntensity: 0.72, animationPhase: 0.4, lineWeight: 1.56 } },
+    { at: 0.52, pose: { lean: 0.1, torsoLean: 0.12, rootOffset: [0.05, 0.01, 0], bodyRotation: [0, 0, -0.08], rightArm: limb([0.22, 0, -1.22], 0.18), leftArm: limb([0.04, 0.02, 0.28]), attackStyle: "punch", animationPhase: 0.62, emphasis: 0.34, smear: 0.12, trailIntensity: 0.16, lineWeight: 1.2 } },
     { at: 1, pose: BASE_POSE },
   ],
   vill_jab_triple: [
@@ -193,9 +197,10 @@ const MOVE_CLIPS: Record<string, PoseKeyframe[]> = {
     { at: 1, pose: BASE_POSE },
   ],
   hero_tilt_side: [
-    { at: 0, pose: { lean: -0.16, torsoLean: -0.2, rightArm: limb([-0.6, 0.12, -1.12]), leftArm: limb([0.22, 0.04, 0.56]), rightLeg: limb([0.28, 0, -0.14]), plantedFoot: "left", lineWeight: 1.1 } },
-    { at: 0.45, pose: { lean: 0.24, torsoLean: 0.22, bodyRotation: [0, 0, -0.1], rightArm: limb([0.1, 0.02, -1.68], 0.34), leftArm: limb([0.08, 0, 0.3]), rightLeg: limb([-0.06, 0, 0.06]), attackStyle: "kick", animationPhase: 0.46, emphasis: 0.86, smear: 0.92, trailIntensity: 0.62, lineWeight: 1.4 } },
-    { at: 0.74, pose: { lean: 0.12, torsoLean: 0.12, rightArm: limb([0.2, 0, -1.36], 0.18), attackStyle: "kick", animationPhase: 0.72, emphasis: 0.42, lineWeight: 1.2 } },
+    { at: 0, pose: { lean: -0.26, torsoLean: -0.34, rootOffset: [-0.08, -0.01, 0], bodyScale: [1.06, 0.9, 1], bodyRotation: [0, 0, 0.12], rightArm: limb([-0.92, 0.16, -1.32]), leftArm: limb([0.36, 0.06, 0.72]), rightLeg: limb([0.42, 0, -0.22]), leftLeg: limb([-0.24, 0, 0.1]), plantedFoot: "left", lineWeight: 1.16 } },
+    { at: 0.22, pose: { lean: -0.38, torsoLean: -0.48, headLean: 0.06, rootOffset: [-0.16, -0.06, 0], bodyScale: [1.1, 0.78, 1], bodyRotation: [0, 0, 0.28], rightArm: limb([-1.16, 0.18, -1.68]), leftArm: limb([0.54, 0.08, 0.98]), rightLeg: limb([0.56, 0, -0.28]), leftLeg: limb([-0.32, 0, 0.12]), plantedFoot: "left", lineWeight: 1.24 } },
+    { at: 0.42, pose: { lean: 0.34, torsoLean: 0.3, headLean: -0.1, rootOffset: [0.12, 0.04, 0], bodyRotation: [0, 0, -0.24], bodyScale: [0.96, 1.12, 1], rightArm: limb([0.1, 0.02, -1.94], 0.46), leftArm: limb([-0.08, 0, 0.12]), rightLeg: limb([-0.2, 0, 0.12]), leftLeg: limb([0.06, 0, 0]), attackStyle: "special", animationPhase: 0.42, emphasis: 1, smear: 0.98, trailIntensity: 0.84, lineWeight: 1.56 } },
+    { at: 0.62, pose: { lean: 0.14, torsoLean: 0.14, rootOffset: [0.04, 0.01, 0], bodyRotation: [0, 0, -0.1], rightArm: limb([0.22, 0, -1.38], 0.22), leftArm: limb([0.02, 0, 0.22]), attackStyle: "special", animationPhase: 0.64, emphasis: 0.4, smear: 0.14, trailIntensity: 0.2, lineWeight: 1.24 } },
     { at: 1, pose: BASE_POSE },
   ],
   hero_sweep: [
@@ -211,9 +216,10 @@ const MOVE_CLIPS: Record<string, PoseKeyframe[]> = {
     { at: 1, pose: BASE_POSE },
   ],
   hero_launcher: [
-    { at: 0, pose: { lean: -0.18, torsoLean: -0.28, bodyScale: [1.04, 0.9, 1], leftArm: limb([0.26, 0.06, 0.72]), rightArm: limb([-0.4, 0.08, -0.94]), leftLeg: limb([-0.44, 0, 0.18]), rightLeg: limb([0.5, 0, -0.18]), plantedFoot: "left", lineWeight: 1.18 } },
-    { at: 0.42, pose: { lean: 0.08, torsoLean: 0.12, bodyScale: [0.98, 1.08, 1], rootOffset: [0, 0.04, 0], bodyRotation: [0, 0, 0.14], leftArm: limb([0.6, 0.12, 1.12], 0.16), rightArm: limb([0.42, 0.02, -1.48], 0.24), leftLeg: limb([-0.12, 0, 0.04]), rightLeg: limb([0.22, 0, -0.08]), attackStyle: "special", animationPhase: 0.44, emphasis: 0.9, smear: 0.88, trailIntensity: 0.58, lineWeight: 1.36 } },
-    { at: 0.74, pose: { lean: 0.04, torsoLean: 0.04, rootOffset: [0, 0.06, 0], rightArm: limb([0.22, 0, -1.02], 0.1), attackStyle: "special", animationPhase: 0.76, emphasis: 0.36, lineWeight: 1.16 } },
+    { at: 0, pose: { lean: -0.28, torsoLean: -0.4, bodyScale: [1.08, 0.86, 1], rootOffset: [-0.06, -0.06, 0], bodyRotation: [0, 0, 0.1], leftArm: limb([0.34, 0.08, 0.9]), rightArm: limb([-0.7, 0.12, -1.18]), leftLeg: limb([-0.58, 0, 0.24]), rightLeg: limb([0.68, 0, -0.24]), plantedFoot: "left", lineWeight: 1.24 } },
+    { at: 0.2, pose: { lean: -0.34, torsoLean: -0.5, headLean: 0.08, bodyScale: [1.1, 0.76, 1], rootOffset: [-0.08, -0.1, 0], bodyRotation: [0, 0, 0.22], leftArm: limb([0.46, 0.1, 1.12]), rightArm: limb([-0.88, 0.16, -1.42]), leftLeg: limb([-0.66, 0, 0.28]), rightLeg: limb([0.8, 0, -0.28]), plantedFoot: "left", lineWeight: 1.28 } },
+    { at: 0.4, pose: { lean: 0.18, torsoLean: 0.26, headLean: -0.08, bodyScale: [0.94, 1.24, 1], rootOffset: [0.04, 0.26, 0], bodyRotation: [0, 0, 0.32], leftArm: limb([1.12, 0.18, 1.42], 0.28), rightArm: limb([0.74, 0.04, -1.72], 0.36), leftLeg: limb([-0.04, 0, 0]), rightLeg: limb([0.12, 0, -0.04]), attackStyle: "special", animationPhase: 0.4, emphasis: 1, smear: 0.9, trailIntensity: 0.86, lineWeight: 1.56 } },
+    { at: 0.62, pose: { lean: 0.12, torsoLean: 0.12, rootOffset: [0.01, 0.14, 0], bodyRotation: [0, 0, 0.14], rightArm: limb([0.36, 0, -1.22], 0.16), leftArm: limb([0.48, 0.08, 0.72]), attackStyle: "special", animationPhase: 0.64, emphasis: 0.4, smear: 0.12, trailIntensity: 0.24, lineWeight: 1.22 } },
     { at: 1, pose: BASE_POSE },
   ],
   hero_smash_side: [
@@ -228,9 +234,10 @@ const MOVE_CLIPS: Record<string, PoseKeyframe[]> = {
     { at: 1, pose: { ...BASE_POSE, rootOffset: [0, 0.06, 0], attackStyle: "air_attack" } },
   ],
   hero_air_forward: [
-    { at: 0, pose: { lean: -0.08, torsoLean: -0.12, rootOffset: [0, 0.1, 0], rightArm: limb([-0.44, 0.08, -1.12]), leftArm: limb([0.18, 0.04, 0.74]), leftLeg: limb([0.16, 0, 0.34]), rightLeg: limb([-0.3, 0, -0.42]), attackStyle: "air_attack", lineWeight: 1.14 } },
-    { at: 0.42, pose: { lean: 0.18, torsoLean: 0.16, rootOffset: [0.04, 0.08, 0], bodyRotation: [0, 0, -0.06], rightArm: limb([0.18, 0.02, -1.72], 0.34), leftArm: limb([0.04, 0, 0.26]), leftLeg: limb([0.04, 0, 0.12]), rightLeg: limb([-0.08, 0, -0.08]), attackStyle: "air_attack", animationPhase: 0.42, emphasis: 0.82, smear: 0.94, trailIntensity: 0.68, lineWeight: 1.38 } },
-    { at: 0.72, pose: { lean: 0.08, torsoLean: 0.06, rightArm: limb([0.2, 0, -1.22], 0.14), attackStyle: "air_attack", animationPhase: 0.74, emphasis: 0.34, lineWeight: 1.18 } },
+    { at: 0, pose: { lean: -0.18, torsoLean: -0.24, rootOffset: [0, 0.14, 0], bodyScale: [1.04, 0.92, 1], bodyRotation: [0, 0, 0.06], rightArm: limb([-0.62, 0.1, -1.3]), leftArm: limb([0.28, 0.04, 0.9]), leftLeg: limb([0.28, 0, 0.46]), rightLeg: limb([-0.46, 0, -0.58]), attackStyle: "air_attack", lineWeight: 1.2 } },
+    { at: 0.18, pose: { lean: -0.3, torsoLean: -0.36, headLean: 0.06, rootOffset: [0.02, 0.16, 0], bodyScale: [1.08, 0.84, 1], bodyRotation: [0, 0, 0.18], rightArm: limb([-0.86, 0.12, -1.58]), leftArm: limb([0.46, 0.06, 1.02]), leftLeg: limb([0.42, 0, 0.38]), rightLeg: limb([-0.62, 0, -0.72]), attackStyle: "air_attack", lineWeight: 1.26 } },
+    { at: 0.38, pose: { lean: 0.3, torsoLean: 0.26, headLean: -0.1, rootOffset: [0.12, 0.04, 0], bodyScale: [0.96, 1.1, 1], bodyRotation: [0, 0, -0.18], rightArm: limb([0.16, 0.02, -1.98], 0.42), leftArm: limb([-0.1, 0, 0.08]), leftLeg: limb([0.04, 0, 0.02]), rightLeg: limb([-0.12, 0, -0.08]), attackStyle: "special", animationPhase: 0.38, emphasis: 1, smear: 1, trailIntensity: 0.88, lineWeight: 1.54 } },
+    { at: 0.62, pose: { lean: 0.12, torsoLean: 0.1, rootOffset: [0.05, 0.04, 0], bodyRotation: [0, 0, -0.08], rightArm: limb([0.24, 0, -1.32], 0.18), leftArm: limb([0.04, 0, 0.2]), attackStyle: "air_attack", animationPhase: 0.64, emphasis: 0.34, smear: 0.14, trailIntensity: 0.18, lineWeight: 1.22 } },
     { at: 1, pose: { ...BASE_POSE, rootOffset: [0, 0.06, 0] } },
   ],
   hero_air_down_spike: [
@@ -264,9 +271,10 @@ const MOVE_CLIPS: Record<string, PoseKeyframe[]> = {
     { at: 1, pose: BASE_POSE },
   ],
   vill_guard_break_big: [
-    { at: 0, pose: { lean: -0.28, torsoLean: -0.34, bodyScale: [1.1, 0.86, 1], rightArm: limb([-1, 0.12, -1.36]), leftArm: limb([0.48, 0.08, 1.02]), leftLeg: limb([-0.3, 0, 0.14]), rightLeg: limb([0.64, 0, -0.24]), plantedFoot: "left", attackStyle: "special", lineWeight: 1.24 } },
-    { at: 0.62, pose: { lean: 0.32, torsoLean: 0.28, bodyScale: [0.96, 1.16, 1], bodyRotation: [0, 0, -0.12], rightArm: limb([0.08, 0, -1.94], 0.52), leftArm: limb([-0.08, 0, 0.1]), rightLeg: limb([0.04, 0, -0.02]), attackStyle: "special", animationPhase: 0.62, emphasis: 1, smear: 1, trailIntensity: 0.82, lineWeight: 1.52 } },
-    { at: 0.86, pose: { lean: 0.1, torsoLean: 0.1, rightArm: limb([0.16, 0, -1.48], 0.28), attackStyle: "special", animationPhase: 0.86, emphasis: 0.42, lineWeight: 1.24 } },
+    { at: 0, pose: { lean: -0.38, torsoLean: -0.46, rootOffset: [-0.12, -0.04, 0], bodyScale: [1.14, 0.82, 1], bodyRotation: [0, 0, 0.08], rightArm: limb([-1.28, 0.14, -1.64]), leftArm: limb([0.62, 0.08, 1.22]), leftLeg: limb([-0.42, 0, 0.2]), rightLeg: limb([0.84, 0, -0.34]), plantedFoot: "left", attackStyle: "special", lineWeight: 1.3 } },
+    { at: 0.22, pose: { lean: -0.5, torsoLean: -0.62, headLean: 0.08, rootOffset: [-0.2, -0.1, 0], bodyScale: [1.18, 0.7, 1], bodyRotation: [0, 0, 0.28], rightArm: limb([-1.46, 0.16, -1.94]), leftArm: limb([0.82, 0.12, 1.42]), leftLeg: limb([-0.54, 0, 0.24]), rightLeg: limb([1.02, 0, -0.42]), plantedFoot: "left", attackStyle: "special", lineWeight: 1.38 } },
+    { at: 0.46, pose: { lean: 0.44, torsoLean: 0.4, headLean: -0.1, rootOffset: [0.18, 0.06, 0], bodyScale: [0.94, 1.2, 1], bodyRotation: [0, 0, -0.24], rightArm: limb([0.06, 0, -2.16], 0.62), leftArm: limb([-0.18, 0, -0.04]), rightLeg: limb([-0.04, 0, 0.02]), attackStyle: "special", animationPhase: 0.46, emphasis: 1, smear: 1, trailIntensity: 0.96, lineWeight: 1.62 } },
+    { at: 0.7, pose: { lean: 0.14, torsoLean: 0.12, rootOffset: [0.06, 0.02, 0], bodyRotation: [0, 0, -0.12], rightArm: limb([0.18, 0, -1.5], 0.28), leftArm: limb([0.08, 0.02, 0.18]), attackStyle: "special", animationPhase: 0.72, emphasis: 0.42, smear: 0.16, trailIntensity: 0.24, lineWeight: 1.26 } },
     { at: 1, pose: BASE_POSE },
   ],
   vill_poison_orb: [
@@ -299,23 +307,41 @@ const MOVE_CLIPS: Record<string, PoseKeyframe[]> = {
     { at: 0.72, pose: { lean: 0.06, torsoLean: 0.08, rootOffset: [0.03, -0.02, 0], rightArm: limb([0.18, 0, -0.66], 0.08), attackStyle: "special", animationPhase: 0.74, emphasis: 0.28, lineWeight: 1.14 } },
     { at: 1, pose: BASE_POSE },
   ],
+  block: [
+    { at: 0, pose: { lean: -0.18, torsoLean: -0.24, headLean: 0.04, rootOffset: [-0.04, 0, 0], bodyScale: [1.04, 0.9, 1], leftArm: limb([1, 0.04, 1.12], 0.08), rightArm: limb([0.98, -0.04, -1.12], 0.08), leftLeg: limb([-0.3, 0, 0.1]), rightLeg: limb([0.38, 0, -0.12]), lineWeight: 1.22, emphasis: 0.34 } },
+    { at: 0.38, pose: { lean: -0.06, torsoLean: 0.02, rootOffset: [0.01, 0, 0], bodyScale: [0.96, 1.02, 1], leftArm: limb([0.54, 0.02, 0.72], 0.04), rightArm: limb([0.58, -0.02, -0.72], 0.04), lineWeight: 1.14, emphasis: 0.16 } },
+    { at: 1, pose: { ...BASE_POSE, lean: -0.02, torsoLean: 0 } },
+  ],
   parry: [
-    { at: 0, pose: { lean: -0.06, torsoLean: -0.1, leftArm: limb([0.44, 0.04, 0.74]), rightArm: limb([-0.34, -0.04, -0.74]), leftLeg: limb([-0.18, 0, 0.06]), rightLeg: limb([0.18, 0, -0.06]), attackStyle: "grab", lineWeight: 1.1 } },
-    { at: 0.36, pose: { lean: 0, torsoLean: 0.06, bodyScale: [0.96, 1.08, 1], leftArm: limb([0.9, 0.02, 1.16], 0.08), rightArm: limb([0.9, -0.02, -1.16], 0.08), attackStyle: "grab", animationPhase: 0.4, emphasis: 0.7, smear: 0.46, lineWeight: 1.28 } },
+    { at: 0, pose: { lean: -0.2, torsoLean: -0.28, headLean: 0.04, bodyScale: [1.02, 0.88, 1], rootOffset: [-0.03, -0.01, 0], leftArm: limb([0.7, 0.04, 1.02], 0.08), rightArm: limb([0.68, -0.04, -1.02], 0.08), leftLeg: limb([-0.24, 0, 0.1]), rightLeg: limb([0.3, 0, -0.1]), attackStyle: "grab", lineWeight: 1.18 } },
+    { at: 0.14, pose: { lean: -0.04, torsoLean: 0.16, headLean: -0.06, bodyScale: [0.88, 1.16, 1], rootOffset: [0.02, 0.03, 0], bodyRotation: [0, 0, -0.26], leftArm: limb([1.18, 0.02, 1.4], 0.16), rightArm: limb([1.2, -0.02, -1.4], 0.16), attackStyle: "grab", animationPhase: 0.18, emphasis: 1, smear: 0.28, trailIntensity: 0.46, lineWeight: 1.52 } },
+    { at: 0.34, pose: { lean: 0.02, torsoLean: 0.08, bodyRotation: [0, 0, -0.12], leftArm: limb([0.48, 0.02, 0.6]), rightArm: limb([0.54, -0.02, -0.6]), attackStyle: "grab", animationPhase: 0.38, emphasis: 0.34, smear: 0.06, trailIntensity: 0.08, lineWeight: 1.18 } },
     { at: 1, pose: BASE_POSE },
   ],
   dodge: [
-    { at: 0, pose: { lean: -0.2, torsoLean: -0.22, rootOffset: [-0.08, 0, 0], bodyScale: [1.02, 0.92, 1], leftArm: limb([0.38, 0.04, 0.9]), rightArm: limb([-0.38, -0.04, -0.9]), leftLeg: limb([0.32, 0, 0.46]), rightLeg: limb([0.18, 0, -0.24]), attackStyle: "dodge", lineWeight: 1.16 } },
-    { at: 0.5, pose: { lean: 0, torsoLean: 0.04, rootOffset: [0.14, 0, 0], bodyScale: [0.92, 0.98, 1], leftArm: limb([0.12, 0, 0.34]), rightArm: limb([0.12, 0, -0.34]), leftLeg: limb([0.14, 0, 0.12]), rightLeg: limb([-0.04, 0, -0.12]), attackStyle: "dodge", animationPhase: 0.52, emphasis: 0.58, trailIntensity: 0.72, lineWeight: 1.22 } },
+    { at: 0, pose: { lean: -0.28, torsoLean: -0.34, rootOffset: [-0.14, -0.02, 0], bodyScale: [1.06, 0.86, 1], bodyRotation: [0, 0, 0.1], leftArm: limb([0.5, 0.04, 1.04]), rightArm: limb([-0.46, -0.04, -1.04]), leftLeg: limb([0.44, 0, 0.6]), rightLeg: limb([0.24, 0, -0.32]), attackStyle: "dodge", lineWeight: 1.2 } },
+    { at: 0.24, pose: { lean: -0.12, torsoLean: -0.04, rootOffset: [0.08, -0.01, 0], bodyScale: [0.84, 1, 1], bodyRotation: [0, 0, -0.2], leftArm: limb([0.12, 0, 0.2]), rightArm: limb([0.1, 0, -0.2]), leftLeg: limb([0.02, 0, 0.02]), rightLeg: limb([-0.04, 0, -0.02]), attackStyle: "dodge", animationPhase: 0.26, emphasis: 0.58, smear: 0.18, trailIntensity: 0.94, lineWeight: 1.34 } },
+    { at: 0.56, pose: { lean: 0.04, torsoLean: 0.1, rootOffset: [0.2, 0.01, 0], bodyScale: [0.92, 1.04, 1], bodyRotation: [0, 0, -0.08], leftArm: limb([0.04, 0, 0.12]), rightArm: limb([0.04, 0, -0.12]), attackStyle: "dodge", animationPhase: 0.58, emphasis: 0.34, smear: 0.04, trailIntensity: 0.28, lineWeight: 1.16 } },
+    { at: 0.78, pose: { lean: 0.02, torsoLean: 0.02, rootOffset: [0.08, 0, 0], attackStyle: "dodge", animationPhase: 0.8, emphasis: 0.14, lineWeight: 1.08 } },
     { at: 1, pose: BASE_POSE },
   ],
   landing: [
-    { at: 0, pose: { lean: 0, torsoLean: 0.24, bodyScale: [1.06, 0.88, 1], leftArm: limb([0.12, 0.04, 0.48]), rightArm: limb([0.12, -0.04, -0.48]), leftLeg: limb([-0.44, 0, 0.08]), rightLeg: limb([-0.44, 0, -0.08]), lineWeight: 1.26, emphasis: 0.54 } },
+    { at: 0, pose: { lean: 0, torsoLean: 0.34, headLean: -0.06, rootOffset: [0, -0.08, 0], bodyScale: [1.1, 0.76, 1], bodyRotation: [0, 0, 0.04], leftArm: limb([0.24, 0.04, 0.68]), rightArm: limb([0.24, -0.04, -0.68]), leftLeg: limb([-0.62, 0, 0.12]), rightLeg: limb([-0.62, 0, -0.12]), lineWeight: 1.34, emphasis: 0.78, smear: 0.08, trailIntensity: 0.18 } },
+    { at: 0.26, pose: { lean: 0.06, torsoLean: 0.12, headLean: 0.02, rootOffset: [0, 0.06, 0], bodyScale: [0.96, 1.12, 1], bodyRotation: [0, 0, -0.04], leftArm: limb([0.06, 0.02, 0.22]), rightArm: limb([0.06, -0.02, -0.22]), leftLeg: limb([-0.16, 0, 0.04]), rightLeg: limb([-0.1, 0, -0.04]), lineWeight: 1.2, emphasis: 0.32 } },
+    { at: 0.6, pose: { lean: 0.02, torsoLean: 0.04, rootOffset: [0, 0.01, 0], bodyScale: [0.99, 1.02, 1], leftArm: limb([0.08, 0.02, 0.26]), rightArm: limb([0.08, -0.02, -0.26]), leftLeg: limb([-0.18, 0, 0.04]), rightLeg: limb([-0.12, 0, -0.04]), lineWeight: 1.1, emphasis: 0.14 } },
     { at: 1, pose: BASE_POSE },
   ],
   hitstun: [
-    { at: 0, pose: { lean: -0.18, torsoLean: -0.22, rootOffset: [-0.06, 0.02, 0], bodyRotation: [0, 0, -0.14], leftArm: limb([0.84, 0.08, 1.18]), rightArm: limb([0.96, -0.08, -1.18]), leftLeg: limb([0.54, 0, 0.24]), rightLeg: limb([0.38, 0, -0.2]), lineWeight: 1.22 } },
+    { at: 0, pose: { lean: -0.3, torsoLean: -0.36, headLean: 0.06, rootOffset: [-0.1, 0.06, 0], bodyRotation: [0, 0, -0.24], bodyScale: [1.06, 0.9, 1], leftArm: limb([1.02, 0.08, 1.38]), rightArm: limb([1.18, -0.08, -1.38]), leftLeg: limb([0.7, 0, 0.32]), rightLeg: limb([0.48, 0, -0.28]), lineWeight: 1.3 } },
+    { at: 0.28, pose: { lean: -0.18, torsoLean: -0.2, rootOffset: [-0.06, 0.03, 0], bodyRotation: [0, 0, -0.14], bodyScale: [1.02, 0.96, 1], leftArm: limb([0.62, 0.06, 0.82]), rightArm: limb([0.76, -0.06, -0.82]), lineWeight: 1.22 } },
+    { at: 0.62, pose: { lean: -0.08, torsoLean: -0.1, rootOffset: [-0.03, 0.01, 0], bodyRotation: [0, 0, -0.08], leftArm: limb([0.38, 0.04, 0.52]), rightArm: limb([0.48, -0.04, -0.52]), lineWeight: 1.14 } },
     { at: 1, pose: { ...BASE_POSE, lean: -0.04, torsoLean: -0.06 } },
+  ],
+  blockstun: [
+    { at: 0, pose: { lean: -0.22, torsoLean: -0.3, headLean: 0.04, rootOffset: [-0.06, -0.01, 0], bodyScale: [1.04, 0.86, 1], leftArm: limb([0.98, 0.04, 1.12], 0.08), rightArm: limb([0.96, -0.04, -1.12], 0.08), leftLeg: limb([-0.34, 0, 0.1]), rightLeg: limb([0.4, 0, -0.12]), lineWeight: 1.26, emphasis: 0.46 } },
+    { at: 0.3, pose: { lean: -0.1, torsoLean: -0.06, rootOffset: [-0.01, 0, 0], bodyScale: [0.98, 0.98, 1], leftArm: limb([0.66, 0.02, 0.82], 0.06), rightArm: limb([0.7, -0.02, -0.82], 0.06), lineWeight: 1.18, emphasis: 0.22 } },
+    { at: 0.58, pose: { lean: -0.04, torsoLean: 0.02, rootOffset: [0.01, 0, 0], bodyScale: [0.96, 1.02, 1], leftArm: limb([0.4, 0.02, 0.52]), rightArm: limb([0.44, -0.02, -0.52]), lineWeight: 1.12, emphasis: 0.12 } },
+    { at: 1, pose: { ...BASE_POSE, lean: -0.02, torsoLean: 0 } },
   ],
 };
 
@@ -325,19 +351,26 @@ export const resolvePresentationMoveId = (moveId?: string): string | undefined =
   moveId ? MOVE_ALIASES[moveId] ?? moveId : undefined;
 
 const sampleIdlePose = (time: number): SampledStickPose => {
-  const sway = Math.sin(time * 1.8) * 0.08;
-  const headLag = Math.sin(time * 1.2) * 0.04;
+  const breath = Math.sin(time * 1.4);
+  const settle = Math.sin(time * 0.7 + 0.8);
+  const sway = breath * 0.08;
+  const compression = Math.max(0, -breath);
+  const release = Math.max(0, breath);
   return {
     ...BASE_POSE,
     lean: sway,
-    torsoLean: sway * 0.8,
-    headLean: headLag,
-    leftArm: limb([0.18 + sway * 0.2, 0.03, 0.42 + sway * 0.2]),
-    rightArm: limb([-0.12 - sway * 0.15, -0.03, -0.42 - sway * 0.2]),
-    leftLeg: limb([-0.16, 0, 0.06]),
-    rightLeg: limb([0.22, 0, -0.06]),
+    torsoLean: sway * 1.1,
+    headLean: -sway * 0.2 + settle * 0.03,
+    rootOffset: [sway * 0.03, release * 0.01 - compression * 0.03, 0],
+    bodyScale: [1.02 + compression * 0.04, 0.98 - compression * 0.1 + release * 0.04, 1],
+    bodyRotation: [0, 0, sway * 0.16],
+    leftArm: limb([0.22 + sway * 0.22 - compression * 0.04, 0.03, 0.48 + sway * 0.24]),
+    rightArm: limb([-0.16 - sway * 0.2 + compression * 0.04, -0.03, -0.48 - sway * 0.24]),
+    leftLeg: limb([-0.2 + release * 0.04, 0, 0.08]),
+    rightLeg: limb([0.24 - release * 0.04, 0, -0.08]),
     plantedFoot: "left",
-    lineWeight: 1.02,
+    emphasis: release * 0.12,
+    lineWeight: 1.04 + release * 0.06,
   };
 };
 
@@ -345,50 +378,63 @@ const sampleRunPose = (time: number, speedRatio: number): SampledStickPose => {
   const cycle = time * (4 + speedRatio * 5);
   const stride = Math.sin(cycle);
   const counterStride = Math.sin(cycle + Math.PI);
-  const lean = 0.16 + speedRatio * 0.12;
+  const drive = Math.sin(cycle + Math.PI / 2);
+  const compression = Math.max(0, -drive);
+  const release = Math.max(0, drive);
+  const lean = 0.18 + speedRatio * 0.18 + release * 0.04;
   return {
     ...BASE_POSE,
     lean,
-    torsoLean: lean * 0.9,
-    headLean: -lean * 0.2,
-    leftArm: limb([-0.18 + counterStride * 0.48, 0.02, 0.62 + counterStride * 0.18]),
-    rightArm: limb([0.04 + stride * 0.52, -0.02, -0.62 - stride * 0.18]),
-    leftLeg: limb([-0.1 + stride * 0.68, 0, 0.1], Math.max(0, stride * 0.08)),
-    rightLeg: limb([-0.02 + counterStride * 0.68, 0, -0.1], Math.max(0, counterStride * 0.08)),
+    torsoLean: lean * 1.08,
+    headLean: -lean * 0.24 + stride * 0.04,
+    rootOffset: [stride * 0.05, release * 0.02 - compression * 0.06, 0],
+    bodyRotation: [0, 0, -stride * 0.08],
+    bodyScale: [1.02 + compression * 0.04, 0.96 - compression * 0.08 + release * 0.1, 1],
+    leftArm: limb([-0.24 + counterStride * 0.62, 0.04, 0.76 + counterStride * 0.26]),
+    rightArm: limb([0.08 + stride * 0.66, -0.04, -0.76 - stride * 0.26]),
+    leftLeg: limb([-0.18 + stride * 0.88, 0, 0.12], Math.max(0, stride * 0.14)),
+    rightLeg: limb([-0.06 + counterStride * 0.88, 0, -0.12], Math.max(0, counterStride * 0.14)),
     plantedFoot: stride > 0 ? "right" : "left",
-    emphasis: Math.min(1, speedRatio),
-    trailIntensity: Math.max(0, speedRatio - 0.25),
-    lineWeight: 1.06 + speedRatio * 0.12,
+    emphasis: Math.min(1, speedRatio * 0.72 + release * 0.22),
+    trailIntensity: Math.max(0, speedRatio - 0.2) * (0.5 + release * 0.5),
+    lineWeight: 1.08 + speedRatio * 0.14 + release * 0.08,
   };
 };
 
 const sampleAirPose = (snapshot: PoseSampleState, time: number): SampledStickPose => {
   const vy = snapshot.velocity[1];
+  const drift = Math.sin(time * 2.2) * 0.06;
   if (vy >= 0) {
     return {
       ...BASE_POSE,
-      lean: 0.04,
-      torsoLean: -0.08,
-      rootOffset: [0, 0.08, 0],
-      leftArm: limb([-0.22, 0.04, 0.64]),
-      rightArm: limb([-0.18, -0.04, -0.64]),
-      leftLeg: limb([0.5, 0, 0.24]),
-      rightLeg: limb([0.42, 0, -0.24]),
+      lean: -0.1 + drift * 0.2,
+      torsoLean: -0.24,
+      headLean: 0.04,
+      rootOffset: [drift * 0.02, 0.14, 0],
+      bodyScale: [1.04, 0.9, 1],
+      bodyRotation: [0, 0, drift * 0.1],
+      leftArm: limb([-0.42, 0.06, 0.98]),
+      rightArm: limb([-0.38, -0.06, -0.98]),
+      leftLeg: limb([0.86, 0, 0.34]),
+      rightLeg: limb([0.74, 0, -0.34]),
       attackStyle: null,
-      lineWeight: 1.08,
+      emphasis: 0.18,
+      lineWeight: 1.16,
     };
   }
-  const drift = Math.sin(time * 2.2) * 0.06;
   return {
     ...BASE_POSE,
-    lean: drift,
-    torsoLean: 0.12,
-    rootOffset: [0, 0.04, 0],
-    leftArm: limb([0.18, 0.04, 0.46]),
-    rightArm: limb([0.12, -0.04, -0.46]),
-    leftLeg: limb([0.62, 0, 0.18]),
-    rightLeg: limb([0.56, 0, -0.18]),
-    lineWeight: 1.1,
+    lean: drift * 0.36,
+    torsoLean: 0.28,
+    headLean: -0.04,
+    rootOffset: [drift * 0.02, 0, 0],
+    bodyScale: [0.96, 1.08, 1],
+    bodyRotation: [0, 0, -drift * 0.12],
+    leftArm: limb([0.42, 0.04, 0.48]),
+    rightArm: limb([0.36, -0.04, -0.48]),
+    leftLeg: limb([0.98, 0, 0.2]),
+    rightLeg: limb([0.92, 0, -0.2]),
+    lineWeight: 1.18,
   };
 };
 
@@ -401,18 +447,28 @@ export const samplePoseForState = (
   const speedRatio = Math.max(0, Math.min(1, horizontalSpeed / 6));
   const moveId = resolvePresentationMoveId(snapshot.moveId);
 
+  if (snapshot.hitstunFrames && snapshot.hitstunFrames > 0) {
+    const phase = Math.min(1, 1 - snapshot.hitstunFrames / (snapshot.hitstunFrames + 16));
+    return sampleClip(MOVE_CLIPS.hitstun, phase);
+  }
+
+  if (snapshot.blockstunFrames && snapshot.blockstunFrames > 0) {
+    const phase = Math.min(1, 1 - snapshot.blockstunFrames / (snapshot.blockstunFrames + 10));
+    return sampleClip(MOVE_CLIPS.blockstun, phase);
+  }
+
+  if (snapshot.justLanded || (snapshot.landingLagFrames ?? 0) > 0) {
+    const landingFrames = Math.max(0, snapshot.landingLagFrames ?? 0);
+    const phase =
+      landingFrames > 0
+        ? Math.min(1, 1 - landingFrames / (landingFrames + 10))
+        : 0.04;
+    return sampleClip(MOVE_CLIPS.landing, phase);
+  }
+
   if (moveId && MOVE_CLIPS[moveId] && moveTotalFrames) {
     const totalFrames = Math.max(1, moveTotalFrames);
     return sampleClip(MOVE_CLIPS[moveId], (snapshot.moveFrame ?? 0) / totalFrames);
-  }
-
-  if (snapshot.justLanded) {
-    return sampleClip(MOVE_CLIPS.landing, 0.2);
-  }
-
-  if (snapshot.hitstunFrames && snapshot.hitstunFrames > 0) {
-    const phase = Math.min(1, 1 - snapshot.hitstunFrames / (snapshot.hitstunFrames + 12));
-    return sampleClip(MOVE_CLIPS.hitstun, phase);
   }
 
   if (snapshot.isDodging) {
@@ -420,7 +476,7 @@ export const samplePoseForState = (
   }
 
   if (snapshot.isBlocking) {
-    return sampleClip(MOVE_CLIPS.parry, 0.35);
+    return sampleClip(MOVE_CLIPS.block, 0.12);
   }
 
   if (snapshot.inAir) {
@@ -441,3 +497,285 @@ export const sampleStickFigurePose = (
   const moveDef = snapshot.moveId ? coreMoves[snapshot.moveId] : undefined;
   return samplePoseForState(snapshot, moveDef?.totalFrames, time);
 };
+
+export type SlicePresentationId =
+  | "idle"
+  | "run"
+  | "jump"
+  | "fall"
+  | "land"
+  | "dodge"
+  | "block"
+  | "parry"
+  | "hitstun"
+  | "hero_jab_1"
+  | "hero_tilt_side"
+  | "hero_launcher"
+  | "hero_air_forward"
+  | "vill_guard_break_big";
+
+export interface SlicePresentationProfile {
+  id: SlicePresentationId;
+  trailSockets: CombatSocketId[];
+  guardSockets: CombatSocketId[];
+  landingSockets: CombatSocketId[];
+  hurtSocket: CombatSocketId;
+  trailWidth: number;
+  trailHeight: number;
+  trailOpacity: number;
+  contactWidth: number;
+  contactHeight: number;
+  contactRotation: number;
+  blockRotation: number;
+  parryRotation: number;
+}
+
+const BASE_SLICE_PROFILE: SlicePresentationProfile = {
+  id: "idle",
+  trailSockets: ["torso", "rightHand"],
+  guardSockets: ["leftHand", "rightHand"],
+  landingSockets: ["leftFoot", "rightFoot"],
+  hurtSocket: "torso",
+  trailWidth: 0.42,
+  trailHeight: 0.16,
+  trailOpacity: 0.2,
+  contactWidth: 0.26,
+  contactHeight: 0.14,
+  contactRotation: 0.18,
+  blockRotation: -0.28,
+  parryRotation: 0.56,
+};
+
+const SLICE_PROFILES: Record<SlicePresentationId, SlicePresentationProfile> = {
+  idle: {
+    ...BASE_SLICE_PROFILE,
+    id: "idle",
+    trailSockets: ["torso", "rightHand"],
+    hurtSocket: "torso",
+    trailWidth: 0.32,
+    trailHeight: 0.1,
+    trailOpacity: 0.12,
+    contactWidth: 0.24,
+    contactHeight: 0.12,
+  },
+  run: {
+    ...BASE_SLICE_PROFILE,
+    id: "run",
+    trailSockets: ["torso", "rightFoot"],
+    hurtSocket: "torso",
+    trailWidth: 0.48,
+    trailHeight: 0.14,
+    trailOpacity: 0.18,
+    contactWidth: 0.28,
+    contactHeight: 0.12,
+  },
+  jump: {
+    ...BASE_SLICE_PROFILE,
+    id: "jump",
+    trailSockets: ["torso", "rightFoot"],
+    hurtSocket: "torso",
+    trailWidth: 0.34,
+    trailHeight: 0.12,
+    trailOpacity: 0.14,
+    contactWidth: 0.24,
+    contactHeight: 0.12,
+  },
+  fall: {
+    ...BASE_SLICE_PROFILE,
+    id: "fall",
+    trailSockets: ["torso", "leftFoot"],
+    hurtSocket: "torso",
+    trailWidth: 0.34,
+    trailHeight: 0.12,
+    trailOpacity: 0.14,
+    contactWidth: 0.24,
+    contactHeight: 0.12,
+  },
+  land: {
+    ...BASE_SLICE_PROFILE,
+    id: "land",
+    trailSockets: ["leftFoot", "rightFoot"],
+    hurtSocket: "torso",
+    trailWidth: 0.44,
+    trailHeight: 0.16,
+    trailOpacity: 0.18,
+    contactWidth: 0.3,
+    contactHeight: 0.16,
+  },
+  dodge: {
+    ...BASE_SLICE_PROFILE,
+    id: "dodge",
+    trailSockets: ["torso", "rightFoot"],
+    hurtSocket: "torso",
+    trailWidth: 0.54,
+    trailHeight: 0.18,
+    trailOpacity: 0.24,
+    contactWidth: 0.28,
+    contactHeight: 0.14,
+    contactRotation: 0.34,
+  },
+  block: {
+    ...BASE_SLICE_PROFILE,
+    id: "block",
+    trailSockets: ["leftHand", "rightHand"],
+    hurtSocket: "torso",
+    trailWidth: 0.38,
+    trailHeight: 0.14,
+    trailOpacity: 0.16,
+    contactWidth: 0.3,
+    contactHeight: 0.12,
+    blockRotation: -0.36,
+  },
+  parry: {
+    ...BASE_SLICE_PROFILE,
+    id: "parry",
+    trailSockets: ["leftHand", "rightHand"],
+    hurtSocket: "torso",
+    trailWidth: 0.4,
+    trailHeight: 0.16,
+    trailOpacity: 0.18,
+    contactWidth: 0.24,
+    contactHeight: 0.3,
+    parryRotation: 0.7,
+  },
+  hitstun: {
+    ...BASE_SLICE_PROFILE,
+    id: "hitstun",
+    trailSockets: ["torso", "head"],
+    hurtSocket: "head",
+    trailWidth: 0.36,
+    trailHeight: 0.14,
+    trailOpacity: 0.16,
+    contactWidth: 0.34,
+    contactHeight: 0.18,
+    contactRotation: 0.46,
+  },
+  hero_jab_1: {
+    ...BASE_SLICE_PROFILE,
+    id: "hero_jab_1",
+    trailSockets: ["torso", "rightHand"],
+    hurtSocket: "torso",
+    trailWidth: 0.48,
+    trailHeight: 0.16,
+    trailOpacity: 0.22,
+    contactWidth: 0.24,
+    contactHeight: 0.12,
+    contactRotation: 0.16,
+  },
+  hero_tilt_side: {
+    ...BASE_SLICE_PROFILE,
+    id: "hero_tilt_side",
+    trailSockets: ["torso", "rightHand"],
+    hurtSocket: "torso",
+    trailWidth: 0.62,
+    trailHeight: 0.18,
+    trailOpacity: 0.24,
+    contactWidth: 0.3,
+    contactHeight: 0.14,
+    contactRotation: 0.2,
+  },
+  hero_launcher: {
+    ...BASE_SLICE_PROFILE,
+    id: "hero_launcher",
+    trailSockets: ["rightHand", "head"],
+    hurtSocket: "head",
+    trailWidth: 0.58,
+    trailHeight: 0.2,
+    trailOpacity: 0.24,
+    contactWidth: 0.28,
+    contactHeight: 0.2,
+    contactRotation: 0.34,
+  },
+  hero_air_forward: {
+    ...BASE_SLICE_PROFILE,
+    id: "hero_air_forward",
+    trailSockets: ["torso", "rightHand"],
+    hurtSocket: "torso",
+    trailWidth: 0.58,
+    trailHeight: 0.2,
+    trailOpacity: 0.24,
+    contactWidth: 0.28,
+    contactHeight: 0.16,
+    contactRotation: 0.2,
+  },
+  vill_guard_break_big: {
+    ...BASE_SLICE_PROFILE,
+    id: "vill_guard_break_big",
+    trailSockets: ["torso", "rightHand"],
+    hurtSocket: "torso",
+    trailWidth: 0.72,
+    trailHeight: 0.24,
+    trailOpacity: 0.28,
+    contactWidth: 0.36,
+    contactHeight: 0.2,
+    contactRotation: 0.24,
+    blockRotation: -0.42,
+  },
+};
+
+const SLICE_MOVE_IDS = new Set<SlicePresentationId>([
+  "hero_jab_1",
+  "hero_tilt_side",
+  "hero_launcher",
+  "hero_air_forward",
+  "vill_guard_break_big",
+]);
+
+export const resolveSlicePresentationId = (
+  snapshot: Pick<
+    PoseSampleState,
+    | "velocity"
+    | "moveId"
+    | "justLanded"
+    | "hitstunFrames"
+    | "blockstunFrames"
+    | "landingLagFrames"
+    | "isDodging"
+    | "isBlocking"
+    | "inAir"
+  >,
+  move?: MoveDefinition,
+  justParried = false,
+): SlicePresentationId => {
+  const moveId = resolvePresentationMoveId(move?.id ?? snapshot.moveId);
+  if (moveId && SLICE_MOVE_IDS.has(moveId as SlicePresentationId)) {
+    return moveId as SlicePresentationId;
+  }
+  if ((snapshot.hitstunFrames ?? 0) > 0) {
+    return "hitstun";
+  }
+  if (justParried || moveId === "parry") {
+    return "parry";
+  }
+  if (snapshot.isDodging || moveId === "dodge") {
+    return "dodge";
+  }
+  if ((snapshot.blockstunFrames ?? 0) > 0 || snapshot.isBlocking) {
+    return "block";
+  }
+  if (snapshot.justLanded || (snapshot.landingLagFrames ?? 0) > 0) {
+    return "land";
+  }
+  if (snapshot.inAir) {
+    return snapshot.velocity[1] >= 0 ? "jump" : "fall";
+  }
+  return Math.hypot(snapshot.velocity[0], snapshot.velocity[2]) > 0.16 ? "run" : "idle";
+};
+
+export const resolveSlicePresentationProfile = (
+  snapshot: Pick<
+    PoseSampleState,
+    | "velocity"
+    | "moveId"
+    | "justLanded"
+    | "hitstunFrames"
+    | "blockstunFrames"
+    | "landingLagFrames"
+    | "isDodging"
+    | "isBlocking"
+    | "inAir"
+  >,
+  move?: MoveDefinition,
+  justParried = false,
+): SlicePresentationProfile =>
+  SLICE_PROFILES[resolveSlicePresentationId(snapshot, move, justParried)];

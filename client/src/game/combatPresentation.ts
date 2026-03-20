@@ -21,9 +21,11 @@ export interface FighterPresentationSnapshot {
   hitLagFrames: number;
   hitstunFrames: number;
   blockstunFrames: number;
+  landingLagFrames: number;
   invulnerable: boolean;
   armored: boolean;
   canAct: boolean;
+  guardBroken: boolean;
   guardMeter: number;
   staminaMeter: number;
   specialMeter: number;
@@ -98,4 +100,6 @@ export type CombatEvent =
 export interface RuntimeFrameSnapshot {
   player: FighterPresentationSnapshot;
   cpu: FighterPresentationSnapshot;
+  roundTimeRemaining: number;
+  maxRoundTime: number;
 }

@@ -1,7 +1,4 @@
 import { create } from 'zustand';
-import { COMBO_WINDOW, COMBO_MULTIPLIER } from '../../game/Physics';
-import { useControls } from './useControls';
-import { clamp } from '../clamp';
 import { useCustomization } from './useCustomization';
 import type { CoinAwardPayload } from './useCustomization';
 import { DEFAULT_ARENA_ID, ARENA_THEMES } from '../../game/arenas';
@@ -13,6 +10,7 @@ import type {
   PresentationMovePhase,
   RuntimeFrameSnapshot,
 } from "../../game/combatPresentation";
+import { useCombatDebug } from "./useCombatDebug";
 
 export type GamePhase = 'menu' | 'lobby' | 'fighting' | 'round_end' | 'match_end';
 export type MatchMode = "single" | "local" | "online";
@@ -33,9 +31,11 @@ export interface CharacterState {
   hitLagFrames?: number;
   hitstunFrames?: number;
   blockstunFrames?: number;
+  landingLagFrames?: number;
   canAct?: boolean;
   invulnerable?: boolean;
   armored?: boolean;
+  guardBroken?: boolean;
   isJumping: boolean;
   isAttacking: boolean;
   isBlocking: boolean;
@@ -107,48 +107,10 @@ interface FightingState {
   // Actions
   startGame: (mode?: MatchMode) => void;
   beginMatch: () => void;
-  endRound: (winner: 'player' | 'cpu' | 'timeout') => void;
   resetRound: () => void;
   restartMatch: () => void;
   returnToMenu: () => void;
-  
-  // Character actions
-  movePlayer: (x: number, y: number, z: number) => void;
-  updatePlayerVelocity: (vx: number, vy: number, vz: number) => void;
-  setPlayerDirection: (direction: 1 | -1) => void;
-  setPlayerJumping: (isJumping: boolean) => void;
-  setPlayerAttacking: (isAttacking: boolean) => void;
-  setPlayerBlocking: (isBlocking: boolean) => void;
-  setPlayerDodging: (isDodging: boolean) => void;        // New dodge action
-  setPlayerGrabbing: (isGrabbing: boolean) => void;      // New grab action
-  setPlayerTaunting: (isTaunting: boolean) => void;      // New taunt action
-  setPlayerAirAttacking: (isAirAttacking: boolean) => void; // New air attack
-  resetPlayerAirJumps: () => void;                       // Reset air jumps when landing
-  usePlayerAirJump: () => boolean;                       // Use an air jump, returns success
-  damagePlayer: (amount: number) => void;
-  updatePlayerCooldowns: (delta: number) => void;
-  updatePlayerMeters: (meters: Partial<{ guard: number; stamina: number; special: number }>) => void;
-  updatePlayerGuardBreak: () => void;
-  
-  // CPU actions
-  moveCPU: (x: number, y: number, z: number) => void;
-  updateCPUVelocity: (vx: number, vy: number, vz: number) => void;
-  setCPUDirection: (direction: 1 | -1) => void;
-  setCPUJumping: (isJumping: boolean) => void;
-  setCPUAttacking: (isAttacking: boolean) => void;
-  setCPUBlocking: (isBlocking: boolean) => void;
-  setCPUDodging: (isDodging: boolean) => void;           // New dodge action
-  setCPUGrabbing: (isGrabbing: boolean) => void;         // New grab action
-  setCPUAirAttacking: (isAirAttacking: boolean) => void; // New air attack
-  resetCPUAirJumps: () => void;                          // Reset air jumps when landing
-  useCPUAirJump: () => boolean;                          // Use an air jump, returns success
-  damageCPU: (amount: number) => void;
-  updateCPUCooldowns: (delta: number) => void;
-  updateCPUMeters: (meters: Partial<{ guard: number; stamina: number; special: number }>) => void;
-  updateCPUGuardBreak: () => void;
-  
-  // Game time
-  updateRoundTime: (delta: number) => void;
+
   setMatchMode: (mode: MatchMode) => void;
   setArenaId: (arenaId: string) => void;
   setSlotType: (slot: PlayerSlot, type: "human" | "cpu") => void;
@@ -164,8 +126,6 @@ const DEFAULT_HEALTH = 100;
 const DEFAULT_GUARD = 80;
 const DEFAULT_STAMINA = 100;
 const DEFAULT_SPECIAL = 0;
-const MAX_SPECIAL = 100;
-const GUARD_BREAK_THRESHOLD = 5;
 const DEFAULT_POSITION_PLAYER: [number, number, number] = [-2, 0, 0];
 const DEFAULT_POSITION_CPU: [number, number, number] = [2, 0, 0];
 const DEFAULT_ROUND_TIME = 60; // 60 seconds per round
@@ -185,6 +145,15 @@ const roundToHundredth = (value: number) => Math.round(value * 100) / 100;
 
 const resolveRoundPhase = (playerScore: number, cpuScore: number): GamePhase =>
   playerScore >= ROUNDS_TO_WIN || cpuScore >= ROUNDS_TO_WIN ? 'match_end' : 'round_end';
+
+const resolveTimeoutWinner = (
+  playerHealth: number,
+  cpuHealth: number,
+): 'player' | 'cpu' | 'timeout' => {
+  if (playerHealth > cpuHealth) return "player";
+  if (cpuHealth > playerHealth) return "cpu";
+  return "timeout";
+};
 
 const getCoinStore = () => useCustomization.getState();
 
@@ -288,9 +257,11 @@ const createDefaultCharacterState = (
   hitLagFrames: 0,
   hitstunFrames: 0,
   blockstunFrames: 0,
+  landingLagFrames: 0,
   canAct: true,
   invulnerable: false,
   armored: false,
+  guardBroken: false,
   isJumping: false,
   isAttacking: false,
   isBlocking: false,
@@ -345,9 +316,11 @@ const toCharacterState = (
   hitLagFrames: snapshot.hitLagFrames,
   hitstunFrames: snapshot.hitstunFrames,
   blockstunFrames: snapshot.blockstunFrames,
+  landingLagFrames: snapshot.landingLagFrames,
   canAct: snapshot.canAct,
   invulnerable: snapshot.invulnerable,
   armored: snapshot.armored,
+  guardBroken: snapshot.guardBroken,
   guardMeter: snapshot.guardMeter,
   staminaMeter: snapshot.staminaMeter,
   specialMeter: snapshot.specialMeter,
@@ -408,9 +381,14 @@ export const useFighting = create<FightingState>((set, get) => ({
   applyRuntimeFrame: (frame) => set((state) => {
     const nextPlayer = toCharacterState(frame.player, state.player);
     const nextCPU = toCharacterState(frame.cpu, state.cpu);
+    const nextRoundTime = Math.max(0, frame.roundTimeRemaining);
     const nextState: Partial<FightingState> = {
       player: nextPlayer,
       cpu: nextCPU,
+      roundTime: nextRoundTime,
+      maxRoundTime: frame.maxRoundTime,
+      playerStatus: nextPlayer.guardBroken ? "guard_break" : undefined,
+      cpuStatus: nextCPU.guardBroken ? "guard_break" : undefined,
     };
 
     if (state.gamePhase === 'fighting') {
@@ -430,14 +408,41 @@ export const useFighting = create<FightingState>((set, get) => ({
         });
         nextState.cpuScore = cpuScore;
         nextState.gamePhase = resolveRoundPhase(state.playerScore, cpuScore);
+      } else if (state.roundTime > 0 && nextRoundTime <= 0) {
+        const winner = resolveTimeoutWinner(nextPlayer.health, nextCPU.health);
+        awardRoundResolutionCoins(winner, 'timeout', {
+          playerHealth: nextPlayer.health,
+          cpuHealth: nextCPU.health,
+        });
+        if (winner === "player") {
+          const playerScore = state.playerScore + 1;
+          nextState.playerScore = playerScore;
+          nextState.gamePhase = resolveRoundPhase(playerScore, state.cpuScore);
+        } else if (winner === "cpu") {
+          const cpuScore = state.cpuScore + 1;
+          nextState.cpuScore = cpuScore;
+          nextState.gamePhase = resolveRoundPhase(state.playerScore, cpuScore);
+        } else {
+          nextState.gamePhase = resolveRoundPhase(state.playerScore, state.cpuScore);
+        }
       }
     }
+
+    useCombatDebug.getState().recordFrame({
+      player: nextPlayer,
+      cpu: nextCPU,
+      playerEvents: state.playerEvents,
+      cpuEvents: state.cpuEvents,
+      roundTimeRemaining: nextRoundTime,
+      maxRoundTime: frame.maxRoundTime,
+    });
 
     return nextState;
   }),
   applyCombatEvents: (events) => set((state) => {
     const playerEvents = filterSlotEvents(events, "player");
     const cpuEvents = filterSlotEvents(events, "cpu");
+    useCombatDebug.getState().pushPendingEvents(events);
 
     events.forEach((event) => {
       if (event.type !== "hit" || event.blocked || event.attacker !== "player") return;
@@ -458,6 +463,7 @@ export const useFighting = create<FightingState>((set, get) => ({
   }),
   
   startGame: (mode) => set((state) => {
+    useCombatDebug.getState().clearHistory();
     const targetMode = mode ?? state.matchMode;
     const slots = createDefaultSlots(targetMode);
     return {
@@ -468,6 +474,8 @@ export const useFighting = create<FightingState>((set, get) => ({
       cpuScore: 0,
       playerEvents: [],
       cpuEvents: [],
+      playerStatus: undefined,
+      cpuStatus: undefined,
       player: createDefaultCharacterState(DEFAULT_POSITION_PLAYER, 1, slots.player1.fighterId),
       cpu: createDefaultCharacterState(DEFAULT_POSITION_CPU, -1, slots.player2.fighterId),
       roundTime: DEFAULT_ROUND_TIME,
@@ -480,6 +488,7 @@ export const useFighting = create<FightingState>((set, get) => ({
     const playerReady = state.slots.player1.ready;
     const opponentReady = state.slots.player2.type === "cpu" ? true : state.slots.player2.ready;
     if (!playerReady || !opponentReady) return state;
+    useCombatDebug.getState().clearHistory();
     const playerFighter = state.slots.player1.fighterId;
     const opponentFighter = state.slots.player2.fighterId;
     return {
@@ -487,6 +496,8 @@ export const useFighting = create<FightingState>((set, get) => ({
       paused: false,
       playerEvents: [],
       cpuEvents: [],
+      playerStatus: undefined,
+      cpuStatus: undefined,
       player: createDefaultCharacterState(DEFAULT_POSITION_PLAYER, 1, playerFighter),
       cpu: createDefaultCharacterState(DEFAULT_POSITION_CPU, -1, opponentFighter),
       roundTime: DEFAULT_ROUND_TIME,
@@ -501,503 +512,50 @@ export const useFighting = create<FightingState>((set, get) => ({
     };
   }),
   
-  endRound: (winner) => set((state) => {
-    let playerScore = state.playerScore;
-    let cpuScore = state.cpuScore;
-    
-    if (winner === 'player') {
-      playerScore += 1;
-    } else if (winner === 'cpu') {
-      cpuScore += 1;
-    }
-    
+  resetRound: () => set((state) => {
+    useCombatDebug.getState().clearHistory();
     return {
-      gamePhase: resolveRoundPhase(playerScore, cpuScore),
+      gamePhase: 'fighting',
       paused: false,
-      playerScore,
-      cpuScore
-    };
-  }),
-  
-  resetRound: () => set((state) => ({
-    gamePhase: 'fighting',
-    paused: false,
-    playerEvents: [],
-    cpuEvents: [],
-    player: createDefaultCharacterState(DEFAULT_POSITION_PLAYER, 1, state.slots.player1.fighterId),
-    cpu: createDefaultCharacterState(DEFAULT_POSITION_CPU, -1, state.slots.player2.fighterId),
-    roundTime: DEFAULT_ROUND_TIME,
-  })),
-
-  restartMatch: () => set((state) => ({
-    gamePhase: 'fighting',
-    paused: false,
-    playerScore: 0,
-    cpuScore: 0,
-    playerEvents: [],
-    cpuEvents: [],
-    player: createDefaultCharacterState(DEFAULT_POSITION_PLAYER, 1, state.slots.player1.fighterId),
-    cpu: createDefaultCharacterState(DEFAULT_POSITION_CPU, -1, state.slots.player2.fighterId),
-    roundTime: DEFAULT_ROUND_TIME,
-  })),
-  
-  returnToMenu: () => set((state) => ({
-    gamePhase: 'menu',
-    paused: false,
-    playerScore: 0,
-    cpuScore: 0,
-    playerEvents: [],
-    cpuEvents: [],
-    slots: createDefaultSlots(state.matchMode),
-  })),
-  
-  // Player actions
-  movePlayer: (x, y, z) => set((state) => ({
-    player: {
-      ...state.player,
-      position: [x, y, z]
-    }
-  })),
-  
-  updatePlayerVelocity: (vx, vy, vz) => set((state) => ({
-    player: {
-      ...state.player,
-      velocity: [vx, vy, vz]
-    }
-  })),
-  
-  setPlayerDirection: (direction) => set((state) => ({
-    player: {
-      ...state.player,
-      direction
-    }
-  })),
-  
-  setPlayerJumping: (isJumping) => set((state) => ({
-    player: {
-      ...state.player,
-      isJumping
-    }
-  })),
-  
-  setPlayerAttacking: (isAttacking) => set((state) => {
-    return {
-      player: {
-        ...state.player,
-        isAttacking
-      }
-    };
-  }),
-  
-  setPlayerBlocking: (isBlocking) => set((state) => ({
-    player: {
-      ...state.player,
-      isBlocking
-    }
-  })),
-  
-  damagePlayer: (amount) => set((state) => {
-    const newHealth = Math.max(0, state.player.health - amount);
-    const updatedPlayer = {
-      ...state.player,
-      health: newHealth,
-    };
-
-    if (newHealth === 0 && state.gamePhase === 'fighting') {
-      const cpuScore = state.cpuScore + 1;
-      awardRoundResolutionCoins('cpu', 'ko', {
-        playerHealth: newHealth,
-        cpuHealth: state.cpu.health,
-      });
-      return {
-        player: updatedPlayer,
-        gamePhase: resolveRoundPhase(state.playerScore, cpuScore),
-        cpuScore
-      };
-    }
-
-    return {
-      player: updatedPlayer
-    };
-  }),
-  
-  // CPU actions
-  moveCPU: (x, y, z) => set((state) => ({
-    cpu: {
-      ...state.cpu,
-      position: [x, y, z]
-    }
-  })),
-  
-  updateCPUVelocity: (vx, vy, vz) => set((state) => ({
-    cpu: {
-      ...state.cpu,
-      velocity: [vx, vy, vz]
-    }
-  })),
-  
-  setCPUDirection: (direction) => set((state) => ({
-    cpu: {
-      ...state.cpu,
-      direction
-    }
-  })),
-  
-  setCPUJumping: (isJumping) => set((state) => ({
-    cpu: {
-      ...state.cpu,
-      isJumping
-    }
-  })),
-  
-  setCPUAttacking: (isAttacking) => set((state) => {
-    return {
-      cpu: {
-        ...state.cpu,
-        isAttacking
-      }
-    };
-  }),
-  
-  setCPUBlocking: (isBlocking) => set((state) => ({
-    cpu: {
-      ...state.cpu,
-      isBlocking
-    }
-  })),
-  
-  damageCPU: (amount) => set((state) => {
-    const newHealth = Math.max(0, state.cpu.health - amount);
-    const deliveredKO = newHealth === 0 && state.gamePhase === 'fighting';
-    if (deliveredKO) {
-      awardRoundResolutionCoins('player', 'ko', {
-        playerHealth: state.player.health,
-        cpuHealth: newHealth,
-      });
-    }
-
-    const updatedCPU = {
-      ...state.cpu,
-      health: newHealth,
-    };
-
-    if (newHealth === 0 && state.gamePhase === 'fighting') {
-      const playerScore = state.playerScore + 1;
-      return {
-        cpu: updatedCPU,
-        gamePhase: resolveRoundPhase(playerScore, state.cpuScore),
-        playerScore
-      };
-    }
-
-    return {
-      cpu: updatedCPU
-    };
-  }),
-  
-  // New Player Action Methods
-  setPlayerDodging: (isDodging) => set((state) => {
-    return {
-      player: {
-        ...state.player,
-        isDodging
-      }
+      playerEvents: [],
+      cpuEvents: [],
+      playerStatus: undefined,
+      cpuStatus: undefined,
+      player: createDefaultCharacterState(DEFAULT_POSITION_PLAYER, 1, state.slots.player1.fighterId),
+      cpu: createDefaultCharacterState(DEFAULT_POSITION_CPU, -1, state.slots.player2.fighterId),
+      roundTime: DEFAULT_ROUND_TIME,
     };
   }),
 
-  setPlayerGrabbing: (isGrabbing) => set((state) => {
+  restartMatch: () => set((state) => {
+    useCombatDebug.getState().clearHistory();
     return {
-      player: {
-        ...state.player,
-        isGrabbing
-      }
-    };
-  }),
-
-  setPlayerTaunting: (isTaunting) => set((state) => ({
-    player: {
-      ...state.player,
-      isTaunting
-    }
-  })),
-
-  setPlayerAirAttacking: (isAirAttacking) => set((state) => {
-    return {
-      player: {
-        ...state.player,
-        isAirAttacking
-      }
-    };
-  }),
-
-  resetPlayerAirJumps: () => set((state) => ({
-    player: {
-      ...state.player,
-      airJumpsLeft: 2 // Reset to 2 air jumps
-    }
-  })),
-
-  usePlayerAirJump: () => {
-    let jumpSuccess = false;
-    
-    set((state) => {
-      if (state.player.airJumpsLeft <= 0) {
-        return state; // No changes to state
-      }
-
-      jumpSuccess = true;
-      
-      return {
-        player: {
-          ...state.player,
-          airJumpsLeft: state.player.airJumpsLeft - 1
-        }
-      };
-    });
-    
-    return jumpSuccess; // Return success flag
-  },
-
-  // New CPU Action Methods
-  setCPUDodging: (isDodging) => set((state) => {
-    return {
-      cpu: {
-        ...state.cpu,
-        isDodging
-      }
-    };
-  }),
-
-  setCPUGrabbing: (isGrabbing) => set((state) => {
-    return {
-      cpu: {
-        ...state.cpu,
-        isGrabbing,
-      },
-    };
-  }),
-
-  setCPUAirAttacking: (isAirAttacking) => set((state) => {
-    return {
-      cpu: {
-        ...state.cpu,
-        isAirAttacking
-      }
-    };
-  }),
-
-  resetCPUAirJumps: () => set((state) => ({
-    cpu: {
-      ...state.cpu,
-      airJumpsLeft: 2 // Reset to 2 air jumps
-    }
-  })),
-
-  useCPUAirJump: () => {
-    let jumpSuccess = false;
-    
-    set((state) => {
-      if (state.cpu.airJumpsLeft <= 0) {
-        // No air jumps left
-        return state; // No changes to state
-      }
-      
-      jumpSuccess = true;
-      return {
-        cpu: {
-          ...state.cpu,
-          airJumpsLeft: state.cpu.airJumpsLeft - 1
-        }
-      };
-    });
-    
-    return jumpSuccess; // Return success flag
-  },
-
-  // Update player cooldowns
-  updatePlayerCooldowns: (delta) => set((state) => {
-    // Convert delta from seconds to milliseconds
-    const deltaMs = delta * 1000;
-    
-    // Update all cooldowns using time-based calculation
-    const newAttackCooldown = state.player.attackCooldown > 0 
-      ? Math.max(0, state.player.attackCooldown - deltaMs) 
-      : 0;
-      
-    const newDodgeCooldown = state.player.dodgeCooldown > 0
-      ? Math.max(0, state.player.dodgeCooldown - deltaMs)
-      : 0;
-      
-    const newGrabCooldown = state.player.grabCooldown > 0
-      ? Math.max(0, state.player.grabCooldown - deltaMs)
-      : 0;
-      
-    const newMoveCooldown = state.player.moveCooldown > 0
-      ? Math.max(0, state.player.moveCooldown - deltaMs)
-      : 0;
-    
-    // Update combo timer and reset combo if timeout
-    let newComboTimer = state.player.comboTimer > 0
-      ? Math.max(0, state.player.comboTimer - deltaMs)
-      : 0;
-    
-    let newComboCount = state.player.comboCount;
-    
-    // If combo timer expired, reset combo
-    if (state.player.comboTimer > 0 && newComboTimer === 0 && state.player.comboCount > 0) {
-      if (useControls.getState().debugMode) {
-        console.log("Player combo reset - timeout!");
-      }
-      newComboCount = 0;
-    }
-    
-    return {
-      player: {
-        ...state.player,
-        attackCooldown: newAttackCooldown,
-        dodgeCooldown: newDodgeCooldown,
-        grabCooldown: newGrabCooldown,
-        moveCooldown: newMoveCooldown,
-        comboTimer: newComboTimer,
-        comboCount: newComboCount
-      }
+      gamePhase: 'fighting',
+      paused: false,
+      playerScore: 0,
+      cpuScore: 0,
+      playerEvents: [],
+      cpuEvents: [],
+      playerStatus: undefined,
+      cpuStatus: undefined,
+      player: createDefaultCharacterState(DEFAULT_POSITION_PLAYER, 1, state.slots.player1.fighterId),
+      cpu: createDefaultCharacterState(DEFAULT_POSITION_CPU, -1, state.slots.player2.fighterId),
+      roundTime: DEFAULT_ROUND_TIME,
     };
   }),
   
-  updatePlayerMeters: (meters) => set((state) => {
-    const nextGuard = meters.guard !== undefined ? clamp(meters.guard, 0, DEFAULT_GUARD) : state.player.guardMeter;
-    const guardBroken = nextGuard <= GUARD_BREAK_THRESHOLD;
+  returnToMenu: () => set((state) => {
+    useCombatDebug.getState().clearHistory();
     return {
-      player: {
-        ...state.player,
-        guardMeter: nextGuard,
-        staminaMeter: meters.stamina !== undefined ? clamp(meters.stamina, 0, DEFAULT_STAMINA) : state.player.staminaMeter,
-        specialMeter: meters.special !== undefined ? clamp(meters.special, 0, MAX_SPECIAL) : state.player.specialMeter,
-        isBlocking: guardBroken ? false : state.player.isBlocking,
-        isDodging: guardBroken ? false : state.player.isDodging,
-      },
-      playerStatus: guardBroken ? "guard_break" : state.playerStatus,
-    };
-  }),
-  
-  updatePlayerGuardBreak: () => set((state) => ({
-    player: {
-      ...state.player,
-      guardMeter: 0,
-      isBlocking: false,
-      isDodging: false,
-    },
-    playerStatus: "guard_break",
-  })),
-  
-  // Update CPU cooldowns
-  updateCPUCooldowns: (delta) => set((state) => {
-    // Convert delta from seconds to milliseconds
-    const deltaMs = delta * 1000;
-    
-    // Update all cooldowns using time-based calculation
-    const newAttackCooldown = state.cpu.attackCooldown > 0 
-      ? Math.max(0, state.cpu.attackCooldown - deltaMs) 
-      : 0;
-      
-    const newDodgeCooldown = state.cpu.dodgeCooldown > 0
-      ? Math.max(0, state.cpu.dodgeCooldown - deltaMs)
-      : 0;
-      
-    const newGrabCooldown = state.cpu.grabCooldown > 0
-      ? Math.max(0, state.cpu.grabCooldown - deltaMs)
-      : 0;
-      
-    const newMoveCooldown = state.cpu.moveCooldown > 0
-      ? Math.max(0, state.cpu.moveCooldown - deltaMs)
-      : 0;
-    
-    // Update combo timer and reset combo if timeout
-    let newComboTimer = state.cpu.comboTimer > 0
-      ? Math.max(0, state.cpu.comboTimer - deltaMs)
-      : 0;
-    
-    let newComboCount = state.cpu.comboCount;
-    
-    // If combo timer expired, reset combo
-    if (state.cpu.comboTimer > 0 && newComboTimer === 0 && state.cpu.comboCount > 0) {
-      if (useControls.getState().debugMode) {
-        console.log("CPU combo reset - timeout!");
-      }
-      newComboCount = 0;
-    }
-    
-    return {
-      cpu: {
-        ...state.cpu,
-        attackCooldown: newAttackCooldown,
-        dodgeCooldown: newDodgeCooldown,
-        grabCooldown: newGrabCooldown,
-        moveCooldown: newMoveCooldown,
-        comboTimer: newComboTimer,
-        comboCount: newComboCount
-      }
-    };
-  }),
-  
-  updateCPUMeters: (meters) => set((state) => {
-    const nextGuard = meters.guard !== undefined ? clamp(meters.guard, 0, DEFAULT_GUARD) : state.cpu.guardMeter;
-    const guardBroken = nextGuard <= GUARD_BREAK_THRESHOLD;
-    return {
-      cpu: {
-        ...state.cpu,
-        guardMeter: nextGuard,
-        staminaMeter: meters.stamina !== undefined ? clamp(meters.stamina, 0, DEFAULT_STAMINA) : state.cpu.staminaMeter,
-        specialMeter: meters.special !== undefined ? clamp(meters.special, 0, MAX_SPECIAL) : state.cpu.specialMeter,
-        isBlocking: guardBroken ? false : state.cpu.isBlocking,
-        isDodging: guardBroken ? false : state.cpu.isDodging,
-      },
-      cpuStatus: guardBroken ? "guard_break" : state.cpuStatus,
-    };
-  }),
-  
-  updateCPUGuardBreak: () => set((state) => ({
-    cpu: {
-      ...state.cpu,
-      guardMeter: 0,
-      isBlocking: false,
-      isDodging: false,
-    },
-    cpuStatus: "guard_break",
-  })),
-  
-  // Game time
-  updateRoundTime: (delta) => set((state) => {
-    const newTime = Math.max(0, state.roundTime - delta);
-    
-    // If time is up, end the round
-    if (newTime === 0 && state.gamePhase === 'fighting') {
-      // Determine winner based on health
-      let winner: 'player' | 'cpu' | 'timeout' = 'timeout';
-      if (state.player.health > state.cpu.health) {
-        winner = 'player';
-      } else if (state.cpu.health > state.player.health) {
-        winner = 'cpu';
-      }
-      awardRoundResolutionCoins(winner, 'timeout', {
-        playerHealth: state.player.health,
-        cpuHealth: state.cpu.health,
-      });
-      
-      return {
-        roundTime: newTime,
-        gamePhase: resolveRoundPhase(
-          winner === 'player' ? state.playerScore + 1 : state.playerScore,
-          winner === 'cpu' ? state.cpuScore + 1 : state.cpuScore,
-        ),
-        paused: false,
-        playerScore: winner === 'player' ? state.playerScore + 1 : state.playerScore,
-        cpuScore: winner === 'cpu' ? state.cpuScore + 1 : state.cpuScore
-      };
-    }
-    
-    return {
-      roundTime: newTime
+      gamePhase: 'menu',
+      paused: false,
+      playerScore: 0,
+      cpuScore: 0,
+      playerEvents: [],
+      cpuEvents: [],
+      playerStatus: undefined,
+      cpuStatus: undefined,
+      slots: createDefaultSlots(state.matchMode),
     };
   }),
   setMatchMode: (mode) => set((state) => ({

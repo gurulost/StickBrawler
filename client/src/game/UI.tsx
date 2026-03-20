@@ -6,6 +6,8 @@ import { useCustomization } from "../lib/stores/useCustomization";
 import { Coins } from "lucide-react";
 import { useEffects } from "../lib/stores/useEffects";
 import { MusicToggle } from "../components/ui/music-toggle";
+import CombatDebugPanel from "./CombatDebugPanel";
+import { useCombatDebug } from "../lib/stores/useCombatDebug";
 
 type TelemetryDigest = Partial<
     Record<
@@ -44,6 +46,12 @@ const UI = () => {
   const {
     debugMode,
     toggleDebugMode,
+    combatPlaybackPaused,
+    setCombatPlaybackPaused,
+    toggleCombatPlaybackPaused,
+    combatPlaybackRate,
+    setCombatPlaybackRate,
+    queueCombatFrameStep,
     lowGraphicsMode,
     toggleLowGraphicsMode,
     showSilhouetteDebug,
@@ -51,6 +59,7 @@ const UI = () => {
     inkQuality,
     cycleInkQuality,
   } = useControls();
+  const clearReviewFrame = useCombatDebug((state) => state.clearReviewFrame);
   const { coins, lastCoinEvent } = useCustomization();
   const landingBurst = useEffects((state) => state.landingBurst);
   const impactFlash = useEffects((state) => state.impactFlash);
@@ -145,6 +154,11 @@ const UI = () => {
       clearInterval(id);
     };
   }, [debugMode]);
+
+  useEffect(() => {
+    if (debugMode) return;
+    clearReviewFrame();
+  }, [clearReviewFrame, debugMode]);
   
   // Pulse health bar when low health
   useEffect(() => {
@@ -347,6 +361,39 @@ const UI = () => {
             >
               {lowGraphicsMode ? "Low Gfx On" : "Low Gfx Off"}
             </button>
+            {debugMode && gamePhase === 'fighting' && (
+              <>
+                <button
+                  onClick={() => {
+                    if (combatPlaybackPaused) {
+                      clearReviewFrame();
+                      setCombatPlaybackPaused(false);
+                      return;
+                    }
+                    toggleCombatPlaybackPaused();
+                  }}
+                  className="px-3 py-2 rounded-full text-xs font-semibold bg-white/15 text-white hover:bg-white/25"
+                >
+                  {combatPlaybackPaused ? "Sim Play" : "Sim Pause"}
+                </button>
+                <button
+                  onClick={() => setCombatPlaybackRate(combatPlaybackRate === 1 ? 0.25 : 1)}
+                  className="px-3 py-2 rounded-full text-xs font-semibold bg-white/15 text-white hover:bg-white/25"
+                >
+                  Speed {combatPlaybackRate === 1 ? "1x" : "0.25x"}
+                </button>
+                <button
+                  onClick={() => {
+                    setCombatPlaybackPaused(true);
+                    clearReviewFrame();
+                    queueCombatFrameStep();
+                  }}
+                className="px-3 py-2 rounded-full text-xs font-semibold bg-white/15 text-white hover:bg-white/25"
+              >
+                Step
+                </button>
+              </>
+            )}
           </>
         )}
       </div>
@@ -398,6 +445,15 @@ const UI = () => {
             );
           })}
         </div>
+      )}
+      {debugMode && (
+        <CombatDebugPanel
+          player={player}
+          cpu={cpu}
+          playerLabel={playerOneLabel}
+          cpuLabel={opponentLabel}
+          gamePhase={gamePhase}
+        />
       )}
       
       {/* Health bars with improved styling */}

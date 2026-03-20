@@ -1,0 +1,8 @@
+Total messages: 7 (Errors: 1, Warnings: 0)
+Returning 5 messages for level "info"
+
+[INFO] %cDownload the React DevTools for a better development experience: https://reactjs.org/link/react-devtools font-weight:bold @ http://127.0.0.1:3000/@fs/Users/davedixon/Documents/GitHub/StickBrawler/node_modules/.vite/deps/chunk-JCLMRTSR.js?v=2f448b53:21550
+[LOG] Music autoplay blocked, will retry on next user interaction (e.g., clicking Play) @ http://127.0.0.1:3000/src/lib/stores/useAudio.tsx:128
+[ERROR] Failed to load resource: the server responded with a status of 401 (Unauthorized) @ http://127.0.0.1:3000/api/auth/me:0
+[LOG] THREE.WebGLRenderer: Context Lost. @ http://127.0.0.1:3000/@fs/Users/davedixon/Documents/GitHub/StickBrawler/node_modules/.vite/deps/chunk-664ZIH6C.js?v=2f448b53:17834
+[LOG] THREE.WebGLRenderer: Context Lost. @ http://127.0.0.1:3000/@fs/Users/davedixon/Documents/GitHub/StickBrawler/node_modules/.vite/deps/chunk-664ZIH6C.js?v=2f448b53:17834

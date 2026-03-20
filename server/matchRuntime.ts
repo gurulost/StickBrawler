@@ -1,6 +1,7 @@
 import { MatchRuntime, createEmptyInputs, type DualInputState } from "../client/src/game/matchRuntime";
 import type { CharacterState, GamePhase } from "../client/src/lib/stores/useFighting";
 import type { CombatTelemetryEvent } from "../client/src/game/combatTelemetry";
+import type { FighterPresentationSnapshot } from "../client/src/game/combatPresentation";
 
 export { MatchRuntime } from "../client/src/game/matchRuntime";
 
@@ -43,6 +44,65 @@ function createDefaultCharacterState(
   };
 }
 
+function mirrorPresentationSnapshot(
+  current: CharacterState,
+  snapshot: FighterPresentationSnapshot,
+): CharacterState {
+  return {
+    ...current,
+    health: snapshot.health,
+    position: snapshot.position,
+    velocity: snapshot.velocity,
+    direction: snapshot.facing,
+    fighterId: snapshot.fighterId,
+    grounded: snapshot.grounded,
+    inAir: snapshot.inAir,
+    action: snapshot.action,
+    moveId: snapshot.moveId,
+    moveInstanceId: snapshot.moveInstanceId,
+    moveFrame: snapshot.moveFrame,
+    movePhase: snapshot.movePhase,
+    hitLagFrames: snapshot.hitLagFrames,
+    hitstunFrames: snapshot.hitstunFrames,
+    blockstunFrames: snapshot.blockstunFrames,
+    landingLagFrames: snapshot.landingLagFrames,
+    canAct: snapshot.canAct,
+    invulnerable: snapshot.invulnerable,
+    armored: snapshot.armored,
+    guardBroken: snapshot.guardBroken,
+    guardMeter: snapshot.guardMeter,
+    staminaMeter: snapshot.staminaMeter,
+    specialMeter: snapshot.specialMeter,
+    comboCount: snapshot.comboCounter,
+    comboTimer: snapshot.comboTimer,
+    attackCooldown: snapshot.attackCooldown,
+    dodgeCooldown: snapshot.dodgeCooldown,
+    grabCooldown: snapshot.grabCooldown,
+    moveCooldown: snapshot.moveCooldown,
+    isJumping: snapshot.inAir,
+    isAttacking: snapshot.action === "attack",
+    isBlocking: snapshot.isBlocking,
+    isDodging: snapshot.isDodging,
+    isGrabbing: snapshot.isGrabbing,
+    isTaunting: snapshot.isTaunting,
+    isAirAttacking: snapshot.isAirAttacking,
+    airJumpsLeft: snapshot.airJumpsLeft,
+    lastMoveType:
+      snapshot.lastStartedMoveId ??
+      snapshot.lastConfirmedMoveId ??
+      snapshot.moveId ??
+      current.lastMoveType,
+    lastStartedMoveId: snapshot.lastStartedMoveId,
+    lastHitMoveId: snapshot.lastConfirmedMoveId,
+    justStartedMove: Boolean(snapshot.justStartedMove),
+    justLanded: Boolean(snapshot.justLanded),
+    justHit: Boolean(snapshot.justHit),
+    justBlocked: Boolean(snapshot.justBlocked),
+    justParried: Boolean(snapshot.justParried),
+    justGuardBroke: Boolean(snapshot.justGuardBroke),
+  };
+}
+
 const noopAudio = {
   playHit: (_intensity?: number) => {},
   playPunch: () => {},
@@ -62,6 +122,8 @@ export class ServerMatchRuntime {
   private player: CharacterState = createDefaultCharacterState(DEFAULT_POSITION_PLAYER, 1, "stick_hero");
   private cpu: CharacterState = createDefaultCharacterState(DEFAULT_POSITION_CPU, -1, "stick_villain");
   private gamePhase: GamePhase = "fighting";
+  private roundTimeRemaining = 60;
+  private maxRoundTime = 60;
   private telemetryBuffer: CombatTelemetryEvent[] = [];
   private inputs: DualInputState = createEmptyInputs();
 
@@ -95,8 +157,6 @@ export class ServerMatchRuntime {
     this.runtime.update({
       delta: frame.delta,
       inputs: this.inputs,
-      player: this.player,
-      cpu: this.cpu,
       gamePhase: this.gamePhase,
     });
   }
@@ -104,6 +164,8 @@ export class ServerMatchRuntime {
   reset() {
     this.player = createDefaultCharacterState(DEFAULT_POSITION_PLAYER, 1, "stick_hero");
     this.cpu = createDefaultCharacterState(DEFAULT_POSITION_CPU, -1, "stick_villain");
+    this.roundTimeRemaining = 60;
+    this.maxRoundTime = 60;
     this.runtime.reset({ player: this.player, cpu: this.cpu });
   }
 
@@ -118,6 +180,8 @@ export class ServerMatchRuntime {
       player: { ...this.player },
       cpu: { ...this.cpu },
       gamePhase: this.gamePhase,
+      roundTimeRemaining: this.roundTimeRemaining,
+      maxRoundTime: this.maxRoundTime,
     };
   }
 
@@ -128,105 +192,12 @@ export class ServerMatchRuntime {
   private createFightingActions() {
     return {
       applyRuntimeFrame: (frame: any) => {
-        this.player = { ...this.player, ...frame.player };
-        this.cpu = { ...this.cpu, ...frame.cpu };
+        this.player = mirrorPresentationSnapshot(this.player, frame.player);
+        this.cpu = mirrorPresentationSnapshot(this.cpu, frame.cpu);
+        this.roundTimeRemaining = frame.roundTimeRemaining;
+        this.maxRoundTime = frame.maxRoundTime;
       },
       applyCombatEvents: () => {},
-      movePlayer: (x: number, y: number, z: number) => {
-        this.player.position = [x, y, z];
-      },
-      moveCPU: (x: number, y: number, z: number) => {
-        this.cpu.position = [x, y, z];
-      },
-      updatePlayerVelocity: (vx: number, vy: number, vz: number) => {
-        this.player.velocity = [vx, vy, vz];
-      },
-      updateCPUVelocity: (vx: number, vy: number, vz: number) => {
-        this.cpu.velocity = [vx, vy, vz];
-      },
-      setPlayerDirection: (direction: 1 | -1) => {
-        this.player.direction = direction;
-      },
-      setCPUDirection: (direction: 1 | -1) => {
-        this.cpu.direction = direction;
-      },
-      setPlayerJumping: (jumping: boolean) => {
-        this.player.isJumping = jumping;
-      },
-      setCPUJumping: (jumping: boolean) => {
-        this.cpu.isJumping = jumping;
-      },
-      setPlayerAttacking: (attacking: boolean) => {
-        this.player.isAttacking = attacking;
-      },
-      setCPUAttacking: (attacking: boolean) => {
-        this.cpu.isAttacking = attacking;
-      },
-      setPlayerBlocking: (blocking: boolean) => {
-        this.player.isBlocking = blocking;
-      },
-      setCPUBlocking: (blocking: boolean) => {
-        this.cpu.isBlocking = blocking;
-      },
-      setPlayerDodging: (dodging: boolean) => {
-        this.player.isDodging = dodging;
-      },
-      setPlayerGrabbing: (grabbing: boolean) => {
-        this.player.isGrabbing = grabbing;
-      },
-      setPlayerTaunting: (taunting: boolean) => {
-        this.player.isTaunting = taunting;
-      },
-      setPlayerAirAttacking: (airAttacking: boolean) => {
-        this.player.isAirAttacking = airAttacking;
-      },
-      resetPlayerAirJumps: () => {
-        this.player.airJumpsLeft = 2;
-      },
-      usePlayerAirJump: () => {
-        this.player.airJumpsLeft = Math.max(0, this.player.airJumpsLeft - 1);
-      },
-      setCPUDodging: (dodging: boolean) => {
-        this.cpu.isDodging = dodging;
-      },
-      setCPUGrabbing: (grabbing: boolean) => {
-        this.cpu.isGrabbing = grabbing;
-      },
-      setCPUAirAttacking: (airAttacking: boolean) => {
-        this.cpu.isAirAttacking = airAttacking;
-      },
-      resetCPUAirJumps: () => {
-        this.cpu.airJumpsLeft = 2;
-      },
-      useCPUAirJump: () => {
-        this.cpu.airJumpsLeft = Math.max(0, this.cpu.airJumpsLeft - 1);
-      },
-      damagePlayer: (amount: number) => {
-        this.player.health = Math.max(0, this.player.health - amount);
-      },
-      damageCPU: (amount: number) => {
-        this.cpu.health = Math.max(0, this.cpu.health - amount);
-      },
-      updateRoundTime: (_delta: number) => {
-      },
-      updatePlayerCooldowns: (_delta: number) => {
-      },
-      updateCPUCooldowns: (_delta: number) => {
-      },
-      updatePlayerMeters: (payload: { guard?: number; stamina?: number; special?: number }) => {
-        if (payload.guard !== undefined) this.player.guardMeter = payload.guard;
-        if (payload.stamina !== undefined) this.player.staminaMeter = payload.stamina;
-        if (payload.special !== undefined) this.player.specialMeter = payload.special;
-      },
-      updateCPUMeters: (payload: { guard?: number; stamina?: number; special?: number }) => {
-        if (payload.guard !== undefined) this.cpu.guardMeter = payload.guard;
-        if (payload.stamina !== undefined) this.cpu.staminaMeter = payload.stamina;
-        if (payload.special !== undefined) this.cpu.specialMeter = payload.special;
-      },
-      updatePlayerGuardBreak: () => {
-      },
-      updateCPUGuardBreak: () => {
-      },
     };
   }
 }

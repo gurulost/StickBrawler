@@ -79,6 +79,7 @@ export function sampleCombatSpatialFrame(input: {
   fighter: FighterCombatState;
   move?: MoveDefinition;
   hurtboxes?: HurtboxDefinition[];
+  time?: number;
 }): CombatSpatialFrame {
   const sampledPose = samplePoseForState(
     {
@@ -86,12 +87,14 @@ export function sampleCombatSpatialFrame(input: {
       moveId: input.move?.id ?? input.fighter.moveId,
       moveFrame: input.fighter.moveFrame,
       hitstunFrames: input.fighter.hitstunFrames,
+      blockstunFrames: input.fighter.blockstunFrames,
+      landingLagFrames: (input.fighter as { landingLagFrames?: number }).landingLagFrames,
       isDodging: input.fighter.action === "dodge",
       isBlocking: input.fighter.action === "blockstun",
       inAir: input.fighter.inAir,
     },
     input.move?.totalFrames,
-    0,
+    input.time ?? 0,
   );
   const sockets = computeRigSockets(sampledPose);
   const hurtboxes = buildHurtRegions(input.fighter, sockets, input.hurtboxes);
@@ -272,30 +275,28 @@ function resolveHitboxSocket(
 
 function computeRigSockets(pose: SampledStickPose): RigSocketMap {
   const bodyEuler = new Euler(...pose.bodyRotation);
-  const leftShoulder = applyBody([SHOULDER_X, ARM_ROOT_Y, 0], bodyEuler);
-  const rightShoulder = applyBody([-SHOULDER_X, ARM_ROOT_Y, 0], bodyEuler);
-  const leftHip = applyBody([HIP_X, HIP_ROOT_Y, 0], bodyEuler);
-  const rightHip = applyBody([-HIP_X, HIP_ROOT_Y, 0], bodyEuler);
-  const leftHand = applyBody(
+  const transformPoint = (point: [number, number, number]) =>
+    addVec3(applyBody(scaleVec3Components(point, pose.bodyScale), bodyEuler), pose.rootOffset);
+  const leftShoulder = transformPoint([SHOULDER_X, ARM_ROOT_Y, 0]);
+  const rightShoulder = transformPoint([-SHOULDER_X, ARM_ROOT_Y, 0]);
+  const leftHip = transformPoint([HIP_X, HIP_ROOT_Y, 0]);
+  const rightHip = transformPoint([-HIP_X, HIP_ROOT_Y, 0]);
+  const leftHand = transformPoint(
     addVec3([SHOULDER_X, ARM_ROOT_Y, 0], rotateLocal([0, -ARM_LENGTH, pose.leftArm.reach], pose.leftArm.rotation)),
-    bodyEuler,
   );
-  const rightHand = applyBody(
+  const rightHand = transformPoint(
     addVec3([-SHOULDER_X, ARM_ROOT_Y, 0], rotateLocal([0, -ARM_LENGTH, pose.rightArm.reach], pose.rightArm.rotation)),
-    bodyEuler,
   );
-  const leftFoot = applyBody(
+  const leftFoot = transformPoint(
     addVec3([HIP_X, HIP_ROOT_Y, 0], rotateLocal([0, -LEG_LENGTH, pose.leftLeg.reach], pose.leftLeg.rotation)),
-    bodyEuler,
   );
-  const rightFoot = applyBody(
+  const rightFoot = transformPoint(
     addVec3([-HIP_X, HIP_ROOT_Y, 0], rotateLocal([0, -LEG_LENGTH, pose.rightLeg.reach], pose.rightLeg.rotation)),
-    bodyEuler,
   );
 
   return {
-    head: applyBody(HEAD_LOCAL, bodyEuler),
-    torso: applyBody(TORSO_LOCAL, bodyEuler),
+    head: transformPoint(HEAD_LOCAL),
+    torso: transformPoint(TORSO_LOCAL),
     leftShoulder,
     rightShoulder,
     leftHip,
@@ -354,6 +355,13 @@ function scaleVec3(
   scalar: number,
 ): [number, number, number] {
   return [vector[0] * scalar, vector[1] * scalar, vector[2] * scalar];
+}
+
+function scaleVec3Components(
+  vector: [number, number, number],
+  scale: [number, number, number],
+): [number, number, number] {
+  return [vector[0] * scale[0], vector[1] * scale[1], vector[2] * scale[2]];
 }
 
 function midpoint(

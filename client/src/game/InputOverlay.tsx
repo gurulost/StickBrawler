@@ -3,19 +3,33 @@ import { useControls } from "../lib/stores/useControls";
 import { useInputDebug } from "../lib/stores/useInputDebug";
 import type { DebugEntry } from "../lib/stores/useInputDebug";
 
+const hasMeaningfulDebugSignal = (entry: DebugEntry | null) =>
+  Boolean(
+    entry &&
+      (entry.attack ||
+        entry.special ||
+        entry.defendModes.length > 0 ||
+        entry.moveId ||
+        entry.direction !== "neutral" ||
+        !entry.grounded),
+  );
+
 const containerStyle: React.CSSProperties = {
   position: "absolute",
-  top: 16,
+  top: 96,
   left: 16,
-  padding: 12,
-  background: "rgba(0, 0, 0, 0.55)",
+  padding: "10px 12px",
+  background: "rgba(5, 9, 18, 0.5)",
   color: "#fff",
   fontFamily: "monospace",
-  fontSize: 12,
-  borderRadius: 8,
+  fontSize: 11,
+  borderRadius: 10,
   pointerEvents: "none",
   zIndex: 50,
-  minWidth: 220,
+  minWidth: 180,
+  maxWidth: 220,
+  boxShadow: "0 12px 28px rgba(0, 0, 0, 0.24)",
+  backdropFilter: "blur(8px)",
 };
 
 const slotStyle: React.CSSProperties = {
@@ -56,12 +70,16 @@ function renderEntry(slot: string, entry: DebugEntry | null) {
 export function InputOverlay() {
   const debugMode = useControls((state) => state.debugMode);
   const slots = useInputDebug((state) => state.slots);
-  const content = useMemo(
-    () => Object.entries(slots).map(([slot, entry]) => renderEntry(slot, entry)),
+  const activeEntries = useMemo(
+    () => Object.entries(slots).filter(([, entry]) => hasMeaningfulDebugSignal(entry)),
     [slots],
   );
+  const content = useMemo(
+    () => activeEntries.map(([slot, entry]) => renderEntry(slot, entry)),
+    [activeEntries],
+  );
 
-  if (!debugMode) return null;
+  if (!debugMode || activeEntries.length === 0) return null;
 
   return <div style={containerStyle}>{content}</div>;
 }

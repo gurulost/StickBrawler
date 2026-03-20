@@ -23,7 +23,7 @@ const Limbs: FC<LimbsProps> = ({
 }) => {
   const { getPlayerInkParams, getCPUInkParams } = useCustomization();
   const inkParams = isPlayer ? getPlayerInkParams() : getCPUInkParams();
-  const glowBoost = pose.lineWeight > 1.2 ? 0.16 : pose.emphasis * 0.12;
+  const glowBoost = Math.max(pose.emphasis * 0.14, Math.max(0, pose.lineWeight - 1) * 0.38);
   const limbMaterial = useInkMaterial({
     baseColor: colors.secondary ?? colors.primary,
     rimColor: colors.glow ?? inkParams.rimColor,
@@ -31,7 +31,8 @@ const Limbs: FC<LimbsProps> = ({
     glow: inkParams.glow + glowBoost,
   });
   const outlineMaterial = useOutlineMaterial(inkParams.outlineColor);
-  const outlineScale = 1 + inkParams.lineWidth + Math.max(0, pose.lineWeight - 1) * 0.06;
+  const outlineScale =
+    1 + inkParams.lineWidth + Math.max(0, pose.lineWeight - 1) * 0.12 + pose.emphasis * 0.02;
 
   const armConfig = style.silhouette?.arms ?? {
     length: 0.7,

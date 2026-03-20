@@ -1,18 +1,16 @@
 import { create } from 'zustand';
+import type { PlayerSlot } from "../../hooks/use-player-controls";
+import {
+  consumeCombatTrainingRunFrame,
+  createCombatTrainingRunFromPreset,
+  createCombatTrainingRunFromSequence,
+  type CombatTrainingFrameSample,
+  type CombatTrainingPresetId,
+  type CombatTrainingRun,
+  type CombatTrainingStep,
+} from "../combatTraining";
 
-export enum Controls {
-  // Movement controls
-  jump = "jump",
-  forward = "forward",
-  backward = "backward",
-  leftward = "leftward",
-  rightward = "rightward",
-
-  // Core verbs
-  attack = "attack",
-  special = "special",
-  defend = "defend",
-}
+export { Controls } from "../../input/controls";
 
 type ControlsState = {
   debugMode: boolean;
@@ -42,6 +40,21 @@ type ControlsState = {
   queueCombatFrameStep: (frames?: number) => void;
   consumeCombatFrameSteps: () => number;
   resetCombatPlayback: () => void;
+  combatTrainingTargetSlot: PlayerSlot;
+  setCombatTrainingTargetSlot: (slot: PlayerSlot) => void;
+  combatTrainingActiveRun: CombatTrainingRun | null;
+  combatTrainingNextRunId: number;
+  queueCombatTrainingPreset: (presetId: CombatTrainingPresetId, slot?: PlayerSlot) => void;
+  queueCombatTrainingSequence: (input: {
+    label: string;
+    description?: string;
+    slot?: PlayerSlot;
+    fighter?: "any" | "hero" | "villain";
+    presetId?: string;
+    steps: CombatTrainingStep[];
+  }) => void;
+  consumeCombatTrainingFrame: () => CombatTrainingFrameSample | null;
+  clearCombatTraining: () => void;
   lowGraphicsMode: boolean;
   toggleLowGraphicsMode: () => void;
   showSilhouetteDebug: boolean;
@@ -106,6 +119,38 @@ export const useControls = create<ControlsState>((set, get) => ({
       combatPlaybackRate: 1,
       queuedCombatFrameSteps: 0,
     }),
+  combatTrainingTargetSlot: "player1",
+  setCombatTrainingTargetSlot: (slot) => set({ combatTrainingTargetSlot: slot }),
+  combatTrainingActiveRun: null,
+  combatTrainingNextRunId: 1,
+  queueCombatTrainingPreset: (presetId, slot) =>
+    set((state) => ({
+      combatTrainingActiveRun: createCombatTrainingRunFromPreset(
+        presetId,
+        slot ?? state.combatTrainingTargetSlot,
+        state.combatTrainingNextRunId,
+      ),
+      combatTrainingNextRunId: state.combatTrainingNextRunId + 1,
+    })),
+  queueCombatTrainingSequence: (input) =>
+    set((state) => ({
+      combatTrainingActiveRun: createCombatTrainingRunFromSequence(
+        {
+          ...input,
+          slot: input.slot ?? state.combatTrainingTargetSlot,
+        },
+        state.combatTrainingNextRunId,
+      ),
+      combatTrainingNextRunId: state.combatTrainingNextRunId + 1,
+    })),
+  consumeCombatTrainingFrame: () => {
+    const activeRun = get().combatTrainingActiveRun;
+    if (!activeRun) return null;
+    const { sample, nextRun } = consumeCombatTrainingRunFrame(activeRun);
+    set({ combatTrainingActiveRun: nextRun });
+    return sample;
+  },
+  clearCombatTraining: () => set({ combatTrainingActiveRun: null }),
   lowGraphicsMode: false,
   toggleLowGraphicsMode: () => set((state) => ({ lowGraphicsMode: !state.lowGraphicsMode })),
   showSilhouetteDebug: false,

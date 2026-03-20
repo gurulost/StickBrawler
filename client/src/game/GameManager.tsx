@@ -16,6 +16,13 @@ import type { CharacterState } from "../lib/stores/useFighting";
 import type { IntentContext } from "../input/intentTypes";
 import { resolveCombatDebugReviewRecord, useCombatDebug } from "../lib/stores/useCombatDebug";
 import {
+  describeCombatTrainingRun,
+  injectCombatTrainingFrame,
+  injectCombatTrainingIntentFrame,
+  type CombatTrainingPresetId,
+  type CombatTrainingStep,
+} from "../lib/combatTraining";
+import {
   CAMERA_LOOK_HEIGHT_BASE,
   CAMERA_TRACK_SMOOTHING,
   resolveCombatCameraRig,
@@ -35,6 +42,7 @@ const GameManager = () => {
   const combatPlaybackPaused = useControls((state) => state.combatPlaybackPaused);
   const combatPlaybackRate = useControls((state) => state.combatPlaybackRate);
   const resetCombatPlayback = useControls((state) => state.resetCombatPlayback);
+  const clearCombatTraining = useControls((state) => state.clearCombatTraining);
   const debugHistory = useCombatDebug((state) => state.history);
   const reviewFrameId = useCombatDebug((state) => state.reviewFrameId);
 
@@ -139,30 +147,45 @@ const GameManager = () => {
     cpuSnapshotRef.current = fighting.cpu;
   }, [fighting.player, fighting.cpu]);
 
-  const advanceRuntimeFrames = useCallback(
-    (frames: number) => {
-      if (!runtimeRef.current || frames <= 0) return;
-      for (let index = 0; index < frames; index += 1) {
-        const inputState = getInputState();
-        const latest = useFighting.getState();
-        if (latest.gamePhase !== "fighting" || latest.paused) return;
-        const intents = resolveIntents(
-          inputState,
+  const buildRuntimeFrame = useCallback(
+    (delta: number) => {
+      const latest = useFighting.getState();
+      if (latest.gamePhase !== "fighting" || latest.paused) return null;
+      const controlsState = useControls.getState();
+      const injectedTrainingFrame = controlsState.consumeCombatTrainingFrame();
+      const inputs = injectCombatTrainingFrame(getInputState(), injectedTrainingFrame);
+      const intents = injectCombatTrainingIntentFrame(
+        resolveIntents(
+          inputs,
           {
             player1: buildIntentContext(latest.player),
             player2: buildIntentContext(latest.cpu),
           },
-          1 / 60,
-        );
-        runtimeRef.current.update({
-          delta: 1 / 60,
-          inputs: inputState,
-          intents,
-          gamePhase: latest.gamePhase,
-        });
-      }
+          delta,
+        ),
+        injectedTrainingFrame,
+      );
+      return {
+        delta,
+        inputs,
+        intents,
+        gamePhase: latest.gamePhase,
+        trainingOverrideSlots: injectedTrainingFrame ? [injectedTrainingFrame.slot] : undefined,
+      };
     },
     [getInputState, resolveIntents],
+  );
+
+  const advanceRuntimeFrames = useCallback(
+    (frames: number) => {
+      if (!runtimeRef.current || frames <= 0) return;
+      for (let index = 0; index < frames; index += 1) {
+        const frame = buildRuntimeFrame(1 / 60);
+        if (!frame) return;
+        runtimeRef.current.update(frame);
+      }
+    },
+    [buildRuntimeFrame],
   );
 
   // Update arena style ref when arenaId changes
@@ -211,9 +234,10 @@ const GameManager = () => {
     }
     if (fighting.gamePhase !== "fighting" && prevPhaseRef.current === "fighting") {
       resetCombatPlayback();
+      clearCombatTraining();
     }
     prevPhaseRef.current = fighting.gamePhase;
-  }, [fighting.gamePhase, resetCombatPlayback]);
+  }, [clearCombatTraining, fighting.gamePhase, resetCombatPlayback]);
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
@@ -229,11 +253,32 @@ const GameManager = () => {
     const win = window as Window & {
       advanceTime?: (ms: number) => void;
       render_game_to_text?: () => string;
+      runCombatTrainingPreset?: (presetId: CombatTrainingPresetId, slot?: "player1" | "player2") => void;
+      queueCombatTrainingSequence?: (input: {
+        label: string;
+        description?: string;
+        slot?: "player1" | "player2";
+        fighter?: "any" | "hero" | "villain";
+        presetId?: string;
+        steps: CombatTrainingStep[];
+      }) => void;
+      clearCombatTraining?: () => void;
     };
     win.advanceTime = (ms: number) => {
       useCombatDebug.getState().clearReviewFrame();
       const frames = Math.max(1, Math.round(ms / (1000 / 60)));
       advanceRuntimeFrames(frames);
+    };
+    win.runCombatTrainingPreset = (presetId, slot = "player1") => {
+      useCombatDebug.getState().clearReviewFrame();
+      useControls.getState().queueCombatTrainingPreset(presetId, slot);
+    };
+    win.queueCombatTrainingSequence = (input) => {
+      useCombatDebug.getState().clearReviewFrame();
+      useControls.getState().queueCombatTrainingSequence(input);
+    };
+    win.clearCombatTraining = () => {
+      useControls.getState().clearCombatTraining();
     };
     win.render_game_to_text = () =>
       JSON.stringify({
@@ -243,6 +288,7 @@ const GameManager = () => {
           historyFrames: debugHistory.length,
           combatPlaybackPaused,
           combatPlaybackRate,
+          training: describeCombatTrainingRun(useControls.getState().combatTrainingActiveRun),
         },
         player: {
           x: presentedPlayer.position[0],
@@ -264,6 +310,9 @@ const GameManager = () => {
     return () => {
       delete win.advanceTime;
       delete win.render_game_to_text;
+      delete win.runCombatTrainingPreset;
+      delete win.queueCombatTrainingSequence;
+      delete win.clearCombatTraining;
     };
   }, [
     advanceRuntimeFrames,
@@ -278,15 +327,6 @@ const GameManager = () => {
 
   useFrame((state, delta) => {
     if (!runtimeRef.current) return;
-    const inputs = getInputState();
-    const intents = resolveIntents(
-      inputs,
-      {
-        player1: buildIntentContext(fighting.player),
-        player2: buildIntentContext(fighting.cpu),
-      },
-      delta,
-    );
     const activeCombat = fighting.gamePhase === "fighting" && !fighting.paused;
     const queuedStepFrames = activeCombat
       ? useControls.getState().consumeCombatFrameSteps()
@@ -304,20 +344,15 @@ const GameManager = () => {
     if (activeCombat) {
       if (queuedStepFrames > 0) {
         for (let index = 0; index < queuedStepFrames; index += 1) {
-          runtimeRef.current.update({
-            delta: 1 / 60,
-            inputs,
-            intents,
-            gamePhase: fighting.gamePhase,
-          });
+          const frame = buildRuntimeFrame(1 / 60);
+          if (!frame) break;
+          runtimeRef.current.update(frame);
         }
       } else if (!combatPlaybackPaused) {
-        runtimeRef.current.update({
-          delta: simulatedDeltaSeconds,
-          inputs,
-          intents,
-          gamePhase: fighting.gamePhase,
-        });
+        const frame = buildRuntimeFrame(simulatedDeltaSeconds);
+        if (frame) {
+          runtimeRef.current.update(frame);
+        }
       }
     }
 

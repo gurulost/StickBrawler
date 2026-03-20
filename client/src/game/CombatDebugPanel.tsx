@@ -4,6 +4,12 @@ import type { GamePhase } from "../lib/stores/useFighting";
 import type { CharacterState } from "../lib/stores/useFighting";
 import { useControls } from "../lib/stores/useControls";
 import {
+  COMBAT_TRAINING_PRESET_ORDER,
+  COMBAT_TRAINING_PRESETS,
+  describeCombatTrainingRun,
+  matchesCombatTrainingFighter,
+} from "../lib/combatTraining";
+import {
   resolveCombatDebugReviewRecord,
   useCombatDebug,
 } from "../lib/stores/useCombatDebug";
@@ -67,6 +73,11 @@ const CombatDebugPanel: FC<CombatDebugPanelProps> = ({
   const showInstanceData = useControls((state) => state.combatDebugShowInstanceData);
   const toggleShowInstanceData = useControls((state) => state.toggleCombatDebugShowInstanceData);
   const setCombatPlaybackPaused = useControls((state) => state.setCombatPlaybackPaused);
+  const combatTrainingTargetSlot = useControls((state) => state.combatTrainingTargetSlot);
+  const setCombatTrainingTargetSlot = useControls((state) => state.setCombatTrainingTargetSlot);
+  const combatTrainingActiveRun = useControls((state) => state.combatTrainingActiveRun);
+  const queueCombatTrainingPreset = useControls((state) => state.queueCombatTrainingPreset);
+  const clearCombatTraining = useControls((state) => state.clearCombatTraining);
   const history = useCombatDebug((state) => state.history);
   const reviewFrameId = useCombatDebug((state) => state.reviewFrameId);
   const setReviewFrameId = useCombatDebug((state) => state.setReviewFrameId);
@@ -97,6 +108,12 @@ const CombatDebugPanel: FC<CombatDebugPanelProps> = ({
     () => resolveRecentCombatEvents(focusedSlot, history),
     [focusedSlot, history],
   );
+  const trainingSummary = useMemo(
+    () => describeCombatTrainingRun(combatTrainingActiveRun),
+    [combatTrainingActiveRun],
+  );
+  const trainingTargetLabel = combatTrainingTargetSlot === "player1" ? playerLabel : cpuLabel;
+  const trainingTargetFighterId = combatTrainingTargetSlot === "player1" ? player.fighterId : cpu.fighterId;
   const canReview =
     history.length > 1 && (gamePhase === "fighting" || gamePhase === "round_end" || gamePhase === "match_end");
 
@@ -200,6 +217,80 @@ const CombatDebugPanel: FC<CombatDebugPanelProps> = ({
               }}
               className="mt-3 w-full accent-cyan-300"
             />
+          </div>
+        </div>
+
+        <div className="mb-3 rounded-2xl border border-white/8 bg-slate-900/55 p-3">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <div className="text-[10px] font-semibold uppercase tracking-[0.24em] text-slate-400">
+                Training Injector
+              </div>
+              <div className="mt-1 text-xs text-slate-300">
+                Queue deterministic input scripts through the same runtime input and intent path the fight uses.
+              </div>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <button
+                type="button"
+                onClick={() => setCombatTrainingTargetSlot("player1")}
+                className={buttonClass(combatTrainingTargetSlot === "player1")}
+              >
+                Target {playerLabel}
+              </button>
+              <button
+                type="button"
+                onClick={() => setCombatTrainingTargetSlot("player2")}
+                className={buttonClass(combatTrainingTargetSlot === "player2")}
+              >
+                Target {cpuLabel}
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  clearReviewFrame();
+                  clearCombatTraining();
+                }}
+                className={buttonClass(false)}
+              >
+                Clear Queue
+              </button>
+            </div>
+          </div>
+
+          <div className="mt-3 rounded-xl border border-white/8 bg-white/[0.03] px-3 py-2 text-xs text-slate-300">
+            {trainingSummary ? (
+              <span className="font-mono text-[11px] text-white/90">
+                {trainingSummary.label} · {trainingSummary.slot === "player1" ? playerLabel : cpuLabel} · {trainingSummary.stepLabel} · frame {trainingSummary.frameNumber + 1}/{trainingSummary.totalFrames}
+              </span>
+            ) : (
+              <span>
+                No script queued. Use <span className="font-semibold text-white">{trainingTargetLabel}</span> with Sim Pause + Step or <span className="font-mono text-[11px] text-white/90">window.runCombatTrainingPreset(...)</span>.
+              </span>
+            )}
+          </div>
+
+          <div className="mt-3 grid gap-2 sm:grid-cols-2 xl:grid-cols-5">
+            {COMBAT_TRAINING_PRESET_ORDER.map((presetId) => {
+              const preset = COMBAT_TRAINING_PRESETS[presetId];
+              const allowed = matchesCombatTrainingFighter(preset.fighter, trainingTargetFighterId);
+              const active = trainingSummary?.presetId === preset.id;
+              return (
+                <button
+                  key={preset.id}
+                  type="button"
+                  disabled={!allowed}
+                  title={allowed ? preset.description : `${preset.label} only applies to the current ${preset.fighter} slice.`}
+                  onClick={() => {
+                    clearReviewFrame();
+                    queueCombatTrainingPreset(preset.id, combatTrainingTargetSlot);
+                  }}
+                  className={`${buttonClass(active)} text-left ${allowed ? "" : "cursor-not-allowed opacity-40"}`}
+                >
+                  {preset.label}
+                </button>
+              );
+            })}
           </div>
         </div>
 

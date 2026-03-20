@@ -4,7 +4,7 @@ Source of truth checklist for a large/intense task.
 
 ## Metadata
 - Created: 2026-03-20T02:59:47
-- Last Updated: 2026-03-20T05:08:27-0400
+- Last Updated: 2026-03-20T05:39:07-0400
 - Workspace: /Users/davedixon/Documents/GitHub/StickBrawler
 - Checklist Doc: /Users/davedixon/Documents/GitHub/StickBrawler/docs/runtime-authority-and-brutal-vertical-slice-polish-production-checklist.md
 
@@ -58,6 +58,10 @@ Source of truth checklist for a large/intense task.
   - Evidence: authored clips and procedural locomotion already exposed `bodyScale`, `rootOffset`, `bodyRotation`, `smear`, `trailIntensity`, and `lineWeight`, but the browser slice still read as smooth generic motion instead of deliberate brush-stroke timing, especially in `hero_jab_1`, `hero_tilt_side`, `hero_launcher`, `landing`, `block`, and `parry`.
   - Owner: Codex
   - Linked Fix: P-007
+- [x] F-008 [status:verified] [P1] [confidence:0.93] The remaining tuning workflow gap was still real: there was no deterministic way to force exact slice actions in-engine, and the raw input path still misrouted key authored directions badly enough that CPU-heavy preset attempts collapsed into the wrong moves.
+  - Evidence: Playwright keyboard synthesis remained unreliable for balance loops, `use-player-intents.ts` still overloaded one direction model across movement and move selection, and early training-injector smoke showed `vill_guard_break_big` collapsing into `vill_low_stab` until per-step intent overrides and CPU-slot override routing were added.
+  - Owner: Codex
+  - Linked Fix: P-008
 
 ## Fix Log
 - [x] P-001 [status:verified] Runtime now owns combat truth; store mirrors runtime snapshots/events instead of authoring health, damage, cooldown, meter, guard-break, and KO state.
@@ -81,6 +85,9 @@ Source of truth checklist for a large/intense task.
 - [x] P-007 [status:verified] Re-authored the first slice around an ink-calligraphy timing language and amplified the render response so motion beats now communicate through compression/release, compact defensive shells, slash-shaped trails, parry cuts, landing rebound, and whole-figure line-weight spikes.
   - Addresses: F-007
   - Evidence: `client/src/game/stickfigure/movePresentation.ts`, `client/src/game/StickFigure.tsx`, `client/src/game/stickfigure/Limbs.tsx`, `client/src/game/stickfigure/Torso.tsx`, `client/src/game/stickfigure/Head.tsx`, `tests/client/presentation-polish.test.ts`
+- [x] P-008 [status:verified] Finished the deterministic tuning seam with a combat training injector, split movement-direction vs. action-direction routing cleanly, and taught solo-mode runtime to honor scripted CPU-slot overrides so exact hero/villain slice moves can be forced and stepped without fake move IDs.
+  - Addresses: F-008
+  - Evidence: `client/src/lib/combatTraining.ts`, `client/src/lib/stores/useControls.tsx`, `client/src/game/GameManager.tsx`, `client/src/game/CombatDebugPanel.tsx`, `client/src/input/intentDirection.ts`, `client/src/hooks/use-player-intents.ts`, `client/src/game/matchRuntime.ts`, `tests/client/combat-training.test.ts`
 
 ## Validation Log
 - [x] V-001 [status:verified] `npm run check`
@@ -88,21 +95,21 @@ Source of truth checklist for a large/intense task.
 - [x] V-002 [status:verified] `npm run lint`
   - Evidence: 2026-03-20 04:03 -0400 skipped; `package.json` has no lint script, so there is no configured lint validation to run for this repo.
 - [x] V-003 [status:verified] `npm test -- --runInBand`
-  - Evidence: 2026-03-20 05:00 -0400 passed with 34/34 tests green, including the new motion-language assertions in `tests/client/presentation-polish.test.ts` alongside the existing combat-readability, combat-debug, authority, resolver, and runtime coverage.
+  - Evidence: 2026-03-20 05:37 -0400 passed with 37/37 tests green, including the new deterministic training coverage in `tests/client/combat-training.test.ts` alongside the existing motion-language, combat-readability, combat-debug, authority, resolver, and runtime coverage.
 - [x] V-004 [status:verified] Playwright live smoke on `http://127.0.0.1:3000`
-  - Evidence: 2026-03-20 05:06 -0400 live browser pass on the final motion-language state verified debug/timeline overlays in-engine, forced `hero_jab_1` through live input once during the round, and confirmed recent-event/timeline data continued to tie CPU confirms to explicit move IDs and hitstun poses rather than generic reactions; no new browser failures appeared beyond the known guest-mode `401 /api/auth/me` and scene-swap `THREE.WebGLRenderer: Context Lost.` noise.
+  - Evidence: 2026-03-20 05:39 -0400 fresh browser pass on paused solo matches verified the new injector end-to-end: `Hero Launcher` produced `player.moveId = "hero_launcher"` after one stepped frame, and `Vill Guard Break` produced `cpu.moveId = "vill_guard_break_big"` after one stepped frame in solo mode through the training panel/browser hooks; no new browser failures appeared beyond the known guest-mode `401 /api/auth/me` noise.
 - [x] V-005 [status:verified] Checklist sign-off validator
-  - Evidence: 2026-03-20 05:08 -0400 `python3 "$HOME/.codex/skills/intense-job-checklist/scripts/validate_checklist.py" "/Users/davedixon/Documents/GitHub/StickBrawler/docs/runtime-authority-and-brutal-vertical-slice-polish-production-checklist.md" --require-signoff` passed with 0 warnings and 0 errors after the motion-language pass was logged.
+  - Evidence: 2026-03-20 05:39 -0400 `python3 "$HOME/.codex/skills/intense-job-checklist/scripts/validate_checklist.py" "/Users/davedixon/Documents/GitHub/StickBrawler/docs/runtime-authority-and-brutal-vertical-slice-polish-production-checklist.md" --require-signoff` passed with 0 warnings and 0 errors after the deterministic training-injector pass was logged.
 
 ## Residual Risks
 - [x] R-001 [status:accepted_risk] Guest-mode console noise remains from unauthenticated `401 /api/auth/me`, `404 /api/economy/:profileId`, and scene-swap `THREE.WebGLRenderer: Context Lost.` logs.
   - Rationale: These predate the combat transition work and did not block the architecture handoff or slice validation.
   - Owner: Codex
   - Follow-up trigger/date: Address when doing a broader menu/auth polish pass.
-- [x] R-002 [status:accepted_risk] Automated browser key synthesis did not reliably drive live match controls during Playwright smoke, so tuning verification relied on runtime-driven combat plus the new debug controls rather than a scripted hero-input sequence.
-  - Rationale: The slice is shippable for this phase, but future balance work would benefit from a deterministic dev/training input injector.
+- [x] R-002 [status:verified] Deterministic training injection now covers the former browser-input gap, including exact solo CPU-slot forcing for authored slice moves.
+  - Rationale: This follow-up risk was closed by `P-008`; stepped tuning no longer depends on flaky browser key synthesis for the core hero/villain slice.
   - Owner: Codex
-  - Follow-up trigger/date: Add a debug-only move/input injector before the next deep tuning cycle.
+  - Follow-up trigger/date: Reopen only if a later balance workflow needs richer macro recording than the current preset/sequence hooks provide.
 
 ## Change Log
 - 2026-03-20T02:59:47: Checklist initialized.
@@ -114,3 +121,4 @@ Source of truth checklist for a large/intense task.
 - 2026-03-20T04:41:24-0400: Reran the checklist validator after logging the combat-plane pass; sign-off remains clean with 0 warnings and 0 errors.
 - 2026-03-20T05:07:20-0400: Logged the motion-language pass: re-authored the first slice toward an ink-calligraphy timing style, strengthened whole-figure line-weight/trail/parry rendering, expanded presentation-polish regression coverage, and reran `npm run check`, `npm test -- --runInBand`, plus live browser smoke on the updated slice.
 - 2026-03-20T05:08:27-0400: Reran the checklist validator after logging the motion-language pass; sign-off remains clean with 0 warnings and 0 errors.
+- 2026-03-20T05:39:07-0400: Logged the deterministic training-injector pass: added a combat training queue with browser hooks and inspector controls, split movement-direction vs. action-direction routing, enabled solo CPU-slot scripted override in runtime, expanded automated coverage with `tests/client/combat-training.test.ts`, reran `npm run check` and `npm test -- --runInBand`, and verified both `hero_launcher` and `vill_guard_break_big` in fresh Playwright solo-match smoke.

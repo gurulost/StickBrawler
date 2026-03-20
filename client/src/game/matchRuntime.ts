@@ -61,6 +61,10 @@ import type {
   DefendIntent,
 } from "../input/intentTypes";
 import {
+  resolveActionIntentDirection,
+  resolveMovementIntentDirection,
+} from "../input/intentDirection";
+import {
   getMoveTableFor,
   resolveMoveFromIntent,
   pressToStrength,
@@ -127,6 +131,9 @@ const createControlSnapshot = (): ControlSnapshot =>
     {} as ControlSnapshot,
   );
 
+const hasActiveControlSnapshot = (snapshot: ControlSnapshot) =>
+  CONTROL_NAMES.some((name) => !!snapshot[name]);
+
 export const createEmptyInputs = (): DualInputState => ({
   player1: createControlSnapshot(),
   player2: createControlSnapshot(),
@@ -137,6 +144,7 @@ interface FramePayload {
   inputs: DualInputState;
   intents?: DualPlayerIntentFrame;
   gamePhase: GamePhase;
+  trainingOverrideSlots?: PlayerSlot[];
 }
 
 const DEFAULT_GUARD_VALUE = 80;
@@ -527,7 +535,7 @@ export class MatchRuntime {
   };
 
   private processFrame(payload: FramePayload) {
-    const { audio, getDebugMode, getMatchMode } = this.deps;
+    const { audio, getMatchMode } = this.deps;
     const { delta, inputs } = payload;
     const previousPlayer = this.playerState;
     const previousCpu = this.cpuState;
@@ -548,6 +556,10 @@ export class MatchRuntime {
     const opponentControls = inputs.player2;
     const playerDefendState = resolveDefendResolution(playerControls, playerIntentFrame);
     const localOpponentDefendState = resolveDefendResolution(opponentControls, rawOpponentIntentFrame);
+    const cpuManualOverride =
+      !isLocalMultiplayer &&
+      payload.trainingOverrideSlots?.includes("player2") === true &&
+      hasActiveControlSnapshot(opponentControls);
     const playerMoveTable = getMoveTableFor(player.fighterId);
     const cpuMoveTable = getMoveTableFor(cpu.fighterId);
 
@@ -581,7 +593,7 @@ export class MatchRuntime {
       intentTech ||
       (!!playerControls.attack && !prevPlayerControls.attack);
 
-    const cpuControlState = isLocalMultiplayer
+    const cpuControlState = isLocalMultiplayer || cpuManualOverride
       ? snapshotToControlFrame(opponentControls, rawOpponentIntentFrame, localOpponentDefendState)
       : this.cpuBrain.tick(
           {
@@ -597,7 +609,7 @@ export class MatchRuntime {
           },
           delta,
         );
-    const cpuDefendState = isLocalMultiplayer
+    const cpuDefendState = isLocalMultiplayer || cpuManualOverride
       ? localOpponentDefendState
       : deriveCpuDefendState(cpuControlState);
     const cpuTechIntent = cpuDefendState.tech;
@@ -714,7 +726,7 @@ export class MatchRuntime {
     const cpuIsAirborne = cpu.position[1] > 0.15 || cpu.isJumping;
     const cpuIntentFrame = isLocalMultiplayer
       ? rawOpponentIntentFrame
-      : buildCpuIntentFrame(cpuControlState, cpuIsAirborne);
+      : buildCpuIntentFrame(cpuControlState, cpuIsAirborne, cpu.direction);
     const playerDirectionalInfluence = deriveDirectionalInfluence(playerControls, playerIsAirborne);
     const cpuDirectionalInfluence = deriveDirectionalInfluence(cpuControlState, cpuIsAirborne);
     this.advancePlayerTimers(delta, player, cpu, applyResolvedDamage);
@@ -2393,16 +2405,13 @@ function summarizeDefendModes(defend: DefendResolution): string[] {
   return modes;
 }
 
-function buildCpuIntentFrame(controlState: CpuControlFrame, airborne: boolean): PlayerIntentFrame {
-  const direction: Direction = controlState.leftward
-    ? "left"
-    : controlState.rightward
-      ? "right"
-      : controlState.backward
-        ? "back"
-        : controlState.forward
-          ? "forward"
-          : "neutral";
+function buildCpuIntentFrame(
+  controlState: CpuControlFrame,
+  airborne: boolean,
+  facing: 1 | -1,
+): PlayerIntentFrame {
+  const direction: Direction = resolveMovementIntentDirection(controlState);
+  const actionDirection: Direction = resolveActionIntentDirection(controlState, facing);
   const attackPress: PressStyle = {
     heldMs: controlState.attack2 ? 320 : 90,
     tapped: !controlState.attack2,
@@ -2414,7 +2423,7 @@ function buildCpuIntentFrame(controlState: CpuControlFrame, airborne: boolean): 
   const attackIntent = controlState.attack1 || controlState.attack2 || controlState.airAttack
     ? {
         kind: "attack" as const,
-        dir: direction,
+        dir: actionDirection,
         airborne: controlState.airAttack || airborne,
         press: attackPress,
       }
@@ -2422,7 +2431,7 @@ function buildCpuIntentFrame(controlState: CpuControlFrame, airborne: boolean): 
   const specialIntent = controlState.special
     ? {
         kind: "special" as const,
-        dir: direction,
+        dir: actionDirection,
         airborne,
         press: {
           heldMs: 90,

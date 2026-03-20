@@ -13,6 +13,10 @@ import type {
   SpecialIntent,
   JumpIntent,
 } from "../input/intentTypes";
+import {
+  resolveActionIntentDirection,
+  resolveMovementIntentDirection,
+} from "../input/intentDirection";
 
 const TAP_MS = 160;
 const HOLD_MS = 220;
@@ -89,18 +93,19 @@ class IntentAnalyzer {
       this.lastAttackPress = now;
     }
 
-    const direction = this.resolveDirection(snapshot, context);
-    const flickDir = this.trackFlick(direction, now);
-    const dash = this.detectDash(direction, now);
+    const movementDirection = this.resolveMovementDirection(snapshot);
+    const actionDirection = this.resolveActionDirection(snapshot, context);
+    const flickDir = this.trackFlick(movementDirection, now);
+    const dash = this.detectDash(movementDirection, now);
 
     const attackIntent = this.attackBtn.down || this.attackBtn.justPressed
-      ? this.buildAttackIntent(context, direction, flickDir)
+      ? this.buildAttackIntent(context, actionDirection, flickDir)
       : undefined;
     const specialIntent = this.specialBtn.down || this.specialBtn.justPressed
-      ? this.buildSpecialIntent(context, direction, flickDir)
+      ? this.buildSpecialIntent(context, actionDirection, flickDir)
       : undefined;
 
-    const defendIntents = this.buildDefendIntents(context, direction, flickDir, now);
+    const defendIntents = this.buildDefendIntents(context, movementDirection, flickDir, now);
     const jumpIntent = this.jumpBtn.justPressed
       ? this.buildJumpIntent()
       : undefined;
@@ -111,7 +116,7 @@ class IntentAnalyzer {
       defend: defendIntents,
       jump: jumpIntent,
       dash,
-      direction,
+      direction: movementDirection,
     };
   }
 
@@ -206,23 +211,15 @@ class IntentAnalyzer {
     };
   }
 
-  private resolveDirection(snapshot: PlayerInputSnapshot, context: IntentContext): Direction {
-    if (snapshot[Controls.forward] && !snapshot[Controls.backward]) {
-      return "forward";
-    }
-    if (snapshot[Controls.backward] && !snapshot[Controls.forward]) {
-      return "back";
-    }
-    if (snapshot[Controls.leftward] && !snapshot[Controls.rightward]) {
-      return context.facing > 0 ? "left" : "right";
-    }
-    if (snapshot[Controls.rightward] && !snapshot[Controls.leftward]) {
-      return context.facing > 0 ? "right" : "left";
-    }
-    if (snapshot[Controls.forward] && snapshot[Controls.backward]) {
-      return "neutral";
-    }
-    return "neutral";
+  private resolveMovementDirection(snapshot: PlayerInputSnapshot): Direction {
+    return resolveMovementIntentDirection(snapshot);
+  }
+
+  private resolveActionDirection(
+    snapshot: PlayerInputSnapshot,
+    context: IntentContext,
+  ): Direction {
+    return resolveActionIntentDirection(snapshot, context.facing);
   }
 
   private trackFlick(direction: Direction, now: number): Direction | undefined {

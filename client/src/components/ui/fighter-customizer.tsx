@@ -63,7 +63,7 @@ const ColorSelector = ({
 }) => {
   return (
     <div className={`space-y-3 ${className}`}>
-      <label className="text-sm font-medium text-gray-200">{label}</label>
+      <label className="text-sm font-medium text-white/50">{label}</label>
       <div className="grid grid-cols-2 gap-3">
         {Object.entries(colorThemes).map(([key, theme]) => {
           const unlocked = isUnlocked ? isUnlocked(key) : true;
@@ -83,15 +83,15 @@ const ColorSelector = ({
               type="button"
               key={key}
               onClick={handleSelect}
-              className={`relative p-3 rounded-lg border-2 transition-all hover:scale-105 ${
-                value === key 
-                  ? 'border-white ring-2 ring-blue-400 bg-gray-700' 
-                  : 'border-gray-600 hover:border-gray-400 bg-gray-800'
+              className={`relative p-3 clip-angular-sm border transition-all hover:scale-105 ${
+                value === key
+                  ? 'border-[#00f0ff]/60 bg-[#00f0ff]/10 shadow-[0_0_12px_rgba(0,240,255,0.15)]'
+                  : 'border-white/10 hover:border-white/20 bg-ink-dark'
               } ${unlocked ? '' : 'opacity-70 hover:scale-100'}`}
             >
               <div className="flex items-center gap-3">
                 <div 
-                  className="w-8 h-8 rounded-full border border-gray-500"
+                  className="w-8 h-8 rounded-full border border-white/20"
                   style={{ 
                     background: `linear-gradient(135deg, ${theme.primary}, ${theme.secondary})`,
                     boxShadow: `0 0 8px ${theme.glow}40`
@@ -101,10 +101,10 @@ const ColorSelector = ({
                   <div className="text-sm font-medium text-white flex items-center gap-2">
                     {theme?.name || key}
                     {!unlocked && (
-                      <Lock className="w-3 h-3 text-amber-300" aria-label="Locked" />
+                      <Lock className="w-3 h-3 text-[#ffe600]" aria-label="Locked" />
                     )}
                   </div>
-                  <div className="text-xs text-gray-400">
+                  <div className="text-xs text-white/30">
                     {unlocked 
                       ? (theme?.specialEffect || 'Default') 
                       : `Locked • ${cost?.toLocaleString() ?? '—'} coins`}
@@ -112,7 +112,7 @@ const ColorSelector = ({
                 </div>
               </div>
               {!unlocked && (
-                <div className="absolute top-2 right-2 text-[10px] uppercase tracking-wide text-amber-200 bg-black/70 px-2 py-0.5 rounded-full">
+                <div className="absolute top-2 right-2 text-[10px] uppercase tracking-wide text-[#ffe600]/80 bg-ink-dark/90 px-2 py-0.5 clip-angular-sm border border-[#ffe600]/20">
                   {cost?.toLocaleString() ?? '—'} coins
                 </div>
               )}
@@ -146,7 +146,7 @@ const StyleSelector = ({
 }) => {
   return (
     <div className={`space-y-3 ${className}`}>
-      <label className="text-sm font-medium text-gray-200">{label}</label>
+      <label className="text-sm font-medium text-white/50">{label}</label>
       <div className="grid grid-cols-1 gap-2">
         {Object.keys(options).map((key) => {
           const unlocked = isUnlocked ? isUnlocked(key) : true;
@@ -166,17 +166,17 @@ const StyleSelector = ({
               type="button"
               key={key}
               onClick={handleClick}
-              className={`relative p-3 rounded-lg border text-left transition-all hover:bg-gray-700 ${
-                value === key 
-                  ? 'border-blue-400 bg-blue-900/30 text-blue-200' 
-                  : 'border-gray-600 bg-gray-800 text-gray-300 hover:border-gray-500'
+              className={`relative p-3 clip-angular-sm border text-left transition-all hover:bg-white/5 ${
+                value === key
+                  ? 'border-[#00f0ff]/60 bg-[#00f0ff]/10 text-[#00f0ff] shadow-[0_0_12px_rgba(0,240,255,0.1)]'
+                  : 'border-white/10 bg-ink-dark text-white/40 hover:border-white/20'
               } ${unlocked ? '' : 'opacity-70 hover:scale-100'}`}
             >
               <div className="font-medium flex items-center gap-2">
                 {key.charAt(0).toUpperCase() + key.slice(1)}
-                {!unlocked && <Lock className="w-3 h-3 text-amber-300" />}
+                {!unlocked && <Lock className="w-3 h-3 text-[#ffe600]" />}
               </div>
-              <div className="text-xs text-gray-400 mt-1">
+              <div className="text-xs text-white/30 mt-1">
                 {key === 'normal' && 'Balanced fighter with standard proportions'}
                 {key === 'bulky' && 'Heavy fighter with increased durability'}
                 {key === 'slim' && 'Fast fighter with quick movements'}
@@ -187,13 +187,13 @@ const StyleSelector = ({
                 {key === 'acrobatic' && 'Enhanced jumping and air control'}
                 {key === 'robotic' && 'Precise mechanical movements'}
                 {!unlocked && (
-                  <span className="block text-amber-200 mt-1">
+                  <span className="block text-[#ffe600]/80 mt-1">
                     Locked • {cost?.toLocaleString() ?? '—'} coins
                   </span>
                 )}
               </div>
               {!unlocked && (
-                <div className="absolute top-2 right-2 text-[10px] uppercase tracking-wide text-amber-200 bg-black/70 px-2 py-0.5 rounded-full">
+                <div className="absolute top-2 right-2 text-[10px] uppercase tracking-wide text-[#ffe600]/80 bg-ink-dark/90 px-2 py-0.5 clip-angular-sm border border-[#ffe600]/20">
                   Unlock
                 </div>
               )}
@@ -219,7 +219,7 @@ const InkStyleSelector = ({
 }) => {
   return (
     <div className={`space-y-3 ${className}`}>
-      <label className="text-sm font-medium text-gray-200">{label}</label>
+      <label className="text-sm font-medium text-white/50">{label}</label>
       <div className="grid grid-cols-1 gap-2">
         {Object.entries(inkStyles).map(([key, style]) => {
           const isSelected = value === key;
@@ -228,10 +228,10 @@ const InkStyleSelector = ({
               type="button"
               key={key}
               onClick={() => onChange(key as InkStyle)}
-              className={`relative p-3 rounded-lg border text-left transition-all hover:bg-gray-700 ${
+              className={`relative p-3 clip-angular-sm border text-left transition-all hover:bg-white/5 ${
                 isSelected
-                  ? 'border-blue-400 bg-blue-900/30 text-blue-200' 
-                  : 'border-gray-600 bg-gray-800 text-gray-300 hover:border-gray-500'
+                  ? 'border-[#00f0ff]/60 bg-[#00f0ff]/10 text-[#00f0ff] shadow-[0_0_12px_rgba(0,240,255,0.1)]'
+                  : 'border-white/10 bg-ink-dark text-white/40 hover:border-white/20'
               }`}
             >
               <div className="flex items-center gap-3">
@@ -256,7 +256,7 @@ const InkStyleSelector = ({
                 </div>
                 <div className="flex-1">
                   <div className="font-medium">{style.name}</div>
-                  <div className="text-xs text-gray-400 mt-1">{style.description}</div>
+                  <div className="text-xs text-white/30 mt-1">{style.description}</div>
                 </div>
               </div>
             </button>
@@ -287,9 +287,9 @@ const SliderControl = ({
   const clamped = Math.min(max, Math.max(min, Number.isFinite(value) ? value : min));
   return (
     <div className="space-y-1">
-      <div className="flex items-center justify-between text-xs text-gray-400">
-        <span className="text-sm text-gray-200">{label}</span>
-        <span className="font-mono text-gray-300">
+      <div className="flex items-center justify-between text-xs text-white/30">
+        <span className="text-sm text-white/50">{label}</span>
+        <span className="font-mono text-white/40">
           {formatValue ? formatValue(clamped) : clamped.toFixed(2)}
         </span>
       </div>
@@ -321,18 +321,18 @@ const FigureBlendControls = ({
   onTargetChange: (style: FigureStyle | null) => void;
   onBlendChange: (amount: number) => void;
 }) => (
-  <div className="bg-gray-900/40 border border-gray-700 rounded-xl p-4 space-y-3">
+  <div className="bg-ink-dark/40 border border-white/8 clip-angular-sm p-4 space-y-3">
     <div className="flex items-center justify-between">
       <div>
         <p className="text-sm font-semibold text-white">Preset Blending</p>
-        <p className="text-xs text-gray-400">Mix silhouettes to craft new forms</p>
+        <p className="text-xs text-white/30">Mix silhouettes to craft new forms</p>
       </div>
-      <Badge className="bg-gray-700 text-gray-200 border-gray-600">
+      <Badge className="bg-white/5 text-white/50 border-white/10">
         {blendTarget ? `${Math.round(blendAmount * 100)}% ${blendTarget}` : 'Base only'}
       </Badge>
     </div>
     <div className="space-y-2">
-      <label className="text-xs uppercase tracking-wide text-gray-400">Blend Source</label>
+      <label className="text-xs uppercase tracking-wide text-white/30">Blend Source</label>
       <select
         value={blendTarget ?? ''}
         onChange={(event) => {
@@ -342,7 +342,7 @@ const FigureBlendControls = ({
             onBlendChange(0);
           }
         }}
-        className="w-full bg-gray-800 border border-gray-600 rounded-lg px-3 py-2 text-sm text-gray-100"
+        className="w-full bg-ink-dark border border-white/10 clip-angular-sm px-3 py-2 text-sm font-tech text-white/70"
       >
         <option value="">Use base preset</option>
         {styleOptions
@@ -384,15 +384,15 @@ const SilhouetteOverrideControls = ({
   const arms = style.silhouette?.arms;
   const legs = style.silhouette?.legs;
   return (
-    <div className="bg-gray-900/40 border border-gray-700 rounded-xl p-4 space-y-4">
+    <div className="bg-ink-dark/40 border border-white/8 clip-angular-sm p-4 space-y-4">
       <div className="flex items-center justify-between">
         <div>
           <p className="text-sm font-semibold text-white">{label}</p>
-          <p className="text-xs text-gray-400">Directly sculpt the silhouette</p>
+          <p className="text-xs text-white/30">Directly sculpt the silhouette</p>
         </div>
         <button
           type="button"
-          className="text-xs text-blue-300 hover:text-blue-100"
+          className="text-xs text-[#00f0ff]/70 hover:text-[#00f0ff]"
           onClick={onReset}
         >
           Reset
@@ -502,37 +502,37 @@ const InkOverrideControls = ({
   const rimColor = overrides?.rimColor ?? baseStyle.rimColor;
   const outlineColor = overrides?.outlineColor ?? baseStyle.outlineColor;
   return (
-    <div className="bg-gray-900/40 border border-gray-700 rounded-xl p-4 space-y-4">
+    <div className="bg-ink-dark/40 border border-white/8 clip-angular-sm p-4 space-y-4">
       <div className="flex items-center justify-between">
         <div>
           <p className="text-sm font-semibold text-white">{label}</p>
-          <p className="text-xs text-gray-400">Fine-tune ink shader response</p>
+          <p className="text-xs text-white/30">Fine-tune ink shader response</p>
         </div>
         <button
           type="button"
-          className="text-xs text-blue-300 hover:text-blue-100"
+          className="text-xs text-[#00f0ff]/70 hover:text-[#00f0ff]"
           onClick={onReset}
         >
           Reset
         </button>
       </div>
       <div className="grid grid-cols-2 gap-3">
-        <label className="text-xs text-gray-400 flex flex-col gap-1">
-          <span className="text-sm text-gray-200">Rim Color</span>
+        <label className="text-xs text-white/30 flex flex-col gap-1">
+          <span className="text-sm text-white/50">Rim Color</span>
           <input
             type="color"
             value={rimColor}
             onChange={(event) => onChange({ rimColor: event.target.value })}
-            className="w-full h-10 rounded border border-gray-600 bg-gray-800"
+            className="w-full h-10 rounded border border-white/10 bg-ink-dark"
           />
         </label>
-        <label className="text-xs text-gray-400 flex flex-col gap-1">
-          <span className="text-sm text-gray-200">Outline Color</span>
+        <label className="text-xs text-white/30 flex flex-col gap-1">
+          <span className="text-sm text-white/50">Outline Color</span>
           <input
             type="color"
             value={outlineColor}
             onChange={(event) => onChange({ outlineColor: event.target.value })}
-            className="w-full h-10 rounded border border-gray-600 bg-gray-800"
+            className="w-full h-10 rounded border border-white/10 bg-ink-dark"
           />
         </label>
       </div>
@@ -590,7 +590,7 @@ const AccessorySelector = ({
   const canCustomizeColor = value !== 'none' && (!isUnlocked || isUnlocked(value));
   return (
     <div className={`space-y-3 ${className}`}>
-      <label className="text-sm font-medium text-gray-200">{label}</label>
+      <label className="text-sm font-medium text-white/50">{label}</label>
       <div className="grid grid-cols-2 gap-2 max-h-48 overflow-y-auto">
         {Object.entries(accessories).map(([key, accessory]) => {
           const unlocked = isUnlocked ? isUnlocked(key) : true;
@@ -610,40 +610,40 @@ const AccessorySelector = ({
               type="button"
               key={key}
               onClick={handleSelect}
-              className={`relative p-3 rounded-lg border text-left transition-all hover:bg-gray-700 ${
-                value === key 
-                  ? 'border-blue-400 bg-blue-900/30 text-blue-200' 
-                  : 'border-gray-600 bg-gray-800 text-gray-300 hover:border-gray-500'
+              className={`relative p-3 clip-angular-sm border text-left transition-all hover:bg-white/5 ${
+                value === key
+                  ? 'border-[#00f0ff]/60 bg-[#00f0ff]/10 text-[#00f0ff] shadow-[0_0_12px_rgba(0,240,255,0.1)]'
+                  : 'border-white/10 bg-ink-dark text-white/40 hover:border-white/20'
               } ${unlocked ? '' : 'opacity-70 hover:scale-100'}`}
             >
               <div className="flex items-center gap-2">
                 <div className="font-medium text-sm flex items-center gap-1">
                   {accessory?.name || key}
-                  {!unlocked && <Lock className="w-3 h-3 text-amber-300" />}
+                  {!unlocked && <Lock className="w-3 h-3 text-[#ffe600]" />}
                 </div>
                 {accessory?.effect && (
                   <div className="flex gap-1">
                     {accessory.emissive && (
-                      <div className="w-2 h-2 rounded-full bg-yellow-400 animate-pulse" title="Glowing Effect" />
+                      <div className="w-2 h-2 rounded-full bg-[#ffe600] animate-pulse" title="Glowing Effect" />
                     )}
                     {accessory.animated && (
-                      <div className="w-2 h-2 rounded-full bg-blue-400 animate-spin" title="Animated Effect" />
+                      <div className="w-2 h-2 rounded-full bg-[#00f0ff] animate-spin" title="Animated Effect" />
                     )}
                   </div>
                 )}
               </div>
               {accessory?.effect && (
-                <div className="text-xs text-gray-400 mt-1 capitalize">
+                <div className="text-xs text-white/30 mt-1 capitalize">
                   {accessory.effect.replace('_', ' ')} effect
                 </div>
               )}
               {!unlocked && (
-                <div className="text-xs text-amber-200 mt-1">
+                <div className="text-xs text-[#ffe600]/80 mt-1">
                   Locked • {cost?.toLocaleString() ?? '—'} coins
                 </div>
               )}
               {!unlocked && (
-                <div className="absolute top-2 right-2 text-[10px] uppercase tracking-wide text-amber-200 bg-black/70 px-2 py-0.5 rounded-full">
+                <div className="absolute top-2 right-2 text-[10px] uppercase tracking-wide text-[#ffe600]/80 bg-ink-dark/90 px-2 py-0.5 clip-angular-sm border border-[#ffe600]/20">
                   Unlock
                 </div>
               )}
@@ -654,7 +654,7 @@ const AccessorySelector = ({
       
       {canCustomizeColor && (
         <div className="space-y-2">
-          <label className="text-xs font-medium text-gray-300">Accessory Color</label>
+          <label className="text-xs font-medium text-white/40">Accessory Color</label>
           <div className="grid grid-cols-4 gap-2">
             {accessoryColorPalette.map((colorOption) => (
               <button
@@ -662,7 +662,7 @@ const AccessorySelector = ({
                 key={colorOption.color}
                 onClick={() => onColorChange(colorOption.color)}
                 className={`w-8 h-8 rounded border-2 transition-all hover:scale-110 ${
-                  color === colorOption.color ? 'border-white ring-2 ring-blue-400' : 'border-gray-600'
+                  color === colorOption.color ? 'border-white ring-2 ring-[#00f0ff]/50' : 'border-white/10'
                 }`}
                 style={{ 
                   backgroundColor: colorOption.color,
@@ -695,10 +695,10 @@ type PresetCharacter = {
 };
 
 const rarityStyles: Record<PresetRarity, { label: string; className: string }> = {
-  common: { label: 'Common', className: 'bg-gray-700 text-gray-200' },
-  rare: { label: 'Rare', className: 'bg-blue-700/60 text-blue-100' },
-  epic: { label: 'Epic', className: 'bg-purple-700/60 text-purple-100' },
-  legendary: { label: 'Legendary', className: 'bg-amber-600/70 text-amber-50' },
+  common: { label: 'Common', className: 'bg-white/5 text-white/50' },
+  rare: { label: 'Rare', className: 'bg-[#00f0ff]/10 text-[#00f0ff]' },
+  epic: { label: 'Epic', className: 'bg-[#b347ff]/10 text-[#b347ff]' },
+  legendary: { label: 'Legendary', className: 'bg-[#ffe600]/10 text-[#ffe600]' },
 };
 
 const presetCharacters: PresetCharacter[] = [
@@ -1294,41 +1294,36 @@ export function FighterCustomizer({ previewsActive = true }: { previewsActive?: 
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-900 via-blue-900 to-purple-900 p-4">
+    <div className="p-2">
       <div className="max-w-7xl mx-auto">
-        <div className="text-center mb-8">
-          <h1 className="text-4xl font-bold bg-gradient-to-r from-blue-400 to-purple-400 bg-clip-text text-transparent mb-2">
-            Fighter Customization
-          </h1>
-          <p className="text-gray-300">Design your ultimate fighter and dominate the arena</p>
-        </div>
+        {/* Header handled by parent Menu panel */}
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-          <Card className="bg-gray-900/60 border-gray-700">
+          <Card className="bg-ink-dark/60 border-white/5">
             <CardContent className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-              <div className="flex items-center gap-3 text-amber-300">
+              <div className="flex items-center gap-3 text-[#ffe600]">
                 <Coins className="w-8 h-8" />
                 <div>
-                  <p className="text-xs uppercase tracking-wide text-gray-400">Coin Balance</p>
-                  <p className="text-3xl font-bold text-amber-100">{coins.toLocaleString()}</p>
+                  <p className="text-xs uppercase tracking-wide text-white/30">Coin Balance</p>
+                  <p className="text-3xl font-bold text-[#ffe600]/90">{coins.toLocaleString()}</p>
                 </div>
               </div>
-              <div className="text-sm text-gray-400 max-w-2xl">
+              <div className="text-sm text-white/30 max-w-2xl">
                 Earn coins automatically during fights by landing hits, extending combos, and closing out rounds. Spend them here to unlock premium color themes, figure styles, accessories, and animation sets.
               </div>
             </CardContent>
           </Card>
 
-          <Card className="bg-gray-900/60 border-gray-700">
+          <Card className="bg-ink-dark/60 border-white/5">
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-white">
-                <Palette className="w-5 h-5 text-amber-300" />
+                <Palette className="w-5 h-5 text-[#ffe600]" />
                 Recent Coin Activity
               </CardTitle>
             </CardHeader>
             <CardContent>
               {recentCoinEvents.length === 0 ? (
-                <p className="text-sm text-gray-400">
+                <p className="text-sm text-white/30">
                   Play a match to start building a ledger of hits, knockouts, and cosmetic purchases.
                 </p>
               ) : (
@@ -1341,8 +1336,8 @@ export function FighterCustomizer({ previewsActive = true }: { previewsActive?: 
                         className="flex items-start gap-3"
                       >
                         <div
-                          className={`p-2 rounded-full ${
-                            isCredit ? 'bg-green-500/20 text-green-300' : 'bg-rose-500/20 text-rose-300'
+                          className={`p-2 clip-angular-sm ${
+                            isCredit ? 'bg-[#39ff14]/10 text-[#39ff14] border border-[#39ff14]/20' : 'bg-[#ff2d7b]/10 text-[#ff2d7b] border border-[#ff2d7b]/20'
                           }`}
                         >
                           {isCredit ? (
@@ -1351,15 +1346,15 @@ export function FighterCustomizer({ previewsActive = true }: { previewsActive?: 
                             <ArrowDownRight className="w-4 h-4" />
                           )}
                         </div>
-                        <div className="flex-1 text-sm text-gray-200">
+                        <div className="flex-1 text-sm text-white/50">
                           <div className="flex items-center justify-between gap-3">
                             <span>{describeLedgerReason(entry)}</span>
-                            <span className={isCredit ? 'text-green-300' : 'text-rose-300'}>
+                            <span className={isCredit ? 'text-[#39ff14]' : 'text-[#ff2d7b]'}>
                               {isCredit ? '+' : '-'}
                               {entry.amount.toLocaleString()}
                             </span>
                           </div>
-                          <div className="text-xs text-gray-500">
+                          <div className="text-xs text-white/20">
                             {formatLedgerTimestamp(entry.timestamp)}
                           </div>
                         </div>
@@ -1373,7 +1368,7 @@ export function FighterCustomizer({ previewsActive = true }: { previewsActive?: 
         </div>
 
         {economySyncError && (
-          <div className="mb-6 rounded-lg border border-amber-500/40 bg-amber-500/10 px-4 py-3 text-sm text-amber-200">
+          <div className="mb-6 clip-angular-sm border border-[#ffe600]/30 bg-[#ffe600]/5 px-4 py-3 text-sm font-tech text-[#ffe600]/80">
             {economySyncError}
           </div>
         )}
@@ -1385,10 +1380,10 @@ export function FighterCustomizer({ previewsActive = true }: { previewsActive?: 
             aria-live="polite"
           >
             <div
-              className={`flex items-center gap-3 rounded-2xl px-4 py-3 shadow-2xl border ${
+              className={`flex items-center gap-3 clip-angular-sm px-4 py-3 shadow-2xl border font-tech ${
                 economyNotice.type === 'success'
-                  ? 'bg-green-900/80 border-green-500 text-green-100'
-                  : 'bg-rose-900/80 border-rose-500 text-rose-100'
+                  ? 'bg-ink-dark border-[#39ff14]/40 text-[#39ff14] shadow-[0_0_20px_rgba(57,255,20,0.2)]'
+                  : 'bg-ink-dark border-[#ff2d7b]/40 text-[#ff2d7b] shadow-[0_0_20px_rgba(255,45,123,0.2)]'
               }`}
             >
               {economyNotice.type === 'success' ? (
@@ -1404,7 +1399,7 @@ export function FighterCustomizer({ previewsActive = true }: { previewsActive?: 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Character Preview Section */}
           <div className="lg:col-span-1">
-            <Card className="bg-gray-800/50 border-gray-700">
+            <Card className="bg-ink-dark/40 border-white/5">
               <CardHeader>
                 <CardTitle className="flex items-center gap-2 text-white">
                   <Eye className="w-5 h-5" />
@@ -1413,44 +1408,44 @@ export function FighterCustomizer({ previewsActive = true }: { previewsActive?: 
               </CardHeader>
               <CardContent className="space-y-4">
                 <Tabs value={activeTab} onValueChange={setActiveTab}>
-                  <TabsList className="grid w-full grid-cols-2 bg-gray-700">
-                    <TabsTrigger value="player" className="data-[state=active]:bg-blue-600">
+                  <TabsList className="grid w-full grid-cols-2 bg-white/5">
+                    <TabsTrigger value="player" className="font-tech text-xs uppercase tracking-wider data-[state=active]:bg-[#00f0ff]/20 data-[state=active]:text-[#00f0ff] data-[state=active]:shadow-[0_0_12px_rgba(0,240,255,0.15)]">
                       Player
                     </TabsTrigger>
-                    <TabsTrigger value="cpu" className="data-[state=active]:bg-red-600">
+                    <TabsTrigger value="cpu" className="font-tech text-xs uppercase tracking-wider data-[state=active]:bg-[#ff2d7b]/20 data-[state=active]:text-[#ff2d7b] data-[state=active]:shadow-[0_0_12px_rgba(255,45,123,0.15)]">
                       CPU
                     </TabsTrigger>
                   </TabsList>
                   
                   <TabsContent value="player" forceMount>
-                    <CharacterPreview animate={previewsActive && activeTab === 'player'} isPlayer={true} className="mb-4 h-80 rounded-2xl ring-1 ring-blue-400/30 shadow-[0_18px_55px_rgba(37,99,235,0.28)]" />
+                    <CharacterPreview animate={previewsActive && activeTab === 'player'} isPlayer={true} className="mb-4 h-80 clip-angular border border-[#00f0ff]/20 shadow-[0_18px_55px_rgba(0,240,255,0.15)]" />
                     <div className="text-center space-y-2">
-                      <Badge variant="outline" className="bg-blue-900/30 text-blue-200 border-blue-600">
+                      <Badge variant="outline" className="bg-[#00f0ff]/10 text-[#00f0ff] border-[#00f0ff]/40">
                         Player Fighter
                       </Badge>
-                      <p className="text-sm text-gray-400">This is how your fighter will look in battle</p>
+                      <p className="text-sm text-white/30">This is how your fighter will look in battle</p>
                     </div>
                   </TabsContent>
                   
                   <TabsContent value="cpu" forceMount>
-                    <CharacterPreview animate={previewsActive && activeTab === 'cpu'} isPlayer={false} className="mb-4 h-80 rounded-2xl ring-1 ring-rose-400/30 shadow-[0_18px_55px_rgba(244,63,94,0.24)]" />
+                    <CharacterPreview animate={previewsActive && activeTab === 'cpu'} isPlayer={false} className="mb-4 h-80 clip-angular border border-[#ff2d7b]/20 shadow-[0_18px_55px_rgba(255,45,123,0.15)]" />
                     <div className="text-center space-y-2">
-                      <Badge variant="outline" className="bg-red-900/30 text-red-200 border-red-600">
+                      <Badge variant="outline" className="bg-[#ff2d7b]/10 text-[#ff2d7b]/80 border-[#ff2d7b]">
                         CPU Opponent
                       </Badge>
-                      <p className="text-sm text-gray-400">This is how your opponent will look</p>
+                      <p className="text-sm text-white/30">This is how your opponent will look</p>
                     </div>
                   </TabsContent>
                 </Tabs>
 
-                <Separator className="bg-gray-600" />
+                <Separator className="bg-white/10" />
 
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 pointer-events-auto">
                   <Button
                     type="button"
                     variant="outline"
                     onClick={handleRandomizeActive}
-                    className="border-gray-600 text-gray-200 hover:bg-gray-700"
+                    className="border-white/10 text-white/60 hover:bg-white/5"
                   >
                     <Shuffle className="w-4 h-4 mr-2" />
                     Randomize {activeTab === 'player' ? 'Player' : 'CPU'}
@@ -1459,7 +1454,7 @@ export function FighterCustomizer({ previewsActive = true }: { previewsActive?: 
                     type="button"
                     variant="outline"
                     onClick={copyPlayerToCpu}
-                    className="border-gray-600 text-gray-200 hover:bg-gray-700"
+                    className="border-white/10 text-white/60 hover:bg-white/5"
                   >
                     <ArrowLeftRight className="w-4 h-4 mr-2" />
                     Player → CPU
@@ -1468,7 +1463,7 @@ export function FighterCustomizer({ previewsActive = true }: { previewsActive?: 
                     type="button"
                     variant="outline"
                     onClick={copyCpuToPlayer}
-                    className="border-gray-600 text-gray-200 hover:bg-gray-700"
+                    className="border-white/10 text-white/60 hover:bg-white/5"
                   >
                     <ArrowLeftRight className="w-4 h-4 mr-2 rotate-180" />
                     CPU → Player
@@ -1478,7 +1473,7 @@ export function FighterCustomizer({ previewsActive = true }: { previewsActive?: 
                 <div className="space-y-3">
                   <Button 
                     onClick={() => setShowSaveDialog(true)} 
-                    className="w-full bg-green-600 hover:bg-green-700"
+                    className="w-full bg-[#39ff14]/80 hover:bg-[#39ff14] text-black"
                   >
                     <Save className="w-4 h-4 mr-2" />
                     Save Character
@@ -1486,27 +1481,27 @@ export function FighterCustomizer({ previewsActive = true }: { previewsActive?: 
                   
                   {/* Save Dialog */}
                   {showSaveDialog && (
-                    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-                      <div className="bg-gray-800 p-6 rounded-lg border border-gray-600 w-80">
-                        <h3 className="text-lg font-semibold text-white mb-4">Save Character</h3>
+                    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50">
+                      <div className="bg-ink-dark p-6 border border-white/10 w-80" style={{ clipPath: 'polygon(0 0, calc(100% - 16px) 0, 100% 16px, 100% 100%, 16px 100%, 0 calc(100% - 16px))' }}>
+                        <h3 className="text-lg font-tech font-bold text-white uppercase tracking-wider mb-4">Save Character</h3>
                         <Input
                           value={characterName}
                           onChange={(e) => setCharacterName(e.target.value)}
                           placeholder="Enter character name..."
-                          className="mb-4 bg-gray-700 border-gray-600 text-white"
+                          className="mb-4 bg-white/5 border-white/10 text-white"
                         />
                         <div className="flex gap-2">
                           <Button 
                             onClick={handleSaveCharacter}
                             disabled={!characterName.trim()}
-                            className="flex-1 bg-green-600 hover:bg-green-700"
+                            className="flex-1 bg-[#39ff14]/80 hover:bg-[#39ff14] text-black"
                           >
                             Save
                           </Button>
                           <Button 
                             onClick={() => setShowSaveDialog(false)}
                             variant="outline"
-                            className="flex-1 border-gray-600 text-gray-300"
+                            className="flex-1 border-white/10 text-white/40"
                           >
                             Cancel
                           </Button>
@@ -1518,7 +1513,7 @@ export function FighterCustomizer({ previewsActive = true }: { previewsActive?: 
                   <Button 
                     onClick={resetCustomizations} 
                     variant="outline" 
-                    className="w-full border-gray-600 text-gray-300 hover:bg-gray-700"
+                    className="w-full border-white/10 text-white/50 hover:bg-white/5"
                   >
                     <RotateCcw className="w-4 h-4 mr-2" />
                     Reset All
@@ -1526,7 +1521,7 @@ export function FighterCustomizer({ previewsActive = true }: { previewsActive?: 
                   
                   <Button 
                     onClick={enterBattle} 
-                    className="w-full bg-gradient-to-r from-orange-500 to-red-600 hover:from-orange-600 hover:to-red-700 text-white font-bold py-3"
+                    className="w-full bg-gradient-to-r from-[#ff2d7b] to-[#ff6a00] hover:from-[#ff2d7b]/90 hover:to-[#ff6a00]/90 text-white font-bold py-3"
                   >
                     <Zap className="w-5 h-5 mr-2" />
                     Enter Battle!
@@ -1535,7 +1530,7 @@ export function FighterCustomizer({ previewsActive = true }: { previewsActive?: 
                   <Button 
                     onClick={backToMenu} 
                     variant="outline"
-                    className="w-full border-gray-600 text-gray-300 hover:bg-gray-700"
+                    className="w-full border-white/10 text-white/50 hover:bg-white/5"
                   >
                     Back to Menu
                   </Button>
@@ -1546,7 +1541,7 @@ export function FighterCustomizer({ previewsActive = true }: { previewsActive?: 
 
           {/* Customization Controls */}
           <div className="lg:col-span-2">
-            <Card className="bg-gray-800/50 border-gray-700">
+            <Card className="bg-ink-dark/40 border-white/5">
               <CardHeader>
                 <CardTitle className="flex items-center gap-2 text-white">
                   <User className="w-5 h-5" />
@@ -1667,7 +1662,7 @@ export function FighterCustomizer({ previewsActive = true }: { previewsActive?: 
                   />
                 </div>
 
-                <Separator className="my-6 bg-gray-600" />
+                <Separator className="my-6 bg-white/10" />
 
                 <div className="space-y-4">
                   <h3 className="text-lg font-semibold text-white">Advanced Silhouette & Ink</h3>
@@ -1697,7 +1692,7 @@ export function FighterCustomizer({ previewsActive = true }: { previewsActive?: 
                   </div>
                 </div>
 
-                <Separator className="my-6 bg-gray-600" />
+                <Separator className="my-6 bg-white/10" />
 
                 <div className="space-y-3">
                   <h3 className="text-lg font-semibold text-white flex items-center gap-2">
@@ -1710,7 +1705,7 @@ export function FighterCustomizer({ previewsActive = true }: { previewsActive?: 
                         type="button"
                         variant="outline"
                         onClick={() => handleCopyConfig(isPlayerTab ? 'player' : 'cpu')}
-                        className="border-blue-500 text-blue-200 hover:bg-blue-900/30"
+                        className="border-[#00f0ff]/40 text-[#00f0ff] hover:bg-[#00f0ff]/10"
                       >
                         <Copy className="w-4 h-4 mr-2" />
                         Copy {isPlayerTab ? 'Player' : 'CPU'} JSON
@@ -1720,12 +1715,12 @@ export function FighterCustomizer({ previewsActive = true }: { previewsActive?: 
                           value={importBuffer}
                           onChange={(event) => setImportBuffer(event.target.value)}
                           placeholder="Paste fighter JSON to import"
-                          className="bg-gray-800 border-gray-600 text-gray-100 flex-1"
+                          className="bg-ink-dark border-white/10 text-white/70 flex-1"
                         />
                         <Button
                           type="button"
                           onClick={() => handleImportConfig(isPlayerTab ? 'player' : 'cpu')}
-                          className="bg-green-600 hover:bg-green-700"
+                          className="bg-[#39ff14]/80 hover:bg-[#39ff14] text-black"
                         >
                           Import
                         </Button>
@@ -1735,17 +1730,17 @@ export function FighterCustomizer({ previewsActive = true }: { previewsActive?: 
                       <textarea
                         readOnly
                         value={sharePreview}
-                        className="w-full h-36 bg-gray-950 border border-gray-700 rounded-lg p-3 text-xs font-mono text-gray-200"
+                        className="w-full h-36 bg-ink-black border border-white/8 clip-angular-sm p-3 text-xs font-mono text-white/50"
                       />
                     )}
-                    <p className="text-xs text-gray-400">
+                    <p className="text-xs text-white/30">
                       Exports capture blend, silhouette, accessory, and ink settings. Imports apply to whichever tab
                       (Player or CPU) is active.
                     </p>
                   </div>
                 </div>
 
-                <Separator className="my-6 bg-gray-600" />
+                <Separator className="my-6 bg-white/10" />
 
                 {/* Saved Characters Gallery */}
                 {savedCharacters.length > 0 && (
@@ -1758,10 +1753,10 @@ export function FighterCustomizer({ previewsActive = true }: { previewsActive?: 
                       {savedCharacters.map((character) => (
                         <div
                           key={character.id}
-                          className="p-3 rounded-lg border border-gray-600 bg-gray-800 hover:bg-gray-700 transition-all"
+                          className="p-3 clip-angular-sm border border-white/10 bg-ink-dark hover:bg-white/5 transition-all"
                         >
                           <div className="font-medium text-white text-sm mb-2">{character.name}</div>
-                          <div className="text-xs text-gray-400 mb-2">
+                          <div className="text-xs text-white/30 mb-2">
                             {character.figureStyle} • {character.colorTheme}
                           </div>
                           <div 
@@ -1774,7 +1769,7 @@ export function FighterCustomizer({ previewsActive = true }: { previewsActive?: 
                             <Button
                               size="sm"
                               onClick={() => loadCharacter(character, activeTab === 'player')}
-                              className="flex-1 text-xs bg-blue-600 hover:bg-blue-700"
+                              className="flex-1 text-xs bg-[#00f0ff]/80 hover:bg-[#00f0ff] text-black"
                             >
                               Load
                             </Button>
@@ -1782,7 +1777,7 @@ export function FighterCustomizer({ previewsActive = true }: { previewsActive?: 
                               size="sm"
                               variant="outline"
                               onClick={() => deleteCharacter(character.id)}
-                              className="text-xs border-red-600 text-red-400 hover:bg-red-900/30"
+                              className="text-xs border-[#ff2d7b] text-[#ff2d7b] hover:bg-[#ff2d7b]/10"
                             >
                               ✕
                             </Button>
@@ -1805,17 +1800,17 @@ export function FighterCustomizer({ previewsActive = true }: { previewsActive?: 
                         key={option.id}
                         type="button"
                         onClick={() => setPresetFilter(option.id)}
-                        className={`px-3 py-1 rounded-full border text-xs font-semibold uppercase ${
+                        className={`px-3 py-1 clip-angular-sm border text-xs font-tech font-semibold uppercase tracking-wider ${
                           presetFilter === option.id
-                            ? 'border-amber-400 text-amber-200 bg-amber-500/10'
-                            : 'border-gray-600 text-gray-300 hover:border-gray-400'
+                            ? 'border-[#ffe600]/30 text-[#ffe600] bg-[#ffe600]/10 shadow-[0_0_10px_rgba(255,230,0,0.1)]'
+                            : 'border-white/10 text-white/40 hover:border-white/20'
                         }`}
                       >
                         {option.label}
                       </button>
                     ))}
                   </div>
-                  <div className="text-xs text-gray-400">
+                  <div className="text-xs text-white/30">
                     {filteredPresets.length} preset{filteredPresets.length === 1 ? '' : 's'} match your filter.
                   </div>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -1827,20 +1822,20 @@ export function FighterCustomizer({ previewsActive = true }: { previewsActive?: 
                       return (
                         <div
                           key={preset.name}
-                          className="p-4 rounded-xl border border-gray-700 bg-gray-900/40 hover:border-gray-500 transition-all flex flex-col gap-3"
+                          className="p-4 clip-angular-sm border border-white/8 bg-ink-dark/40 hover:border-white/20 transition-all flex flex-col gap-3"
                         >
                           <div className="flex items-center justify-between">
                             <div>
                               <div className="text-sm font-semibold text-white">{preset.name}</div>
-                              <div className="text-xs text-gray-400">
+                              <div className="text-xs text-white/30">
                                 {figureStyles[preset.figureStyle].name} • {colorThemes[preset.colorTheme].name}
                               </div>
                             </div>
-                            <span className={`text-[10px] px-2 py-1 rounded-full font-semibold uppercase ${rarityMeta.className}`}>
+                            <span className={`text-[10px] px-2 py-1 clip-angular-sm font-tech font-semibold uppercase ${rarityMeta.className}`}>
                               {rarityMeta.label}
                             </span>
                           </div>
-                          <p className="text-xs text-gray-400 min-h-[40px]">{preset.description}</p>
+                          <p className="text-xs text-white/30 min-h-[40px]">{preset.description}</p>
                           <div 
                             className="w-full h-2 rounded"
                             style={{ 
@@ -1848,10 +1843,10 @@ export function FighterCustomizer({ previewsActive = true }: { previewsActive?: 
                             }}
                           />
                           <div className="flex items-center justify-between text-xs">
-                            <span className="text-gray-400">
+                            <span className="text-white/30">
                               {owned ? 'All cosmetics unlocked' : `Needs ${missingCost.toLocaleString()} coins`}
                             </span>
-                            <span className="text-amber-200">
+                            <span className="text-[#ffe600]/80">
                               Base value: {preset.baseCost.toLocaleString()}c
                             </span>
                           </div>
@@ -1860,7 +1855,7 @@ export function FighterCustomizer({ previewsActive = true }: { previewsActive?: 
                               type="button"
                               onClick={() => handlePresetEquip(preset, 'player')}
                               disabled={!canAfford}
-                              className={`w-full ${owned ? 'bg-blue-600 hover:bg-blue-700' : 'bg-amber-600 hover:bg-amber-700'} disabled:opacity-50 disabled:cursor-not-allowed`}
+                              className={`w-full ${owned ? 'bg-[#00f0ff]/80 hover:bg-[#00f0ff] text-black' : 'bg-[#ffe600]/80 hover:bg-[#ffe600] text-black'} disabled:opacity-50 disabled:cursor-not-allowed`}
                             >
                               {owned ? 'Equip Player' : canAfford ? 'Unlock+Equip' : 'Need coins'}
                             </Button>
@@ -1869,7 +1864,7 @@ export function FighterCustomizer({ previewsActive = true }: { previewsActive?: 
                               variant="outline"
                               onClick={() => handlePresetEquip(preset, 'cpu')}
                               disabled={!canAfford}
-                              className="border-gray-600 text-gray-200 hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                              className="border-white/10 text-white/60 hover:bg-white/5 disabled:opacity-50 disabled:cursor-not-allowed"
                             >
                               {owned ? 'Equip CPU' : 'Locked'}
                             </Button>

@@ -72,11 +72,8 @@ const Menu = () => {
 
   const handleStartOnlineMatch = (matchId: string) => {
     console.log("Starting online match:", matchId);
-    // Store matchId in sessionStorage for the game to pick up
     sessionStorage.setItem("onlineMatchId", matchId);
     sessionStorage.setItem("matchMode", "online");
-    
-    // Start the game in online mode
     setMatchMode("online");
     startGame("online");
   };
@@ -123,20 +120,23 @@ const Menu = () => {
 
         {customizationMounted && (
           <div className={activePanel === "customization" ? "" : "hidden"} aria-hidden={activePanel !== "customization"}>
-            <section className="rounded-3xl border border-white/10 bg-black/40 p-6 backdrop-blur">
-              <header className="mb-6 flex flex-wrap items-center justify-between gap-4">
+            <section className="ink-card noise-overlay rounded-none relative overflow-hidden p-6" style={{ clipPath: 'polygon(0 0, calc(100% - 20px) 0, 100% 20px, 100% 100%, 20px 100%, 0 calc(100% - 20px))' }}>
+              <div className="absolute top-0 left-0 right-5 h-[2px] bg-gradient-to-r from-[#b347ff] via-[#b347ff]/40 to-transparent" />
+              <header className="mb-6 flex flex-wrap items-center justify-between gap-4 relative z-10">
                 <div>
-                  <p className="text-xs uppercase tracking-[0.4em] text-emerald-200">Ink Customizer</p>
-                  <h2 className="text-2xl font-bold text-white">Craft your silhouette</h2>
+                  <p className="text-[10px] font-tech uppercase tracking-[0.4em] text-[#b347ff]">Ink Customizer</p>
+                  <h2 className="text-2xl font-display text-white">Craft Your Silhouette</h2>
                 </div>
                 <button
                   onClick={() => setActivePanel("main")}
-                  className="rounded-full border border-white/20 px-4 py-2 text-xs font-semibold uppercase tracking-wide text-white/80 hover:text-white"
+                  className="clip-angular-sm border border-white/10 bg-white/5 px-4 py-2 text-[10px] font-tech font-bold uppercase tracking-wider text-white/60 hover:text-white hover:bg-white/10"
                 >
-                  Back to Hero
+                  Back to Menu
                 </button>
               </header>
-              <FighterCustomizer previewsActive={activePanel === "customization"} />
+              <div className="relative z-10">
+                <FighterCustomizer previewsActive={activePanel === "customization"} />
+              </div>
             </section>
           </div>
         )}
@@ -152,20 +152,23 @@ const Menu = () => {
     switch (activePanel) {
       case "leaderboard":
         return (
-          <section className="rounded-3xl border border-white/10 bg-black/40 p-6 backdrop-blur">
-            <header className="mb-6 flex flex-wrap items-center justify-between gap-4">
+          <section className="ink-card noise-overlay rounded-none relative overflow-hidden p-6" style={{ clipPath: 'polygon(0 0, calc(100% - 20px) 0, 100% 20px, 100% 100%, 20px 100%, 0 calc(100% - 20px))' }}>
+            <div className="absolute top-0 left-0 right-5 h-[2px] bg-gradient-to-r from-[#ffe600] via-[#ffe600]/40 to-transparent" />
+            <header className="mb-6 flex flex-wrap items-center justify-between gap-4 relative z-10">
               <div>
-                <p className="text-xs uppercase tracking-[0.4em] text-emerald-200">Scores</p>
-                <h2 className="text-2xl font-bold text-white">World leaderboard</h2>
+                <p className="text-[10px] font-tech uppercase tracking-[0.4em] text-[#ffe600]">Rankings</p>
+                <h2 className="text-2xl font-display text-white">Leaderboard</h2>
               </div>
               <button
                 onClick={() => setActivePanel("main")}
-                className="rounded-full border border-white/20 px-4 py-2 text-xs font-semibold uppercase tracking-wide text-white/80 hover:text-white"
+                className="clip-angular-sm border border-white/10 bg-white/5 px-4 py-2 text-[10px] font-tech font-bold uppercase tracking-wider text-white/60 hover:text-white hover:bg-white/10"
               >
-                Back to Hero
+                Back to Menu
               </button>
             </header>
-            <Leaderboard />
+            <div className="relative z-10">
+              <Leaderboard />
+            </div>
           </section>
         );
       case "online":
@@ -174,9 +177,9 @@ const Menu = () => {
             <div className="mb-4">
               <button
                 onClick={() => setActivePanel("main")}
-                className="rounded-full border border-white/20 px-4 py-2 text-xs font-semibold uppercase tracking-wide text-white/80 hover:text-white"
+                className="clip-angular-sm border border-white/10 bg-white/5 px-4 py-2 text-[10px] font-tech font-bold uppercase tracking-wider text-white/60 hover:text-white hover:bg-white/10"
               >
-                ← Back to Menu
+                Back to Menu
               </button>
             </div>
             <OnlineMultiplayer onStartMatch={handleStartOnlineMatch} />
@@ -184,22 +187,27 @@ const Menu = () => {
         );
       case "controls":
         return (
-          <section className="rounded-3xl border border-white/10 bg-black/40 p-6 backdrop-blur">
-            <header className="mb-6 flex flex-wrap items-center justify-between gap-4">
+          <section className="ink-card noise-overlay rounded-none relative overflow-hidden p-6" style={{ clipPath: 'polygon(0 0, calc(100% - 20px) 0, 100% 20px, 100% 100%, 20px 100%, 0 calc(100% - 20px))' }}>
+            <div className="absolute top-0 left-0 right-5 h-[2px] bg-gradient-to-r from-[#39ff14] via-[#39ff14]/40 to-transparent" />
+            <header className="mb-6 flex flex-wrap items-center justify-between gap-4 relative z-10">
               <div>
-                <p className="text-xs uppercase tracking-[0.4em] text-emerald-200">Moveset</p>
-                <h2 className="text-2xl font-bold text-white">Control layout</h2>
+                <p className="text-[10px] font-tech uppercase tracking-[0.4em] text-[#39ff14]">Moveset</p>
+                <h2 className="text-2xl font-display text-white">Control Layout</h2>
               </div>
               <button
                 onClick={() => setActivePanel("main")}
-                className="rounded-full border border-white/20 px-4 py-2 text-xs font-semibold uppercase tracking-wide text-white/80 hover:text-white"
+                className="clip-angular-sm border border-white/10 bg-white/5 px-4 py-2 text-[10px] font-tech font-bold uppercase tracking-wider text-white/60 hover:text-white hover:bg-white/10"
               >
-                Back to Hero
+                Back to Menu
               </button>
             </header>
-            <div className="grid gap-6 lg:grid-cols-[2fr_1fr]">
-              <div className="rounded-2xl border border-white/10 bg-gradient-to-br from-slate-900/80 to-slate-950/80 p-6">
-                <h3 className="text-lg font-semibold text-white">Keyboard</h3>
+            <div className="relative z-10 grid gap-6 lg:grid-cols-[2fr_1fr]">
+              <div className="p-5" style={{
+                background: 'linear-gradient(135deg, rgba(26, 26, 46, 0.6), rgba(10, 10, 15, 0.8))',
+                border: '1px solid rgba(255, 255, 255, 0.04)',
+                clipPath: 'polygon(0 0, calc(100% - 12px) 0, 100% 12px, 100% 100%, 12px 100%, 0 calc(100% - 12px))',
+              }}>
+                <h3 className="text-sm font-tech font-bold text-white uppercase tracking-wider">Keyboard</h3>
                 <div className="mt-4 grid gap-4 md:grid-cols-2">
                   {bindingSets.map((set) => (
                     <ControlCard key={set.title} title={set.title} subtitle={set.subtitle}>
@@ -213,13 +221,17 @@ const Menu = () => {
                     </ControlCard>
                   ))}
                   <ControlCard title="Ink Tools">
-                    <p className="text-sm text-white/70">Use HUD buttons to toggle Silhouette Overlay & cycle Ink Quality.</p>
+                    <p className="text-xs text-white/50">Use HUD buttons to toggle Silhouette Overlay & cycle Ink Quality.</p>
                   </ControlCard>
                 </div>
               </div>
-              <div className="rounded-2xl border border-white/10 bg-gradient-to-br from-emerald-900/40 to-teal-900/40 p-6">
-                <h3 className="text-lg font-semibold text-white">Controller</h3>
-                <p className="text-sm text-white/70">Press any button to join Player 2.</p>
+              <div className="p-5" style={{
+                background: 'linear-gradient(135deg, rgba(57, 255, 20, 0.04), rgba(10, 10, 15, 0.8))',
+                border: '1px solid rgba(57, 255, 20, 0.1)',
+                clipPath: 'polygon(0 0, calc(100% - 12px) 0, 100% 12px, 100% 100%, 12px 100%, 0 calc(100% - 12px))',
+              }}>
+                <h3 className="text-sm font-tech font-bold text-white uppercase tracking-wider">Controller</h3>
+                <p className="text-xs text-white/40 mt-1">Press any button to join Player 2.</p>
                 <div className="mt-5 space-y-3">
                   <KeyRow keys={["A / Cross"]} description="Light" compact />
                   <KeyRow keys={["B / Circle"]} description="Heavy" compact />
@@ -238,17 +250,30 @@ const Menu = () => {
   };
 
   return (
-    <div className="relative min-h-screen overflow-y-auto bg-slate-950 text-white">
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,_rgba(5,150,105,0.25),_transparent_45%)]" />
-      <div className="absolute inset-0 opacity-40 mix-blend-screen" style={{ backgroundImage: "url('/textures/ink-noise.png')" }} />
-      <div className="relative z-10 mx-auto flex max-w-6xl flex-col gap-10 px-4 py-8">
+    <div className="relative min-h-screen overflow-y-auto text-white" style={{ background: 'linear-gradient(180deg, #0a0a0f, #12121a, #0a0a0f)' }}>
+      {/* Background effects */}
+      <div className="absolute inset-0 bg-[radial-gradient(circle_at_20%_20%,_rgba(0,240,255,0.06),_transparent_40%)]" />
+      <div className="absolute inset-0 bg-[radial-gradient(circle_at_80%_80%,_rgba(255,45,123,0.04),_transparent_40%)]" />
+      <div className="absolute inset-0 opacity-[0.03] mix-blend-screen" style={{ backgroundImage: "url('/textures/ink-noise.png')" }} />
+
+      {/* Decorative grid lines */}
+      <div className="absolute inset-0 opacity-[0.02]" style={{
+        backgroundImage: 'linear-gradient(rgba(255,255,255,0.1) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.1) 1px, transparent 1px)',
+        backgroundSize: '60px 60px',
+      }} />
+
+      <div className="relative z-10 mx-auto flex max-w-6xl flex-col gap-10 px-4 py-6">
+        {/* ─── Header ─── */}
         <header className="flex flex-wrap items-center justify-between gap-4">
-          <div>
-            <p className="text-xs uppercase tracking-[0.6em] text-emerald-200">StickBrawler</p>
-            <h1 className="text-2xl font-bold text-white">Ink-fueled arena</h1>
+          <div className="flex items-center gap-4">
+            <div>
+              <h1 className="font-display text-2xl text-white leading-none">StickBrawler</h1>
+              <p className="text-[9px] font-tech uppercase tracking-[0.5em] text-[#00f0ff]/60 mt-1">Ink-Fueled Arena</p>
+            </div>
           </div>
-          <nav className="flex flex-wrap gap-2">
-            <NavButton active={activePanel === "main"} onClick={() => setActivePanel("main")} label="Hero" />
+
+          <nav className="flex flex-wrap gap-1.5">
+            <NavButton active={activePanel === "main"} onClick={() => setActivePanel("main")} label="Arena" />
             {onlineAvailable && (
               <NavButton
                 active={activePanel === "online"}
@@ -264,7 +289,7 @@ const Menu = () => {
             <NavButton
               active={activePanel === "leaderboard"}
               onClick={() => setActivePanel("leaderboard")}
-              label="Leaderboard"
+              label="Ranks"
             />
             <NavButton
               active={activePanel === "controls"}
@@ -272,14 +297,15 @@ const Menu = () => {
               label="Controls"
             />
           </nav>
+
           <div className="flex items-center gap-3">
             <MusicToggle variant="outline" />
             {status === "authenticated" && user ? (
               <>
-                <span className="text-sm text-white/70">Signed in as {user.username}</span>
+                <span className="text-xs font-tech text-white/40">{user.username}</span>
                 <button
                   onClick={handleLogout}
-                  className="rounded-full border border-white/30 px-4 py-2 text-xs font-semibold uppercase tracking-wide text-white/80 hover:text-white"
+                  className="clip-angular-sm border border-white/10 bg-white/5 px-3 py-1.5 text-[10px] font-tech font-bold uppercase tracking-wider text-white/50 hover:text-white hover:bg-white/10"
                 >
                   Logout
                 </button>
@@ -287,7 +313,7 @@ const Menu = () => {
             ) : (
               <button
                 onClick={() => setShowAuthModal(true)}
-                className="rounded-full border border-white/30 px-4 py-2 text-xs font-semibold uppercase tracking-wide text-white/80 hover:text-white"
+                className="clip-angular-sm border border-[#00f0ff]/20 bg-[#00f0ff]/5 px-4 py-1.5 text-[10px] font-tech font-bold uppercase tracking-wider text-[#00f0ff]/80 hover:text-[#00f0ff] hover:bg-[#00f0ff]/10"
               >
                 Sign In
               </button>
@@ -314,8 +340,10 @@ const NavButton = ({
 }) => (
   <button
     onClick={onClick}
-    className={`rounded-full px-4 py-2 text-xs font-semibold uppercase tracking-wide transition ${
-      active ? "bg-white text-slate-900" : "border border-white/20 text-white/70 hover:text-white"
+    className={`clip-angular-sm px-4 py-2 text-[10px] font-tech font-bold uppercase tracking-wider transition ${
+      active
+        ? "bg-[#00f0ff] text-ink-black shadow-[0_0_16px_rgba(0,240,255,0.3)]"
+        : "border border-white/8 bg-white/3 text-white/40 hover:text-white/70 hover:bg-white/6"
     }`}
   >
     {label}
@@ -331,10 +359,10 @@ const ControlCard = ({
   subtitle?: string;
   children: ReactNode;
 }) => (
-  <details className="rounded-2xl border border-white/10 bg-black/30 p-4 text-sm text-white/80" open>
+  <details className="p-4 text-sm text-white/60 border border-white/5 bg-white/[0.02]" style={{ clipPath: 'polygon(0 0, calc(100% - 8px) 0, 100% 8px, 100% 100%, 8px 100%, 0 calc(100% - 8px))' }} open>
     <summary className="cursor-pointer list-none">
-      <p className="text-base font-semibold text-white">{title}</p>
-      {subtitle && <p className="text-xs text-white/60">{subtitle}</p>}
+      <p className="text-xs font-tech font-bold text-white uppercase tracking-wider">{title}</p>
+      {subtitle && <p className="text-[10px] text-white/30 font-tech mt-0.5">{subtitle}</p>}
     </summary>
     <div className="mt-3 space-y-1">{children}</div>
   </details>
@@ -354,7 +382,7 @@ const KeyRow = ({
       {keys.map((key) => (
         <span
           key={key}
-          className={`rounded-md border border-white/20 bg-white/10 px-2 py-1 text-xs font-semibold text-white ${
+          className={`clip-angular-sm border border-white/10 bg-white/5 px-2 py-1 text-[10px] font-tech font-bold text-white/80 ${
             compact ? "min-w-[48px] text-center" : ""
           }`}
         >
@@ -362,7 +390,7 @@ const KeyRow = ({
         </span>
       ))}
     </div>
-    <p className="text-xs text-white/70">{description}</p>
+    <p className="text-[10px] font-tech text-white/40">{description}</p>
   </div>
 );
 

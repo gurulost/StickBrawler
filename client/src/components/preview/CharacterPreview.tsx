@@ -163,7 +163,7 @@ export function CharacterPreview({ isPlayer, className = "", animate = false }: 
 
   return (
     <div
-      className={`h-64 w-full rounded-lg overflow-hidden ${className} relative bg-[radial-gradient(circle_at_top,_rgba(96,165,250,0.26),_rgba(15,23,42,0.95)_58%)]`}
+      className={`h-64 w-full overflow-hidden ${className} relative bg-[radial-gradient(circle_at_top,_rgba(0,240,255,0.12),_rgba(10,10,15,0.95)_58%)]`}
     >
       <Canvas
         camera={{ position: [0, 1.08, 3.2], fov: 48 }}
@@ -175,10 +175,10 @@ export function CharacterPreview({ isPlayer, className = "", animate = false }: 
           <directionalLight position={[2.5, 4.5, 3]} intensity={1.25} castShadow />
           <directionalLight position={[-3, 2.5, -2]} intensity={0.5} />
           <pointLight position={[0, 2.4, 2.1]} intensity={0.9} color={colors?.glow ?? "#ffffff"} />
-          <pointLight position={[0, 1.1, -2]} intensity={0.45} color={colors?.secondary ?? "#93c5fd"} />
+          <pointLight position={[0, 1.1, -2]} intensity={0.45} color={colors?.secondary ?? "#00f0ff"} />
           <PreviewStage
             accentColor={colors?.secondary ?? "#2563eb"}
-            glowColor={colors?.glow ?? "#93c5fd"}
+            glowColor={colors?.glow ?? "#00f0ff"}
           />
           {colors?.specialEffect && (
             <ParticleEffect

@@ -5,6 +5,11 @@ export default {
   content: ["./client/index.html", "./client/src/**/*.{js,jsx,ts,tsx}"],
   theme: {
     extend: {
+      fontFamily: {
+        sans: ['"Chakra Petch"', 'sans-serif'],
+        display: ['"Bungee Shade"', 'cursive'],
+        tech: ['"Orbitron"', 'sans-serif'],
+      },
       borderRadius: {
         lg: "var(--radius)",
         md: "calc(var(--radius) - 2px)",
@@ -61,23 +66,30 @@ export default {
           border: "hsl(var(--sidebar-border))",
           ring: "hsl(var(--sidebar-ring))",
         },
+        // Neon Ink Dojo custom colors
+        neon: {
+          cyan: '#00f0ff',
+          magenta: '#ff2d7b',
+          green: '#39ff14',
+          yellow: '#ffe600',
+          orange: '#ff6a00',
+          purple: '#b347ff',
+        },
+        ink: {
+          black: '#0a0a0f',
+          dark: '#12121a',
+          mid: '#1a1a2e',
+          surface: '#22223a',
+        },
       },
       keyframes: {
         "accordion-down": {
-          from: {
-            height: "0",
-          },
-          to: {
-            height: "var(--radix-accordion-content-height)",
-          },
+          from: { height: "0" },
+          to: { height: "var(--radix-accordion-content-height)" },
         },
         "accordion-up": {
-          from: {
-            height: "var(--radix-accordion-content-height)",
-          },
-          to: {
-            height: "0",
-          },
+          from: { height: "var(--radix-accordion-content-height)" },
+          to: { height: "0" },
         },
       },
       animation: {

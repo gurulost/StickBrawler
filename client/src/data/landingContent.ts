@@ -42,7 +42,7 @@ export const landingFeatureCards: Array<{
 ];
 
 export const heroBadges = [
-  { label: "Deterministic Runtime", color: "from-purple-500/30 to-indigo-500/30" },
-  { label: "Hand-Drawn VFX", color: "from-amber-500/30 to-rose-500/30" },
-  { label: "Ready for Local 2P", color: "from-emerald-500/30 to-cyan-500/30" },
+  { label: "Deterministic Runtime", color: "from-[#b347ff]/30 to-[#00f0ff]/20" },
+  { label: "Hand-Drawn VFX", color: "from-[#ff2d7b]/30 to-[#ff6a00]/20" },
+  { label: "Ready for Local 2P", color: "from-[#39ff14]/30 to-[#00f0ff]/20" },
 ];

@@ -28,17 +28,17 @@ interface CombatDebugPanelProps {
 }
 
 const buttonClass = (active: boolean) =>
-  `rounded-full border px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.18em] transition ${
+  `clip-angular-sm border px-3 py-1 text-[10px] font-tech font-bold uppercase tracking-[0.18em] transition ${
     active
-      ? "border-white/45 bg-white/18 text-white"
-      : "border-white/15 bg-white/5 text-slate-300 hover:bg-white/10"
+      ? "border-[#00f0ff]/40 bg-[#00f0ff]/15 text-[#00f0ff] shadow-[0_0_8px_rgba(0,240,255,0.15)]"
+      : "border-white/15 bg-white/5 text-white/60 hover:bg-white/10 hover:text-white/80"
   }`;
 
 const toneClass: Record<"hit" | "block" | "parry" | "system", string> = {
-  hit: "border-rose-200/40 bg-rose-400/12 text-rose-100",
-  block: "border-sky-200/35 bg-sky-400/10 text-sky-100",
-  parry: "border-amber-200/40 bg-amber-300/10 text-amber-100",
-  system: "border-white/10 bg-white/5 text-slate-200",
+  hit: "border-[#ff2d7b]/30 bg-[#ff2d7b]/10 text-[#ff2d7b]",
+  block: "border-[#00f0ff]/30 bg-[#00f0ff]/10 text-[#00f0ff]",
+  parry: "border-[#ffe600]/30 bg-[#ffe600]/10 text-[#ffe600]",
+  system: "border-white/10 bg-white/5 text-white/60",
 };
 
 const formatReviewLabel = (frameDelta: number, roundTime: number) => {
@@ -97,7 +97,7 @@ const CombatDebugPanel: FC<CombatDebugPanelProps> = ({
   const focusedSlot = resolveFocusedCombatSlot(inspectedPlayer, inspectedCpu, focus);
   const focusedFighter = focusedSlot === "player" ? inspectedPlayer : inspectedCpu;
   const focusedLabel = focusedSlot === "player" ? playerLabel : cpuLabel;
-  const focusedAccent = focusedSlot === "player" ? "#60a5fa" : "#fb923c";
+  const focusedAccent = focusedSlot === "player" ? "#00f0ff" : "#ff2d7b";
   const reviewLabel = useMemo(() => {
     if (!reviewRecord || !history.length) return undefined;
     const reviewIndex = history.findIndex((entry) => entry.id === reviewRecord.id);
@@ -119,13 +119,13 @@ const CombatDebugPanel: FC<CombatDebugPanelProps> = ({
 
   return (
     <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex max-w-[min(1100px,92vw)] flex-col gap-3 pointer-events-auto">
-      <div className="rounded-2xl border border-white/10 bg-slate-950/78 p-4 shadow-[0_18px_48px_rgba(2,6,23,0.45)] backdrop-blur-md">
+      <div className="border border-white/10 bg-ink-dark/90 p-4 shadow-[0_18px_48px_rgba(0,0,0,0.5)] backdrop-blur-md" style={{ clipPath: 'polygon(0 0, calc(100% - 16px) 0, 100% 16px, 100% 100%, 16px 100%, 0 calc(100% - 16px))' }}>
         <div className="mb-3 flex flex-wrap items-start justify-between gap-3">
           <div>
-            <div className="text-[10px] font-semibold uppercase tracking-[0.32em] text-cyan-200/80">
+            <div className="text-[10px] font-tech font-bold uppercase tracking-[0.32em] text-[#00f0ff]">
               Combat Inspector
             </div>
-            <div className="mt-1 text-sm text-slate-300">
+            <div className="mt-1 text-sm text-white/50 font-tech">
               Answer hit, whiff, and block questions from the same runtime truth the fight uses.
             </div>
           </div>
@@ -145,7 +145,7 @@ const CombatDebugPanel: FC<CombatDebugPanelProps> = ({
 
         <div className="mb-3 grid gap-2 md:grid-cols-2">
           <div>
-            <div className="mb-2 text-[10px] font-semibold uppercase tracking-[0.24em] text-slate-400">
+            <div className="mb-2 text-[10px] font-tech font-bold uppercase tracking-[0.24em] text-white/40">
               Overlay Layers
             </div>
             <div className="flex flex-wrap gap-2">
@@ -160,7 +160,7 @@ const CombatDebugPanel: FC<CombatDebugPanelProps> = ({
           </div>
 
           <div>
-            <div className="mb-2 text-[10px] font-semibold uppercase tracking-[0.24em] text-slate-400">
+            <div className="mb-2 text-[10px] font-tech font-bold uppercase tracking-[0.24em] text-white/40">
               Review Buffer
             </div>
             <div className="flex flex-wrap items-center gap-2">
@@ -199,7 +199,7 @@ const CombatDebugPanel: FC<CombatDebugPanelProps> = ({
               >
                 +1f
               </button>
-              <span className="text-[10px] uppercase tracking-[0.22em] text-slate-400">
+              <span className="text-[10px] font-tech uppercase tracking-[0.22em] text-white/30">
                 {history.length ? `${Math.min(10, (history.length / 60)).toFixed(1)}s cached` : "warming"}
               </span>
             </div>
@@ -215,18 +215,18 @@ const CombatDebugPanel: FC<CombatDebugPanelProps> = ({
                 setCombatPlaybackPaused(true);
                 setReviewFrameId(history[nextIndex]?.id ?? null);
               }}
-              className="mt-3 w-full accent-cyan-300"
+              className="mt-3 w-full"
             />
           </div>
         </div>
 
-        <div className="mb-3 rounded-2xl border border-white/8 bg-slate-900/55 p-3">
+        <div className="mb-3 clip-angular-sm border border-white/8 bg-white/[0.03] p-3">
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div>
-              <div className="text-[10px] font-semibold uppercase tracking-[0.24em] text-slate-400">
+              <div className="text-[10px] font-tech font-bold uppercase tracking-[0.24em] text-[#39ff14]/70">
                 Training Injector
               </div>
-              <div className="mt-1 text-xs text-slate-300">
+              <div className="mt-1 text-xs text-white/40 font-tech">
                 Queue deterministic input scripts through the same runtime input and intent path the fight uses.
               </div>
             </div>
@@ -258,7 +258,7 @@ const CombatDebugPanel: FC<CombatDebugPanelProps> = ({
             </div>
           </div>
 
-          <div className="mt-3 rounded-xl border border-white/8 bg-white/[0.03] px-3 py-2 text-xs text-slate-300">
+          <div className="mt-3 clip-angular-sm border border-white/8 bg-white/[0.03] px-3 py-2 text-xs text-white/50 font-tech">
             {trainingSummary ? (
               <span className="font-mono text-[11px] text-white/90">
                 {trainingSummary.label} · {trainingSummary.slot === "player1" ? playerLabel : cpuLabel} · {trainingSummary.stepLabel} · frame {trainingSummary.frameNumber + 1}/{trainingSummary.totalFrames}
@@ -295,8 +295,8 @@ const CombatDebugPanel: FC<CombatDebugPanelProps> = ({
         </div>
 
         <div className="grid gap-3 lg:grid-cols-[minmax(0,320px)_minmax(0,1fr)]">
-          <div className="rounded-2xl border border-white/8 bg-slate-900/55 p-3">
-            <div className="mb-2 text-[10px] font-semibold uppercase tracking-[0.24em] text-slate-400">
+          <div className="clip-angular-sm border border-white/8 bg-white/[0.03] p-3">
+            <div className="mb-2 text-[10px] font-tech font-bold uppercase tracking-[0.24em] text-[#ff2d7b]/70">
               Recent Events
             </div>
             <div className="space-y-2">
@@ -304,7 +304,7 @@ const CombatDebugPanel: FC<CombatDebugPanelProps> = ({
                 recentEvents.map((entry) => (
                   <div
                     key={entry.key}
-                    className={`rounded-xl border px-3 py-2 text-xs ${toneClass[entry.tone]}`}
+                    className={`clip-angular-sm border px-3 py-2 text-xs font-tech ${toneClass[entry.tone]}`}
                   >
                     <div className="flex items-center justify-between gap-3">
                       <span className="font-semibold uppercase tracking-[0.18em]">{entry.label}</span>
@@ -314,7 +314,7 @@ const CombatDebugPanel: FC<CombatDebugPanelProps> = ({
                   </div>
                 ))
               ) : (
-                <div className="rounded-xl border border-white/8 bg-white/[0.03] px-3 py-4 text-xs text-slate-400">
+                <div className="clip-angular-sm border border-white/8 bg-white/[0.03] px-3 py-4 text-xs text-white/30 font-tech">
                   No recent combat events yet.
                 </div>
               )}

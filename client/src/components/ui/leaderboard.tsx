@@ -24,12 +24,12 @@ export function Leaderboard({ className = "" }: LeaderboardProps) {
     try {
       setLoading(true);
       setError(null);
-      
+
       const response = await fetch('/api/scores');
       if (!response.ok) {
         throw new Error('Failed to fetch scores');
       }
-      
+
       const data = await response.json();
       setScores(data);
     } catch (err) {
@@ -55,142 +55,129 @@ export function Leaderboard({ className = "" }: LeaderboardProps) {
   const getRankIcon = (rank: number) => {
     switch (rank) {
       case 1:
-        return <Trophy className="w-6 h-6 text-yellow-500" />;
+        return <Trophy className="w-5 h-5 text-[#ffe600]" />;
       case 2:
-        return <Medal className="w-6 h-6 text-gray-400" />;
+        return <Medal className="w-5 h-5 text-white/50" />;
       case 3:
-        return <Award className="w-6 h-6 text-amber-600" />;
+        return <Award className="w-5 h-5 text-[#ff6a00]" />;
       default:
-        return <span className="w-6 h-6 flex items-center justify-center text-gray-500 font-bold">#{rank}</span>;
+        return <span className="w-5 h-5 flex items-center justify-center text-white/20 font-tech font-bold text-xs">#{rank}</span>;
+    }
+  };
+
+  const getRankAccent = (rank: number) => {
+    switch (rank) {
+      case 1: return { border: 'rgba(255, 230, 0, 0.2)', bg: 'rgba(255, 230, 0, 0.03)' };
+      case 2: return { border: 'rgba(255, 255, 255, 0.1)', bg: 'rgba(255, 255, 255, 0.02)' };
+      case 3: return { border: 'rgba(255, 106, 0, 0.15)', bg: 'rgba(255, 106, 0, 0.02)' };
+      default: return { border: 'rgba(255, 255, 255, 0.04)', bg: 'transparent' };
     }
   };
 
   if (loading) {
     return (
-      <Card className={`bg-gray-800/50 border-gray-700 ${className}`}>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-white">
-            <Trophy className="w-5 h-5" />
-            Global Leaderboard
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="flex items-center justify-center py-8">
-            <RefreshCw className="w-6 h-6 animate-spin text-blue-500" />
-            <span className="ml-2 text-gray-300">Loading scores...</span>
-          </div>
-        </CardContent>
-      </Card>
+      <div className={className}>
+        <div className="flex items-center justify-center py-12">
+          <RefreshCw className="w-5 h-5 animate-spin text-[#00f0ff]" />
+          <span className="ml-3 text-white/30 font-tech text-sm">Loading scores...</span>
+        </div>
+      </div>
     );
   }
 
   if (error) {
     return (
-      <Card className={`bg-gray-800/50 border-gray-700 ${className}`}>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-white">
-            <Trophy className="w-5 h-5" />
-            Global Leaderboard
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="text-center py-8">
-            <p className="text-red-400 mb-4">{error}</p>
-            <Button 
-              onClick={fetchScores}
-              variant="outline"
-              className="border-gray-600 text-gray-300 hover:bg-gray-700"
-            >
-              <RefreshCw className="w-4 h-4 mr-2" />
-              Try Again
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
+      <div className={className}>
+        <div className="text-center py-12">
+          <p className="text-[#ff2d7b] mb-4 font-tech text-sm">{error}</p>
+          <button
+            onClick={fetchScores}
+            className="clip-angular-sm border border-white/10 bg-white/5 px-4 py-2 text-[10px] font-tech font-bold uppercase tracking-wider text-white/60 hover:text-white hover:bg-white/10"
+          >
+            Try Again
+          </button>
+        </div>
+      </div>
     );
   }
 
   return (
-    <Card className={`bg-gray-800/50 border-gray-700 ${className}`}>
-      <CardHeader>
-        <div className="flex items-center justify-between">
-          <CardTitle className="flex items-center gap-2 text-white">
-            <Trophy className="w-5 h-5" />
-            Global Leaderboard
-          </CardTitle>
-          <Button 
-            onClick={fetchScores}
-            variant="ghost"
-            size="sm"
-            className="text-gray-400 hover:text-white"
-          >
-            <RefreshCw className="w-4 h-4" />
-          </Button>
+    <div className={className}>
+      <div className="flex items-center justify-between mb-4">
+        <div className="flex items-center gap-2">
+          <Trophy className="w-4 h-4 text-[#ffe600]" />
+          <span className="font-tech text-sm font-bold text-white uppercase tracking-wider">Global Rankings</span>
         </div>
-      </CardHeader>
-      <CardContent>
-        {scores.length === 0 ? (
-          <div className="text-center py-8">
-            <Trophy className="w-12 h-12 text-gray-500 mx-auto mb-4" />
-            <p className="text-gray-400">No scores yet!</p>
-            <p className="text-sm text-gray-500 mt-2">Be the first to set a high score</p>
-          </div>
-        ) : (
-          <div className="space-y-3">
-            {scores.map((score, index) => {
-              const rank = index + 1;
-              return (
-                <div
-                  key={score.id}
-                  className={`flex items-center gap-4 p-3 rounded-lg border transition-all hover:bg-gray-700/50 ${
-                    rank <= 3
-                      ? 'border-yellow-500/30 bg-yellow-500/5'
-                      : 'border-gray-600 bg-gray-800/30'
-                  }`}
-                >
-                  <div className="flex-shrink-0">
-                    {getRankIcon(rank)}
+        <button
+          onClick={fetchScores}
+          className="p-2 text-white/20 hover:text-white/50 transition"
+        >
+          <RefreshCw className="w-4 h-4" />
+        </button>
+      </div>
+
+      {scores.length === 0 ? (
+        <div className="text-center py-12">
+          <Trophy className="w-10 h-10 text-white/10 mx-auto mb-4" />
+          <p className="text-white/30 font-tech text-sm">No scores yet!</p>
+          <p className="text-xs font-tech text-white/15 mt-2">Be the first to set a high score</p>
+        </div>
+      ) : (
+        <div className="space-y-2">
+          {scores.map((score, index) => {
+            const rank = index + 1;
+            const accent = getRankAccent(rank);
+            return (
+              <div
+                key={score.id}
+                className="flex items-center gap-4 p-3 transition-all hover:bg-white/[0.02]"
+                style={{
+                  border: `1px solid ${accent.border}`,
+                  background: accent.bg,
+                  clipPath: 'polygon(0 0, calc(100% - 8px) 0, 100% 8px, 100% 100%, 8px 100%, 0 calc(100% - 8px))',
+                }}
+              >
+                <div className="flex-shrink-0">
+                  {getRankIcon(rank)}
+                </div>
+
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2">
+                    <User className="w-3 h-3 text-white/20" />
+                    <span className="text-white/40 text-xs font-tech">
+                      Player {score.userId || 'Anonymous'}
+                    </span>
                   </div>
-                  
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2">
-                      <User className="w-4 h-4 text-gray-400" />
-                      <span className="text-gray-300 text-sm">
-                        Player {score.userId || 'Anonymous'}
-                      </span>
-                    </div>
-                    <div className="text-xs text-gray-500 mt-1">
-                      {formatDate(score.timestamp)}
-                    </div>
-                  </div>
-                  
-                  <div className="text-right">
-                    <Badge 
-                      variant={rank <= 3 ? 'default' : 'secondary'}
-                      className={`text-lg font-bold px-3 py-1 ${
-                        rank === 1 ? 'bg-yellow-500 text-black' :
-                        rank === 2 ? 'bg-gray-400 text-black' :
-                        rank === 3 ? 'bg-amber-600 text-white' :
-                        'bg-gray-600 text-white'
-                      }`}
-                    >
-                      {formatScore(score.score)}
-                    </Badge>
+                  <div className="text-[10px] font-tech text-white/15 mt-0.5">
+                    {formatDate(score.timestamp)}
                   </div>
                 </div>
-              );
-            })}
-          </div>
-        )}
-        
-        {scores.length > 0 && (
-          <div className="mt-6 text-center">
-            <p className="text-xs text-gray-500">
-              Showing top {scores.length} scores
-            </p>
-          </div>
-        )}
-      </CardContent>
-    </Card>
+
+                <div className="text-right">
+                  <span
+                    className={`font-tech font-bold text-sm px-3 py-1 clip-angular-sm ${
+                      rank === 1 ? 'bg-[#ffe600]/10 text-[#ffe600] border border-[#ffe600]/20' :
+                      rank === 2 ? 'bg-white/5 text-white/70 border border-white/10' :
+                      rank === 3 ? 'bg-[#ff6a00]/10 text-[#ff6a00] border border-[#ff6a00]/20' :
+                      'bg-white/3 text-white/40 border border-white/5'
+                    }`}
+                  >
+                    {formatScore(score.score)}
+                  </span>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {scores.length > 0 && (
+        <div className="mt-6 text-center">
+          <p className="text-[10px] font-tech text-white/15 uppercase tracking-wider">
+            Showing top {scores.length} scores
+          </p>
+        </div>
+      )}
+    </div>
   );
 }

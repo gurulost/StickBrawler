@@ -11,6 +11,7 @@ import { configurePassport } from "./auth";
 import { setupVite, serveStatic, log } from "./vite";
 import { env } from "./env";
 import { initOnlineSocketServer } from "./online/serverProvider";
+import { ONLINE_MULTIPLAYER_ENABLED } from "@shared/productFlags";
 
 const app = express();
 app.set("trust proxy", 1);
@@ -111,13 +112,15 @@ app.use((req, res, next) => {
 
   // Online multiplayer WebSocket server (feature-flagged)
   const onlineSocketServer = initOnlineSocketServer({
-    enabled: env.ENABLE_ONLINE_MULTIPLAYER,
+    enabled: ONLINE_MULTIPLAYER_ENABLED && env.ENABLE_ONLINE_MULTIPLAYER,
     port: env.ONLINE_WS_PORT,
   });
 
   if (onlineSocketServer) {
     log(`online multiplayer websocket server started on port ${env.ONLINE_WS_PORT}`, "websocket");
-  } else {
+  } else if (ONLINE_MULTIPLAYER_ENABLED) {
     log(`online multiplayer disabled (set ENABLE_ONLINE_MULTIPLAYER=true to enable)`, "websocket");
+  } else {
+    log(`online multiplayer disabled for this local playtest build`, "websocket");
   }
 })();

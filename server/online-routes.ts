@@ -1,11 +1,16 @@
 import { Router } from "express";
 import { z } from "zod";
+import { ONLINE_MULTIPLAYER_ENABLED } from "@shared/productFlags";
 import { getOnlineSocketServer } from "./online/serverProvider";
 
 const router = Router();
 
 // Create a new online match
 router.post("/create", (req, res) => {
+  if (!ONLINE_MULTIPLAYER_ENABLED) {
+    return res.status(503).json({ error: "Online multiplayer is disabled for this local playtest build" });
+  }
+
   const schema = z.object({
     profileId: z.string(),
   });
@@ -31,6 +36,18 @@ router.post("/create", (req, res) => {
 
 // Health check endpoint
 router.get("/health", (req, res) => {
+  if (!ONLINE_MULTIPLAYER_ENABLED) {
+    return res.json({
+      websocketEnabled: false,
+      websocketPort: 0,
+      status: "disabled",
+      activeMatches: 0,
+      activePlayers: 0,
+      connectedSockets: 0,
+      uptimeMs: 0,
+    });
+  }
+
   const onlineServer = getOnlineSocketServer();
   if (!onlineServer) {
     return res.json({

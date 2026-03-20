@@ -27,7 +27,7 @@ const createCombatState = (
 test("resolveHits only connects during authored active frames", () => {
   const move = coreMoves.hero_jab_1;
   const defender = createCombatState({
-    position: [0.4, 0, 0],
+    position: [0.3, 0, 0],
   });
 
   const startupHits = resolveHits({
@@ -43,7 +43,7 @@ test("resolveHits only connects during authored active frames", () => {
   const activeHits = resolveHits({
     attacker: createCombatState({
       moveId: move.id,
-      moveFrame: move.hitboxes[0].frames.start,
+      moveFrame: Math.ceil((move.hitboxes[0].frames.start + move.hitboxes[0].frames.end) / 2),
     }),
     defender,
     move,

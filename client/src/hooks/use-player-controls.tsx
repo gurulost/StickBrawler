@@ -1,5 +1,6 @@
 import { useCallback, useEffect } from "react";
 import { Controls } from "../lib/stores/useControls";
+import { KEYBOARD_BINDING_CODES } from "../input/controlGuide";
 
 export type PlayerSlot = "player1" | "player2";
 export type PlayerInputSnapshot = Record<Controls, boolean>;
@@ -61,28 +62,7 @@ const clearSource = (slot: PlayerSlot, source: keyof InputSources) => {
   });
 };
 
-const defaultBindings: Record<PlayerSlot, Record<Controls, string[]>> = {
-  player1: {
-    [Controls.jump]: ["ShiftRight"],
-    [Controls.forward]: ["ArrowUp"],
-    [Controls.backward]: ["ArrowDown"],
-    [Controls.leftward]: ["ArrowLeft"],
-    [Controls.rightward]: ["ArrowRight"],
-    [Controls.attack]: ["KeyJ"],
-    [Controls.special]: ["KeyK"],
-    [Controls.defend]: ["KeyL"],
-  },
-  player2: {
-    [Controls.jump]: ["Space"],
-    [Controls.forward]: ["KeyW"],
-    [Controls.backward]: ["KeyS"],
-    [Controls.leftward]: ["KeyA"],
-    [Controls.rightward]: ["KeyD"],
-    [Controls.attack]: ["KeyF"],
-    [Controls.special]: ["KeyG"],
-    [Controls.defend]: ["KeyH"],
-  },
-};
+const defaultBindings = KEYBOARD_BINDING_CODES;
 
 type BindingLookupEntry = { slot: PlayerSlot; action: Controls };
 const bindingLookup = new Map<string, BindingLookupEntry[]>();

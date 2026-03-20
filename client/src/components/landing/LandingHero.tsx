@@ -140,8 +140,8 @@ export function LandingHero({
             transition={{ duration: 0.5, delay: 0.35 }}
             className="max-w-xl text-sm text-white/65 leading-relaxed"
           >
-            Shape your silhouette, layer brush-stroke VFX, and battle in a deterministic arena that mirrors the
-            server runtime. Every match is a sketch come alive.
+            Shape your silhouette, layer brush-stroke VFX, and battle in a deterministic combat runtime tuned for
+            solo sets and couch playtests. Every match is a sketch come alive.
           </motion.p>
 
           {/* Badges */}

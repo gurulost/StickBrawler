@@ -8,6 +8,16 @@ import { useEffects } from "../lib/stores/useEffects";
 import { MusicToggle } from "../components/ui/music-toggle";
 import CombatDebugPanel from "./CombatDebugPanel";
 import { useCombatDebug } from "../lib/stores/useCombatDebug";
+import {
+  COMBAT_HUD_GRAMMAR_HINT,
+  COMBAT_PRIMER_STEPS,
+  COMBAT_PRIMER_SUBTITLE,
+  COMBAT_PRIMER_TITLE,
+  CONTROLLER_CONTROL_CARD,
+  getCombatHudLegendLine,
+  INTENT_GUIDE,
+  KEYBOARD_CONTROL_CARDS,
+} from "../input/controlGuide";
 
 type TelemetryDigest = Partial<
     Record<
@@ -20,6 +30,15 @@ type CombatTag = {
   label: string;
   className: string;
 };
+
+type PrimerProgress = Record<(typeof COMBAT_PRIMER_STEPS)[number]["id"], boolean>;
+
+const createPrimerProgress = (): PrimerProgress => ({
+  move: false,
+  attack: false,
+  defend: false,
+  grab: false,
+});
 
 const UI = () => {
   const {
@@ -40,6 +59,7 @@ const UI = () => {
     slots,
     paused,
     togglePause,
+    runtimeResetNonce,
   } = useFighting();
 
   const { toggleMute, isMuted, playSuccess, setMasterVolume, masterVolume } = useAudio();
@@ -58,6 +78,8 @@ const UI = () => {
     toggleSilhouetteDebug,
     inkQuality,
     cycleInkQuality,
+    combatPrimerDismissed,
+    dismissCombatPrimer,
   } = useControls();
   const clearReviewFrame = useCombatDebug((state) => state.clearReviewFrame);
   const { coins, lastCoinEvent } = useCustomization();
@@ -73,6 +95,11 @@ const UI = () => {
   const cpuSpecialReady = cpu.specialMeter >= 100;
   const playerGuardCritical = player.guardMeter > 0 && player.guardMeter <= 20;
   const cpuGuardCritical = cpu.guardMeter > 0 && cpu.guardMeter <= 20;
+  const primerCards = isLocalMultiplayer ? KEYBOARD_CONTROL_CARDS : [KEYBOARD_CONTROL_CARDS[0]];
+  const showCombatPrimer = gamePhase === "fighting" && !paused && !combatPrimerDismissed;
+  const combatHudLegendLines = isLocalMultiplayer
+    ? [getCombatHudLegendLine("player1"), getCombatHudLegendLine("player2")]
+    : [getCombatHudLegendLine("player1")];
 
   // Animation states for UI elements
   const [showControls, setShowControls] = useState(false);
@@ -82,6 +109,9 @@ const UI = () => {
   const [playerGuardFlash, setPlayerGuardFlash] = useState(false);
   const [cpuGuardFlash, setCpuGuardFlash] = useState(false);
   const [telemetrySummary, setTelemetrySummary] = useState<TelemetryDigest>({});
+  const [primerProgress, setPrimerProgress] = useState<PrimerProgress>(createPrimerProgress);
+  const primerCoreComplete =
+    primerProgress.move && primerProgress.attack && primerProgress.defend;
 
   // Format time as MM:SS
   const formatTime = (seconds: number) => {
@@ -89,6 +119,11 @@ const UI = () => {
     const secs = Math.floor(seconds % 60);
     return `${mins}:${secs.toString().padStart(2, '0')}`;
   };
+
+  const resolveBindingLabel = (
+    card: (typeof KEYBOARD_CONTROL_CARDS)[number],
+    description: string,
+  ) => card.bindings.find((binding) => binding.description === description)?.keys.join(" / ") ?? "—";
 
   // Determine round winner
   const determineWinner = () => {
@@ -160,6 +195,46 @@ const UI = () => {
     clearReviewFrame();
   }, [clearReviewFrame, debugMode]);
 
+  useEffect(() => {
+    setPrimerProgress(createPrimerProgress());
+  }, [gamePhase, runtimeResetNonce]);
+
+  useEffect(() => {
+    if (gamePhase !== "fighting") return;
+    setPrimerProgress((current) => ({
+      move:
+        current.move ||
+        Math.abs(player.velocity[0]) > 0.24 ||
+        Math.abs(player.velocity[2]) > 0.05 ||
+        Boolean(player.isJumping || player.inAir),
+      attack:
+        current.attack ||
+        Boolean(player.isAttacking || player.isAirAttacking || player.justStartedMove),
+      defend:
+        current.defend ||
+        Boolean(player.isBlocking || player.justParried || player.isDodging),
+      grab: current.grab || Boolean(player.isGrabbing),
+    }));
+  }, [
+    gamePhase,
+    player.inAir,
+    player.isAirAttacking,
+    player.isAttacking,
+    player.isBlocking,
+    player.isDodging,
+    player.isGrabbing,
+    player.isJumping,
+    player.justParried,
+    player.justStartedMove,
+    player.velocity,
+  ]);
+
+  useEffect(() => {
+    if (!showCombatPrimer || !primerCoreComplete) return;
+    const timeout = setTimeout(() => dismissCombatPrimer(), 7000);
+    return () => clearTimeout(timeout);
+  }, [dismissCombatPrimer, primerCoreComplete, showCombatPrimer]);
+
   // Pulse health bar when low health
   useEffect(() => {
     if (player.health < 25 || cpu.health < 25) {
@@ -199,6 +274,11 @@ const UI = () => {
     const newVolume = parseFloat(e.target.value);
     setMasterVolume(newVolume);
   };
+
+  const topHudButtonBase =
+    "clip-angular-sm border border-white/15 bg-black/60 text-white/90 shadow-[0_8px_20px_rgba(0,0,0,0.35)] backdrop-blur-md";
+  const topHudButtonInteractive =
+    `${topHudButtonBase} hover:bg-black/80 hover:text-white`;
 
   const renderMeter = (label: string, value: number, colorClass: string, glowColor: string) => (
     <div className="mt-1.5">
@@ -316,24 +396,33 @@ const UI = () => {
   return (
     <div className="absolute top-0 left-0 w-full h-full pointer-events-none">
       {/* ─── Top Control Bar ─── */}
-      <div className="absolute top-3 left-3 pointer-events-auto flex gap-1.5 flex-wrap z-20">
+      <div
+        className="absolute top-3 left-3 pointer-events-auto z-20 flex max-w-[calc(100vw-1.5rem)] flex-wrap items-start gap-1.5 rounded-sm p-1.5"
+        style={{
+          background: "linear-gradient(135deg, rgba(6, 10, 20, 0.84), rgba(16, 20, 34, 0.72))",
+          border: "1px solid rgba(255, 255, 255, 0.08)",
+          boxShadow: "0 10px 30px rgba(0, 0, 0, 0.28)",
+        }}
+      >
         {gamePhase === 'fighting' && (
           <button
             onClick={() => togglePause()}
-            className={`px-3 py-1.5 clip-angular-sm text-[10px] font-tech font-bold uppercase tracking-wider transition ${
+            className={`px-3 py-1.5 text-[10px] font-tech font-bold uppercase tracking-wider transition ${
               paused
-                ? "bg-[#39ff14] text-black shadow-[0_0_12px_rgba(57,255,20,0.4)]"
-                : "bg-white/10 text-white/70 hover:bg-white/15 hover:text-white"
+                ? "clip-angular-sm border border-[#39ff14]/40 bg-[#39ff14] text-black shadow-[0_0_12px_rgba(57,255,20,0.4)]"
+                : topHudButtonInteractive
             }`}
           >
             {paused ? "Resume" : "Pause"}
           </button>
         )}
-        <MusicToggle className="bg-white/10 hover:bg-white/15 text-white/70" />
+        <MusicToggle className={topHudButtonInteractive} />
         <button
           onClick={toggleSilhouetteDebug}
-          className={`px-2.5 py-1.5 clip-angular-sm text-[10px] font-tech font-bold uppercase tracking-wider transition ${
-            showSilhouetteDebug ? "bg-[#b347ff]/60 text-white" : "bg-white/8 text-white/60 hover:bg-white/15"
+          className={`px-2.5 py-1.5 text-[10px] font-tech font-bold uppercase tracking-wider transition ${
+            showSilhouetteDebug
+              ? "clip-angular-sm border border-[#b347ff]/50 bg-[#b347ff]/28 text-white shadow-[0_0_18px_rgba(179,71,255,0.25)]"
+              : topHudButtonInteractive
           }`}
           title="Toggle spline/outline debug overlay"
         >
@@ -341,14 +430,14 @@ const UI = () => {
         </button>
         <button
           onClick={cycleInkQuality}
-          className="px-2.5 py-1.5 clip-angular-sm text-[10px] font-tech font-bold uppercase tracking-wider bg-white/8 text-white/60 hover:bg-white/15 hover:text-white/80"
+          className={`px-2.5 py-1.5 text-[10px] font-tech font-bold uppercase tracking-wider transition ${topHudButtonInteractive}`}
           title="Cycle ink material quality/perf profile"
         >
           Ink: {inkQuality === "cinematic" ? "Cine" : inkQuality === "balanced" ? "Bal" : "Perf"}
         </button>
         <button
           onClick={toggleControls}
-          className="px-2.5 py-1.5 clip-angular-sm text-[10px] font-tech font-bold uppercase tracking-wider bg-white/8 text-white/60 hover:bg-white/15 hover:text-white/80"
+          className={`px-2.5 py-1.5 text-[10px] font-tech font-bold uppercase tracking-wider transition ${topHudButtonInteractive}`}
         >
           Controls
         </button>
@@ -356,13 +445,13 @@ const UI = () => {
           <>
             <button
               onClick={toggleDebugMode}
-              className="px-2.5 py-1.5 clip-angular-sm text-[10px] font-tech font-bold uppercase tracking-wider bg-[#ff2d7b]/60 text-white shadow-lg hover:bg-[#ff2d7b]/80"
+              className="clip-angular-sm border border-[#ff2d7b]/35 bg-[#ff2d7b]/75 px-2.5 py-1.5 text-[10px] font-tech font-bold uppercase tracking-wider text-white shadow-lg hover:bg-[#ff2d7b]/90"
             >
               {debugMode ? "Debug On" : "Debug Off"}
             </button>
             <button
               onClick={toggleLowGraphicsMode}
-              className="px-2.5 py-1.5 clip-angular-sm text-[10px] font-tech font-bold uppercase tracking-wider bg-[#b347ff]/50 text-white shadow-lg hover:bg-[#b347ff]/70"
+              className="clip-angular-sm border border-[#b347ff]/35 bg-[#b347ff]/70 px-2.5 py-1.5 text-[10px] font-tech font-bold uppercase tracking-wider text-white shadow-lg hover:bg-[#b347ff]/85"
             >
               {lowGraphicsMode ? "Low Gfx" : "Full Gfx"}
             </button>
@@ -377,13 +466,13 @@ const UI = () => {
                     }
                     toggleCombatPlaybackPaused();
                   }}
-                  className="px-2.5 py-1.5 clip-angular-sm text-[10px] font-tech font-bold uppercase tracking-wider bg-white/8 text-white/60 hover:bg-white/15"
+                  className={`px-2.5 py-1.5 text-[10px] font-tech font-bold uppercase tracking-wider transition ${topHudButtonInteractive}`}
                 >
                   {combatPlaybackPaused ? "Sim Play" : "Sim Pause"}
                 </button>
                 <button
                   onClick={() => setCombatPlaybackRate(combatPlaybackRate === 1 ? 0.25 : 1)}
-                  className="px-2.5 py-1.5 clip-angular-sm text-[10px] font-tech font-bold uppercase tracking-wider bg-white/8 text-white/60 hover:bg-white/15"
+                  className={`px-2.5 py-1.5 text-[10px] font-tech font-bold uppercase tracking-wider transition ${topHudButtonInteractive}`}
                 >
                   {combatPlaybackRate === 1 ? "1x" : "0.25x"}
                 </button>
@@ -393,12 +482,28 @@ const UI = () => {
                     clearReviewFrame();
                     queueCombatFrameStep();
                   }}
-                  className="px-2.5 py-1.5 clip-angular-sm text-[10px] font-tech font-bold uppercase tracking-wider bg-white/8 text-white/60 hover:bg-white/15"
+                  className={`px-2.5 py-1.5 text-[10px] font-tech font-bold uppercase tracking-wider transition ${topHudButtonInteractive}`}
                 >
                   Step
                 </button>
               </>
             )}
+          </>
+        )}
+        {gamePhase === "fighting" && (
+          <>
+            {combatHudLegendLines.map((line) => (
+              <div
+                key={line.slot}
+                className="clip-angular-sm border border-white/8 bg-black/24 px-2.5 py-1 text-[9px] font-tech uppercase tracking-[0.16em] text-white/72"
+              >
+                <span className="text-white/42">{line.title}</span>{" "}
+                <span>{line.summary}</span>
+              </div>
+            ))}
+            <div className="clip-angular-sm border border-white/8 bg-black/18 px-2.5 py-1 text-[9px] font-tech text-white/48">
+              {COMBAT_HUD_GRAMMAR_HINT}
+            </div>
           </>
         )}
       </div>
@@ -473,7 +578,7 @@ const UI = () => {
       <div className="flex justify-between items-start gap-3 px-4 pt-12">
         {/* Player 1 Health Panel */}
         <div
-          className={`flex-1 max-w-[42%] relative overflow-hidden transition-all duration-300 ${
+          className={`flex-1 max-w-[39%] relative overflow-hidden transition-all duration-300 ${
             playerSpecialReady
               ? "neon-glow-cyan"
               : ""
@@ -482,7 +587,7 @@ const UI = () => {
             background: 'linear-gradient(135deg, rgba(0, 200, 255, 0.08), rgba(10, 10, 15, 0.9))',
             border: playerSpecialReady ? '1px solid rgba(0, 240, 255, 0.4)' : '1px solid rgba(255, 255, 255, 0.06)',
             clipPath: 'polygon(0 0, calc(100% - 16px) 0, 100% 16px, 100% 100%, 16px 100%, 0 calc(100% - 16px))',
-            padding: '12px 16px',
+            padding: '10px 12px',
           }}
         >
           {/* Top edge accent line */}
@@ -541,7 +646,7 @@ const UI = () => {
 
         {/* Center Timer */}
         <div
-          className="flex flex-col items-center px-5 py-2 relative"
+          className="flex flex-col items-center px-4 py-1.5 relative"
           style={{
             background: 'linear-gradient(180deg, rgba(10, 10, 15, 0.9), rgba(26, 26, 46, 0.7))',
             border: '1px solid rgba(255, 255, 255, 0.06)',
@@ -550,12 +655,12 @@ const UI = () => {
         >
           <div className="absolute top-0 left-3 right-3 h-[1px] bg-gradient-to-r from-transparent via-white/20 to-transparent" />
           <span className="font-tech text-xl font-bold text-white tracking-wider tabular-nums">{formatTime(roundTime)}</span>
-          <span className="text-[9px] font-tech tracking-[0.3em] text-white/50 uppercase">{timerSubtitle}</span>
+          <span className="text-[9px] font-tech tracking-[0.3em] text-white/80 uppercase drop-shadow-[0_1px_3px_rgba(0,0,0,0.65)]">{timerSubtitle}</span>
         </div>
 
         {/* Player 2 / CPU Health Panel */}
         <div
-          className={`flex-1 max-w-[42%] relative overflow-hidden transition-all duration-300 ${
+          className={`flex-1 max-w-[39%] relative overflow-hidden transition-all duration-300 ${
             cpuSpecialReady
               ? "neon-glow-magenta"
               : ""
@@ -564,7 +669,7 @@ const UI = () => {
             background: 'linear-gradient(225deg, rgba(255, 45, 123, 0.08), rgba(10, 10, 15, 0.9))',
             border: cpuSpecialReady ? '1px solid rgba(255, 45, 123, 0.4)' : '1px solid rgba(255, 255, 255, 0.06)',
             clipPath: 'polygon(16px 0, 100% 0, 100% calc(100% - 16px), calc(100% - 16px) 100%, 0 100%, 0 16px)',
-            padding: '12px 16px',
+            padding: '10px 12px',
           }}
         >
           {/* Top edge accent line */}
@@ -621,18 +726,18 @@ const UI = () => {
       </div>
 
       {/* ─── Score Display ─── */}
-      <div className="absolute top-[108px] left-0 w-full text-center">
+      <div className="absolute top-[102px] left-0 w-full text-center">
         <div
-          className="inline-flex items-center gap-3 px-6 py-1.5"
+          className="inline-flex items-center gap-2.5 px-5 py-1"
           style={{
             background: 'linear-gradient(90deg, transparent, rgba(10, 10, 15, 0.8), transparent)',
           }}
         >
-          <span className="text-[10px] font-tech uppercase tracking-widest text-white/50">{playerOneLabel}</span>
+          <span className="text-[10px] font-tech uppercase tracking-widest text-white/80 drop-shadow-[0_1px_3px_rgba(0,0,0,0.65)]">{playerOneLabel}</span>
           <span className={`font-tech text-lg font-bold ${playerScore > cpuScore ? 'text-[#00f0ff] neon-text-cyan' : 'text-white/60'}`}>{playerScore}</span>
           <span className="text-white/15 font-tech">|</span>
           <span className={`font-tech text-lg font-bold ${cpuScore > playerScore ? 'text-[#ff2d7b] neon-text-magenta' : 'text-white/60'}`}>{cpuScore}</span>
-          <span className="text-[10px] font-tech uppercase tracking-widest text-white/50">{opponentLabel}</span>
+          <span className="text-[10px] font-tech uppercase tracking-widest text-white/80 drop-shadow-[0_1px_3px_rgba(0,0,0,0.65)]">{opponentLabel}</span>
         </div>
       </div>
 
@@ -643,6 +748,111 @@ const UI = () => {
             className={`clip-angular border px-5 py-2 text-[10px] font-tech font-bold uppercase tracking-[0.25em] backdrop-blur-sm ${centerCallout.className}`}
           >
             {centerCallout.label}
+          </div>
+        </div>
+      )}
+
+      {showCombatPrimer && (
+        <div className="absolute left-4 bottom-20 z-20 max-w-[360px] pointer-events-auto">
+          <div
+            className="overflow-hidden border border-white/10 bg-[linear-gradient(145deg,rgba(9,13,22,0.96),rgba(15,20,34,0.9))] shadow-[0_18px_40px_rgba(0,0,0,0.42)] backdrop-blur-md"
+            style={{
+              clipPath:
+                "polygon(0 0, calc(100% - 14px) 0, 100% 14px, 100% 100%, 16px 100%, 0 calc(100% - 16px))",
+            }}
+          >
+            <div className="h-[2px] bg-gradient-to-r from-[#00f0ff] via-[#b347ff] to-[#ff2d7b]" />
+            <div className="px-3.5 py-3">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <div className="font-tech text-[10px] font-bold uppercase tracking-[0.28em] text-[#00f0ff]">
+                    {COMBAT_PRIMER_TITLE}
+                  </div>
+                  <div className="mt-1 max-w-[280px] text-[10px] leading-4 text-white/68">
+                    {COMBAT_PRIMER_SUBTITLE}
+                  </div>
+                </div>
+                <button
+                  onClick={dismissCombatPrimer}
+                  className="clip-angular-sm border border-white/12 bg-white/6 px-2 py-1 text-[10px] font-tech uppercase tracking-[0.2em] text-white/70 transition hover:bg-white/12 hover:text-white"
+                >
+                  Hide
+                </button>
+              </div>
+
+              <div className="mt-3 space-y-1.5">
+                {primerCards.map((card) => (
+                  <div
+                    key={`primer-${card.title}`}
+                    className="rounded-sm border border-white/8 bg-black/20 px-2.5 py-2"
+                  >
+                    <div className="font-tech text-[10px] font-bold uppercase tracking-[0.22em] text-white/88">
+                      {card.title}
+                    </div>
+                    <div className="mt-1 text-[10px] leading-4 text-white/62">
+                      {card.subtitle}
+                    </div>
+                    <div className="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-[10px] text-white/74">
+                      <span>
+                        <span className="text-white/42">Jump</span>: {resolveBindingLabel(card, "Jump")}
+                      </span>
+                      <span>
+                        <span className="text-white/42">Attack</span>: {resolveBindingLabel(card, "Attack")}
+                      </span>
+                      <span>
+                        <span className="text-white/42">Defend</span>: {resolveBindingLabel(card, "Defend")}
+                      </span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              <div className="mt-2.5 space-y-1.5">
+                {COMBAT_PRIMER_STEPS.map((step) => {
+                  const complete = primerProgress[step.id];
+                  return (
+                    <div
+                      key={step.id}
+                      className={`rounded-sm border px-2.5 py-2 transition ${
+                        complete
+                          ? "border-[#39ff14]/30 bg-[#39ff14]/8"
+                          : "border-white/8 bg-white/[0.03]"
+                      }`}
+                    >
+                      <div className="flex items-center justify-between gap-3">
+                        <div className="font-tech text-[10px] font-bold uppercase tracking-[0.22em] text-white/88">
+                          {step.title}
+                        </div>
+                        <span
+                          className={`font-tech text-[9px] uppercase tracking-[0.18em] ${
+                            complete ? "text-[#39ff14]" : "text-white/36"
+                          }`}
+                        >
+                          {complete ? "Done" : step.id === "grab" ? "Bonus" : "Try it"}
+                        </span>
+                      </div>
+                      <div className="mt-1 text-[10px] leading-4 text-white/76">
+                        {step.prompt}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+
+              <div className="mt-2.5 flex items-center justify-between gap-3 border-t border-white/8 pt-2.5">
+                <div className="text-[10px] text-white/56">
+                  {primerCoreComplete
+                    ? "Basics covered. The primer will clear after a few seconds."
+                    : "Land the first three steps and the primer will get out of the way."}
+                </div>
+                <button
+                  onClick={() => setShowControls(true)}
+                  className="clip-angular-sm border border-[#00f0ff]/20 bg-[#00f0ff]/10 px-3 py-1.5 text-[10px] font-tech uppercase tracking-[0.2em] text-[#c8fbff] transition hover:bg-[#00f0ff]/18"
+                >
+                  Full Controls
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       )}
@@ -764,7 +974,9 @@ const UI = () => {
         <div
           className="absolute top-28 right-4 p-4 pointer-events-auto shadow-2xl animate-slide-down font-tech"
           style={{
-            maxWidth: "280px",
+            maxWidth: "360px",
+            maxHeight: "calc(100vh - 9rem)",
+            overflowY: "auto",
             background: 'linear-gradient(135deg, rgba(18, 18, 26, 0.95), rgba(10, 10, 15, 0.98))',
             border: '1px solid rgba(255, 255, 255, 0.06)',
             clipPath: 'polygon(0 0, calc(100% - 12px) 0, 100% 12px, 100% 100%, 12px 100%, 0 calc(100% - 12px))',
@@ -772,27 +984,46 @@ const UI = () => {
         >
           <div className="absolute top-0 left-0 right-3 h-[1px] bg-gradient-to-r from-[#00f0ff]/40 to-transparent" />
           <div className="font-bold text-sm mb-3 border-b border-white/5 pb-2 text-white uppercase tracking-wider">Controls</div>
+          <div className="space-y-4">
+            {KEYBOARD_CONTROL_CARDS.map((card) => (
+              <div key={card.title}>
+                <div className="font-semibold text-[#00f0ff] text-[10px] uppercase tracking-widest mb-1">{card.title}</div>
+                <div className="mb-2 text-[10px] text-white/45">{card.subtitle}</div>
+                <div className="space-y-1.5">
+                  {card.bindings.map((binding) => (
+                    <div key={`${card.title}-${binding.description}`} className="flex items-center gap-2 text-xs text-white/70">
+                      <span className="min-w-[132px] text-white/40">{binding.description}</span>
+                      <span>{binding.keys.join(" / ")}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ))}
 
-          <div className="mb-3">
-            <div className="font-semibold text-[#00f0ff] text-[10px] uppercase tracking-widest mb-1">Movement</div>
-            <div className="text-xs text-white/70"><span className="text-white/40">Move:</span> Arrow Keys / WASD</div>
-            <div className="text-xs text-white/70"><span className="text-white/40">Jump:</span> W</div>
-          </div>
+            <div>
+              <div className="font-semibold text-[#ff2d7b] text-[10px] uppercase tracking-widest mb-1">{CONTROLLER_CONTROL_CARD.title}</div>
+              <div className="mb-2 text-[10px] text-white/45">{CONTROLLER_CONTROL_CARD.subtitle}</div>
+              <div className="space-y-1.5">
+                {CONTROLLER_CONTROL_CARD.bindings.map((binding) => (
+                  <div key={`controller-${binding.description}`} className="flex items-center gap-2 text-xs text-white/70">
+                    <span className="min-w-[132px] text-white/40">{binding.description}</span>
+                    <span>{binding.keys.join(" / ")}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
 
-          <div className="mb-3">
-            <div className="font-semibold text-[#ff2d7b] text-[10px] uppercase tracking-widest mb-1">Combat</div>
-            <div className="text-xs text-white/70"><span className="text-white/40">Quick:</span> J</div>
-            <div className="text-xs text-white/70"><span className="text-white/40">Strong:</span> K</div>
-            <div className="text-xs text-white/70"><span className="text-white/40">Special:</span> Space</div>
-            <div className="text-xs text-white/70"><span className="text-white/40">Block:</span> L</div>
-          </div>
-
-          <div>
-            <div className="font-semibold text-[#b347ff] text-[10px] uppercase tracking-widest mb-1">Advanced</div>
-            <div className="text-xs text-white/70"><span className="text-white/40">Air:</span> E</div>
-            <div className="text-xs text-white/70"><span className="text-white/40">Dodge:</span> Shift</div>
-            <div className="text-xs text-white/70"><span className="text-white/40">Grab:</span> G</div>
-            <div className="text-xs text-white/70"><span className="text-white/40">Taunt:</span> T</div>
+            <div>
+              <div className="font-semibold text-[#b347ff] text-[10px] uppercase tracking-widest mb-1">How to Fight</div>
+              <div className="space-y-2">
+                {INTENT_GUIDE.map((lesson) => (
+                  <div key={lesson.title}>
+                    <div className="text-[10px] font-semibold text-white/75">{lesson.title}</div>
+                    <div className="text-[10px] text-white/55">{lesson.description}</div>
+                  </div>
+                ))}
+              </div>
+            </div>
           </div>
         </div>
       )}

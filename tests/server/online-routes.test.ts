@@ -21,7 +21,7 @@ test("online routes stay disabled when websocket runtime is not enabled", { conc
     assert.deepEqual(health.body, {
       websocketEnabled: false,
       websocketPort: 0,
-      status: "stopped",
+      status: "disabled",
       activeMatches: 0,
       activePlayers: 0,
       connectedSockets: 0,

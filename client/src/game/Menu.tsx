@@ -8,10 +8,14 @@ import { AuthModal } from "../components/ui/auth-modal";
 import { LandingHero } from "../components/landing/LandingHero";
 import { FeatureGrid } from "../components/landing/FeatureGrid";
 import { ARENA_OPTIONS } from "./arenas";
-import { OnlineMultiplayer } from "../components/online/OnlineMultiplayer";
 import { MusicToggle } from "../components/ui/music-toggle";
+import {
+  CONTROLLER_CONTROL_CARD,
+  INTENT_GUIDE,
+  KEYBOARD_CONTROL_CARDS,
+} from "../input/controlGuide";
 
-type Panel = "main" | "customization" | "leaderboard" | "controls" | "online";
+type Panel = "main" | "customization" | "leaderboard" | "controls";
 
 const Menu = () => {
   const { startGame, matchMode, setMatchMode, arenaId, setArenaId } = useFighting();
@@ -20,7 +24,6 @@ const Menu = () => {
   const [activePanel, setActivePanel] = useState<Panel>("main");
   const [controllerConnected, setControllerConnected] = useState(false);
   const [showAuthModal, setShowAuthModal] = useState(false);
-  const [onlineAvailable, setOnlineAvailable] = useState(false);
   const [customizationMounted, setCustomizationMounted] = useState(false);
 
   useEffect(() => {
@@ -37,30 +40,6 @@ const Menu = () => {
     };
   }, []);
 
-  useEffect(() => {
-    let cancelled = false;
-    fetch("/api/online/health")
-      .then((response) => (response.ok ? response.json() : null))
-      .then((data) => {
-        if (cancelled) return;
-        setOnlineAvailable(Boolean(data?.websocketEnabled && data?.status === "running"));
-      })
-      .catch(() => {
-        if (!cancelled) {
-          setOnlineAvailable(false);
-        }
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
-  useEffect(() => {
-    if (!onlineAvailable && activePanel === "online") {
-      setActivePanel("main");
-    }
-  }, [activePanel, onlineAvailable]);
-
   const handleStartGame = () => {
     startGame(matchMode);
   };
@@ -68,14 +47,6 @@ const Menu = () => {
   const handleOpenCustomization = () => {
     setCustomizationMounted(true);
     setActivePanel("customization");
-  };
-
-  const handleStartOnlineMatch = (matchId: string) => {
-    console.log("Starting online match:", matchId);
-    sessionStorage.setItem("onlineMatchId", matchId);
-    sessionStorage.setItem("matchMode", "online");
-    setMatchMode("online");
-    startGame("online");
   };
 
   const handleVolumeChange = (value: number) => {
@@ -171,28 +142,14 @@ const Menu = () => {
             </div>
           </section>
         );
-      case "online":
-        return (
-          <>
-            <div className="mb-4">
-              <button
-                onClick={() => setActivePanel("main")}
-                className="clip-angular-sm border border-white/10 bg-white/5 px-4 py-2 text-[10px] font-tech font-bold uppercase tracking-wider text-white/60 hover:text-white hover:bg-white/10"
-              >
-                Back to Menu
-              </button>
-            </div>
-            <OnlineMultiplayer onStartMatch={handleStartOnlineMatch} />
-          </>
-        );
       case "controls":
         return (
           <section className="ink-card noise-overlay rounded-none relative overflow-hidden p-6" style={{ clipPath: 'polygon(0 0, calc(100% - 20px) 0, 100% 20px, 100% 100%, 20px 100%, 0 calc(100% - 20px))' }}>
             <div className="absolute top-0 left-0 right-5 h-[2px] bg-gradient-to-r from-[#39ff14] via-[#39ff14]/40 to-transparent" />
             <header className="mb-6 flex flex-wrap items-center justify-between gap-4 relative z-10">
               <div>
-                <p className="text-[10px] font-tech uppercase tracking-[0.4em] text-[#39ff14]">Moveset</p>
-                <h2 className="text-2xl font-display text-white">Control Layout</h2>
+                <p className="text-[10px] font-tech uppercase tracking-[0.4em] text-[#39ff14]">Local Play</p>
+                <h2 className="text-2xl font-display text-white">Controls + Fight Grammar</h2>
               </div>
               <button
                 onClick={() => setActivePanel("main")}
@@ -209,7 +166,7 @@ const Menu = () => {
               }}>
                 <h3 className="text-sm font-tech font-bold text-white uppercase tracking-wider">Keyboard</h3>
                 <div className="mt-4 grid gap-4 md:grid-cols-2">
-                  {bindingSets.map((set) => (
+                  {KEYBOARD_CONTROL_CARDS.map((set) => (
                     <ControlCard key={set.title} title={set.title} subtitle={set.subtitle}>
                       {set.bindings.map((binding) => (
                         <KeyRow
@@ -220,8 +177,10 @@ const Menu = () => {
                       ))}
                     </ControlCard>
                   ))}
-                  <ControlCard title="Ink Tools">
-                    <p className="text-xs text-white/60">Use HUD buttons to toggle Silhouette Overlay & cycle Ink Quality.</p>
+                  <ControlCard title="How to Fight" subtitle="The same intent grammar applies to both fighters.">
+                    {INTENT_GUIDE.map((lesson) => (
+                      <GuideRow key={lesson.title} title={lesson.title} description={lesson.description} />
+                    ))}
                   </ControlCard>
                 </div>
               </div>
@@ -230,15 +189,23 @@ const Menu = () => {
                 border: '1px solid rgba(57, 255, 20, 0.1)',
                 clipPath: 'polygon(0 0, calc(100% - 12px) 0, 100% 12px, 100% 100%, 12px 100%, 0 calc(100% - 12px))',
               }}>
-                <h3 className="text-sm font-tech font-bold text-white uppercase tracking-wider">Controller</h3>
-                <p className="text-xs text-white/55 mt-1">Press any button to join Player 2.</p>
+                <h3 className="text-sm font-tech font-bold text-white uppercase tracking-wider">{CONTROLLER_CONTROL_CARD.title}</h3>
+                <p className="text-xs text-white/55 mt-1">{CONTROLLER_CONTROL_CARD.subtitle}</p>
                 <div className="mt-5 space-y-3">
-                  <KeyRow keys={["A / Cross"]} description="Light" compact />
-                  <KeyRow keys={["B / Circle"]} description="Heavy" compact />
-                  <KeyRow keys={["X / Square"]} description="Guard" compact />
-                  <KeyRow keys={["Y / Triangle"]} description="Special" compact />
-                  <KeyRow keys={["LB"]} description="Dodge" compact />
-                  <KeyRow keys={["RB"]} description="Grab" compact />
+                  {CONTROLLER_CONTROL_CARD.bindings.map((binding) => (
+                    <KeyRow
+                      key={`${binding.description}-${binding.keys.join("-")}`}
+                      keys={[...binding.keys]}
+                      description={binding.description}
+                      compact
+                    />
+                  ))}
+                </div>
+                <div className="mt-5 border-t border-white/8 pt-4">
+                  <h4 className="text-[10px] font-tech font-bold uppercase tracking-[0.25em] text-white/60">Ink Tools</h4>
+                  <p className="mt-2 text-xs text-white/55">
+                    Use the HUD buttons in a match to toggle the silhouette overlay and cycle ink quality.
+                  </p>
                 </div>
               </div>
             </div>
@@ -274,13 +241,6 @@ const Menu = () => {
 
           <nav className="flex flex-wrap gap-1.5">
             <NavButton active={activePanel === "main"} onClick={() => setActivePanel("main")} label="Arena" />
-            {onlineAvailable && (
-              <NavButton
-                active={activePanel === "online"}
-                onClick={() => setActivePanel("online")}
-                label="Online"
-              />
-            )}
             <NavButton
               active={activePanel === "customization"}
               onClick={handleOpenCustomization}
@@ -373,7 +333,7 @@ const KeyRow = ({
   description,
   compact = false,
 }: {
-  keys: string[];
+  keys: readonly string[];
   description: string;
   compact?: boolean;
 }) => (
@@ -394,35 +354,17 @@ const KeyRow = ({
   </div>
 );
 
+const GuideRow = ({
+  title,
+  description,
+}: {
+  title: string;
+  description: string;
+}) => (
+  <div className="space-y-1 border-b border-white/5 pb-2 last:border-b-0 last:pb-0">
+    <p className="text-[10px] font-tech font-bold uppercase tracking-wider text-white/80">{title}</p>
+    <p className="text-[10px] font-tech text-white/55">{description}</p>
+  </div>
+);
+
 export default Menu;
-const bindingSets = [
-  {
-    title: "Player 1",
-    subtitle: "WASD for movement · 1/2/3 for attacks",
-    bindings: [
-      { keys: ["W / S"], description: "Forward / Backward" },
-      { keys: ["A / D"], description: "Left / Right" },
-      { keys: ["Space"], description: "Jump" },
-      { keys: ["1 / 2 / 3"], description: "Light / Heavy / Guard" },
-      { keys: ["Q"], description: "Special" },
-      { keys: ["E"], description: "Air attack" },
-      { keys: ["Shift"], description: "Dodge" },
-      { keys: ["G"], description: "Grab" },
-      { keys: ["T"], description: "Taunt" },
-    ],
-  },
-  {
-    title: "Player 2",
-    subtitle: "Arrow keys for movement · J/K/L for attacks",
-    bindings: [
-      { keys: ["↑ / ↓"], description: "Forward / Backward" },
-      { keys: ["← / →"], description: "Left / Right" },
-      { keys: ["Right Ctrl"], description: "Jump" },
-      { keys: ["J / K / L"], description: "Light / Heavy / Guard" },
-      { keys: ["Enter"], description: "Special" },
-      { keys: ["Shift (Right)"], description: "Air attack" },
-      { keys: ["Slash"], description: "Dodge" },
-      { keys: ["[" , "]"], description: "Taunt / Grab" },
-    ],
-  },
-];

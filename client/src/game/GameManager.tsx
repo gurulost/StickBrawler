@@ -131,6 +131,7 @@ const GameManager = () => {
     [triggerImpactFlash, triggerCameraShake],
   );
   const prevPhaseRef = useRef<GamePhase>(fighting.gamePhase);
+  const prevRuntimeResetNonceRef = useRef(fighting.runtimeResetNonce);
   const playerSnapshotRef = useRef(fighting.player);
   const cpuSnapshotRef = useRef(fighting.cpu);
   const reviewRecord = useMemo(
@@ -226,7 +227,11 @@ const GameManager = () => {
 
   useEffect(() => {
     if (!runtimeRef.current) return;
-    if (fighting.gamePhase === "fighting" && prevPhaseRef.current !== "fighting") {
+    const enteredFighting = fighting.gamePhase === "fighting" && prevPhaseRef.current !== "fighting";
+    const requestedRuntimeReset =
+      fighting.gamePhase === "fighting" &&
+      fighting.runtimeResetNonce !== prevRuntimeResetNonceRef.current;
+    if (enteredFighting || requestedRuntimeReset) {
       runtimeRef.current.reset({
         player: playerSnapshotRef.current,
         cpu: cpuSnapshotRef.current,
@@ -237,7 +242,8 @@ const GameManager = () => {
       clearCombatTraining();
     }
     prevPhaseRef.current = fighting.gamePhase;
-  }, [clearCombatTraining, fighting.gamePhase, resetCombatPlayback]);
+    prevRuntimeResetNonceRef.current = fighting.runtimeResetNonce;
+  }, [clearCombatTraining, fighting.gamePhase, fighting.runtimeResetNonce, resetCombatPlayback]);
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {

@@ -33,6 +33,7 @@ test.afterEach(() => {
     combatTrainingTargetSlot: "player1",
     combatTrainingActiveRun: null,
     combatTrainingNextRunId: 1,
+    combatPrimerDismissed: false,
   });
 });
 
@@ -116,4 +117,14 @@ test("combat training store queues presets through the selected slot", () => {
   assert.equal(sample?.slot, "player2");
   assert.equal(sample?.label, "Hero Jab");
   assert.equal(sample?.inputs[Controls.attack], true);
+});
+
+test("combat primer visibility can be dismissed and restored from the controls store", () => {
+  const store = useControls.getState();
+
+  store.dismissCombatPrimer();
+  assert.equal(useControls.getState().combatPrimerDismissed, true);
+
+  store.restoreCombatPrimer();
+  assert.equal(useControls.getState().combatPrimerDismissed, false);
 });

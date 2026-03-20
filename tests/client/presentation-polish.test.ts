@@ -312,7 +312,7 @@ test("defensive and locomotion poses stay compact and directional", () => {
 
 test("debug timeline data exposes active hitboxes for the tuned slice", () => {
   const jabData = resolveCombatDebugData(createDebugCharacterState("hero_jab_1", 6));
-  const guardBreakData = resolveCombatDebugData(createDebugCharacterState("vill_guard_break_big", 22));
+  const guardBreakData = resolveCombatDebugData(createDebugCharacterState("vill_guard_break_big", 24));
 
   assert.deepEqual(jabData.activeHitboxes, ["hero-jab"]);
   assert.ok(jabData.segments.some((segment) => segment.lane === "phase" && segment.label === "Active"));
@@ -329,15 +329,18 @@ test("arena themes carry distinct stage-specific readability tuning", () => {
   assert.ok(aurora, "auroraFlux should expose open-arena tuning");
   assert.ok(containment, "containment should expose contained-arena tuning");
 
-  assert.equal(sunset?.laneWidth, 2.05);
-  assert.equal(aurora?.laneWidth, 1.9);
+  assert.equal(sunset?.laneWidth, 2.22);
+  assert.equal(aurora?.laneWidth, 2.08);
   assert.equal(sunset?.decorationCount, 2);
   assert.equal(aurora?.decorationCount, 2);
-  assert.equal(containment?.wallTransmission, 0.82);
-  assert.equal(containment?.spawnPadGlow, 0.2);
+  assert.equal(containment?.wallTransmission, 0.86);
+  assert.equal(containment?.spawnPadGlow, 0.16);
 
   assert.notEqual(sunset?.laneWidth, aurora?.laneWidth);
   assert.notEqual(sunset?.decorationOpacity, aurora?.decorationOpacity);
+  assert.ok((sunset?.laneOpacity ?? 0) > (sunset?.gridOpacity ?? 0));
+  assert.ok((aurora?.laneOpacity ?? 0) > (aurora?.gridOpacity ?? 0));
+  assert.ok((containment?.wallOpacity ?? 1) < 0.3);
 });
 
 test("arena theme lookup still falls back to the default configured arena", () => {

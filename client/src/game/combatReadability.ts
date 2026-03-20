@@ -8,19 +8,19 @@ export const COMBAT_PLANE_DISTANCE_WEIGHT = 0.32;
 export const COMBAT_PLANE_PUSH_DEPTH_SCALE = 0.28;
 
 export const CAMERA_TRACK_SMOOTHING = 6.1;
-export const CAMERA_LOOK_HEIGHT_BASE = 1.78;
-export const CAMERA_MIN_HEIGHT = 4.15;
-export const CAMERA_MAX_HEIGHT = 6.35;
-export const CAMERA_MIN_DEPTH = 5.05;
-export const CAMERA_MAX_DEPTH = 7.45;
-export const CAMERA_X_TRACK_LIMIT = ARENA_HALF_WIDTH * 0.42;
-export const CAMERA_TARGET_Z_LIMIT = COMBAT_PLANE_BAND * 0.72;
-export const CAMERA_POSITION_Z_LIMIT = COMBAT_PLANE_BAND * 1.18;
+export const CAMERA_LOOK_HEIGHT_BASE = 1.66;
+export const CAMERA_MIN_HEIGHT = 3.78;
+export const CAMERA_MAX_HEIGHT = 5.72;
+export const CAMERA_MIN_DEPTH = 4;
+export const CAMERA_MAX_DEPTH = 6.45;
+export const CAMERA_X_TRACK_LIMIT = ARENA_HALF_WIDTH * 0.36;
+export const CAMERA_TARGET_Z_LIMIT = COMBAT_PLANE_BAND * 0.58;
+export const CAMERA_POSITION_Z_LIMIT = COMBAT_PLANE_BAND * 0.92;
 
-const CAMERA_SPREAD_Z_WEIGHT = 0.28;
-const CAMERA_VERTICAL_SPREAD_WEIGHT = 0.48;
-const CAMERA_MIDPOINT_DEPTH_TRACK = 0.22;
-const CAMERA_DEPTH_DRIFT_WEIGHT = 0.18;
+const CAMERA_SPREAD_Z_WEIGHT = 0.18;
+const CAMERA_VERTICAL_SPREAD_WEIGHT = 0.42;
+const CAMERA_MIDPOINT_DEPTH_TRACK = 0.12;
+const CAMERA_DEPTH_DRIFT_WEIGHT = 0.1;
 
 const clampValue = (value: number, min: number, max: number) =>
   Math.max(min, Math.min(max, value));
@@ -95,15 +95,15 @@ export function resolveCombatCameraRig(
 
   return {
     position: [
-      clampValue(midpointX * 0.46, -CAMERA_X_TRACK_LIMIT, CAMERA_X_TRACK_LIMIT),
+      clampValue(midpointX * 0.4, -CAMERA_X_TRACK_LIMIT, CAMERA_X_TRACK_LIMIT),
       clampValue(
-        CAMERA_MIN_HEIGHT + combinedSpread * 0.17 + maxHeight * 0.14,
+        CAMERA_MIN_HEIGHT + combinedSpread * 0.14 + maxHeight * 0.16,
         CAMERA_MIN_HEIGHT,
         CAMERA_MAX_HEIGHT,
       ),
       clampValue(
         CAMERA_MIN_DEPTH +
-          combinedSpread * 0.31 +
+          combinedSpread * 0.23 +
           depthDrift * CAMERA_DEPTH_DRIFT_WEIGHT +
           trackedMidpointZ,
         CAMERA_MIN_DEPTH - CAMERA_POSITION_Z_LIMIT,
@@ -113,9 +113,9 @@ export function resolveCombatCameraRig(
     target: [
       clampValue(midpointX, -CAMERA_X_TRACK_LIMIT, CAMERA_X_TRACK_LIMIT),
       clampValue(
-        CAMERA_LOOK_HEIGHT_BASE + maxHeight * 0.34,
+        CAMERA_LOOK_HEIGHT_BASE + maxHeight * 0.38,
         CAMERA_LOOK_HEIGHT_BASE,
-        5.65,
+        5.2,
       ),
       clampValue(
         midpointZ * CAMERA_SPREAD_Z_WEIGHT,

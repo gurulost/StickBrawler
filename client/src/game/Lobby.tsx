@@ -1,11 +1,7 @@
 import { useEffect, useState } from "react";
 import { useFighting, type PlayerSlot } from "../lib/stores/useFighting";
 import type { FighterId } from "../combat/moveTable";
-
-const keyboardMapping = {
-  player1: "Keyboard: WASD + J/K/L + Space",
-  player2: "Keyboard: IJKL + U/O/P + Enter",
-};
+import { getLobbyControlHint } from "../input/controlGuide";
 
 const fighterOptions: Array<{ value: FighterId; label: string }> = [
   { value: "stick_hero", label: "Hero" },
@@ -40,9 +36,7 @@ const SlotCard = ({
   const isPlayerTwo = slot === "player2";
   const isHuman = type === "human";
   const hint = isHuman
-    ? isPlayerTwo && controllerConnected
-      ? "Controller detected – press any button to move."
-      : keyboardMapping[slot]
+    ? getLobbyControlHint(slot, isPlayerTwo && controllerConnected)
     : "CPU will use the adaptive AI brain.";
 
   return (
@@ -165,6 +159,10 @@ const Lobby = () => {
   const playerTwoHuman = slots.player2.type === "human";
   const playerTwoReady = playerTwoHuman ? slots.player2.ready : true;
   const canStart = playerOneReady && playerTwoReady;
+  const lobbyModeLabel = playerTwoHuman ? "Local Versus" : "Solo vs CPU";
+  const lobbyDescription = playerTwoHuman
+    ? "Claim both local slots, check the bindings, and ready up before the first round."
+    : "Lock in your fighter, check the bindings, and ready up for a CPU sparring round.";
 
   return (
     <div
@@ -182,10 +180,10 @@ const Lobby = () => {
       }} />
 
       <div className="text-center space-y-2 relative z-10">
-        <p className="tracking-[0.4em] text-[10px] font-tech text-[#00f0ff]/75 uppercase">Local Versus</p>
+        <p className="tracking-[0.4em] text-[10px] font-tech text-[#00f0ff]/75 uppercase">{lobbyModeLabel}</p>
         <h1 className="font-display text-4xl md:text-5xl">Battle Lobby</h1>
         <p className="text-white/55 text-xs font-tech max-w-xl">
-          Claim your slot, ready up, and sync your controllers before stepping into the arena.
+          {lobbyDescription}
         </p>
       </div>
 

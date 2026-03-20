@@ -29,7 +29,10 @@ test("combat camera rig stays centered on the combat lane even with visible z dr
 
   assert.ok(closeRig.position[2] >= CAMERA_MIN_DEPTH);
   assert.ok(closeRig.position[2] <= CAMERA_MAX_DEPTH);
+  assert.ok(closeRig.position[2] < 5, "close exchanges should keep the camera tight on the fighters");
+  assert.ok(closeRig.position[1] < 4.5, "the read frame should not float too high above grounded combat");
   assert.ok(Math.abs(closeRig.target[2]) < 0.12);
   assert.ok(wideRig.position[2] > closeRig.position[2]);
+  assert.ok(wideRig.position[2] < 6.5, "wide spacing should still stay closer than the legacy frame");
   assert.ok(Math.abs(wideRig.target[2]) < 0.01);
 });

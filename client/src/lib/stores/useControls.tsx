@@ -12,6 +12,22 @@ import {
 
 export { Controls } from "../../input/controls";
 
+const COMBAT_PRIMER_STORAGE_KEY = "stickbrawler.combat-primer-dismissed";
+
+const readCombatPrimerDismissed = () => {
+  if (typeof window === "undefined") return false;
+  return window.localStorage.getItem(COMBAT_PRIMER_STORAGE_KEY) === "1";
+};
+
+const writeCombatPrimerDismissed = (dismissed: boolean) => {
+  if (typeof window === "undefined") return;
+  if (dismissed) {
+    window.localStorage.setItem(COMBAT_PRIMER_STORAGE_KEY, "1");
+    return;
+  }
+  window.localStorage.removeItem(COMBAT_PRIMER_STORAGE_KEY);
+};
+
 type ControlsState = {
   debugMode: boolean;
   toggleDebugMode: () => void;
@@ -61,6 +77,9 @@ type ControlsState = {
   toggleSilhouetteDebug: () => void;
   inkQuality: InkQualitySetting;
   cycleInkQuality: () => void;
+  combatPrimerDismissed: boolean;
+  dismissCombatPrimer: () => void;
+  restoreCombatPrimer: () => void;
   networkMode: "offline" | "online";
   setNetworkMode: (mode: "offline" | "online") => void;
   onlineLatency: number;
@@ -162,6 +181,15 @@ export const useControls = create<ControlsState>((set, get) => ({
       const nextIndex = (order.indexOf(state.inkQuality) + 1) % order.length;
       return { inkQuality: order[nextIndex] };
     }),
+  combatPrimerDismissed: readCombatPrimerDismissed(),
+  dismissCombatPrimer: () => {
+    writeCombatPrimerDismissed(true);
+    set({ combatPrimerDismissed: true });
+  },
+  restoreCombatPrimer: () => {
+    writeCombatPrimerDismissed(false);
+    set({ combatPrimerDismissed: false });
+  },
   networkMode: "offline",
   setNetworkMode: (mode) => set({ networkMode: mode }),
   onlineLatency: 0,

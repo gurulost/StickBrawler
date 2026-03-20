@@ -4,6 +4,7 @@ import type { CoinAwardPayload } from './useCustomization';
 import { DEFAULT_ARENA_ID, ARENA_THEMES } from '../../game/arenas';
 import type { FighterId } from "../../combat/moveTable";
 import type { FighterActionState } from "../../combat/types";
+import { ONLINE_MULTIPLAYER_ENABLED } from "@shared/productFlags";
 import type {
   CombatEvent,
   FighterPresentationSnapshot,
@@ -97,6 +98,7 @@ interface FightingState {
   maxRoundTime: number;
   currentGameScore: number; // Total score for current game session
   arenaId: string;
+  runtimeResetNonce: number;
   
   // High score tracking
   submitScore: (finalScore: number) => Promise<void>;
@@ -131,15 +133,21 @@ const DEFAULT_POSITION_CPU: [number, number, number] = [2, 0, 0];
 const DEFAULT_ROUND_TIME = 60; // 60 seconds per round
 const ROUNDS_TO_WIN = 2;
 
-const createDefaultSlots = (mode: MatchMode): SlotState => ({
+const normalizeMatchMode = (mode: MatchMode): MatchMode =>
+  !ONLINE_MULTIPLAYER_ENABLED && mode === "online" ? "local" : mode;
+
+const createDefaultSlots = (mode: MatchMode): SlotState => {
+  const normalizedMode = normalizeMatchMode(mode);
+  return ({
   player1: { type: "human", ready: false, label: "Player 1", fighterId: "stick_hero" },
   player2: {
-    type: mode === "single" ? "cpu" : "human",
-    ready: mode === "single",
-    label: mode === "single" ? "CPU" : mode === "local" ? "Player 2" : "Remote",
-    fighterId: mode === "single" ? "stick_villain" : "stick_hero",
+    type: normalizedMode === "single" ? "cpu" : "human",
+    ready: normalizedMode === "single",
+    label: normalizedMode === "single" ? "CPU" : "Player 2",
+    fighterId: normalizedMode === "single" ? "stick_villain" : "stick_hero",
   },
 });
+};
 
 const roundToHundredth = (value: number) => Math.round(value * 100) / 100;
 
@@ -378,6 +386,7 @@ export const useFighting = create<FightingState>((set, get) => ({
   maxRoundTime: DEFAULT_ROUND_TIME,
   currentGameScore: 0,
   arenaId: DEFAULT_ARENA_ID,
+  runtimeResetNonce: 0,
   applyRuntimeFrame: (frame) => set((state) => {
     const nextPlayer = toCharacterState(frame.player, state.player);
     const nextCPU = toCharacterState(frame.cpu, state.cpu);
@@ -464,7 +473,7 @@ export const useFighting = create<FightingState>((set, get) => ({
   
   startGame: (mode) => set((state) => {
     useCombatDebug.getState().clearHistory();
-    const targetMode = mode ?? state.matchMode;
+    const targetMode = normalizeMatchMode(mode ?? state.matchMode);
     const slots = createDefaultSlots(targetMode);
     return {
       gamePhase: 'lobby',
@@ -498,6 +507,7 @@ export const useFighting = create<FightingState>((set, get) => ({
       cpuEvents: [],
       playerStatus: undefined,
       cpuStatus: undefined,
+      runtimeResetNonce: state.runtimeResetNonce + 1,
       player: createDefaultCharacterState(DEFAULT_POSITION_PLAYER, 1, playerFighter),
       cpu: createDefaultCharacterState(DEFAULT_POSITION_CPU, -1, opponentFighter),
       roundTime: DEFAULT_ROUND_TIME,
@@ -521,6 +531,7 @@ export const useFighting = create<FightingState>((set, get) => ({
       cpuEvents: [],
       playerStatus: undefined,
       cpuStatus: undefined,
+      runtimeResetNonce: state.runtimeResetNonce + 1,
       player: createDefaultCharacterState(DEFAULT_POSITION_PLAYER, 1, state.slots.player1.fighterId),
       cpu: createDefaultCharacterState(DEFAULT_POSITION_CPU, -1, state.slots.player2.fighterId),
       roundTime: DEFAULT_ROUND_TIME,
@@ -538,6 +549,7 @@ export const useFighting = create<FightingState>((set, get) => ({
       cpuEvents: [],
       playerStatus: undefined,
       cpuStatus: undefined,
+      runtimeResetNonce: state.runtimeResetNonce + 1,
       player: createDefaultCharacterState(DEFAULT_POSITION_PLAYER, 1, state.slots.player1.fighterId),
       cpu: createDefaultCharacterState(DEFAULT_POSITION_CPU, -1, state.slots.player2.fighterId),
       roundTime: DEFAULT_ROUND_TIME,
@@ -555,13 +567,17 @@ export const useFighting = create<FightingState>((set, get) => ({
       cpuEvents: [],
       playerStatus: undefined,
       cpuStatus: undefined,
+      matchMode: normalizeMatchMode(state.matchMode),
       slots: createDefaultSlots(state.matchMode),
     };
   }),
-  setMatchMode: (mode) => set((state) => ({
-    matchMode: mode,
-    slots: state.gamePhase === 'lobby' ? createDefaultSlots(mode) : state.slots,
-  })),
+  setMatchMode: (mode) => set((state) => {
+    const normalizedMode = normalizeMatchMode(mode);
+    return {
+      matchMode: normalizedMode,
+      slots: state.gamePhase === 'lobby' ? createDefaultSlots(normalizedMode) : state.slots,
+    };
+  }),
   setArenaId: (arenaId) =>
     set(() => ({
       arenaId: ARENA_THEMES[arenaId] ? arenaId : DEFAULT_ARENA_ID,
@@ -575,7 +591,9 @@ export const useFighting = create<FightingState>((set, get) => ({
         },
       };
     }
-    const nextMode: MatchMode = type === "human" ? (state.matchMode === "online" ? "online" : "local") : "single";
+    const nextMode: MatchMode = type === "human"
+      ? normalizeMatchMode(state.matchMode === "online" ? "online" : "local")
+      : "single";
     return {
       matchMode: nextMode,
       slots: {
@@ -583,7 +601,7 @@ export const useFighting = create<FightingState>((set, get) => ({
         player2: {
           type,
           ready: type === "cpu",
-          label: type === "human" ? (nextMode === "online" ? "Remote" : "Player 2") : "CPU",
+          label: type === "human" ? "Player 2" : "CPU",
           fighterId: type === "cpu" ? "stick_villain" : state.slots.player2.fighterId,
         },
       },

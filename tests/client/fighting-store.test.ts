@@ -118,6 +118,42 @@ test("local match advances to match_end from runtime KO snapshots", () => {
   store.getState().returnToMenu();
 });
 
+test("online match requests normalize to local play when the feature is disabled", () => {
+  const store = useFighting;
+  store.getState().returnToMenu();
+
+  store.getState().setMatchMode("online");
+  assert.equal(store.getState().matchMode, "local");
+
+  store.getState().startGame("online");
+  assert.equal(store.getState().matchMode, "local");
+  assert.equal(store.getState().slots.player2.type, "human");
+  assert.equal(store.getState().slots.player2.label, "Player 2");
+
+  store.getState().returnToMenu();
+  store.getState().setMatchMode("single");
+});
+
+test("resetRound increments the runtime reset nonce while keeping the match active", () => {
+  const store = useFighting;
+  store.getState().returnToMenu();
+  store.getState().startGame("single");
+  store.getState().setSlotReady("player1", true);
+  store.getState().beginMatch();
+
+  const beforeReset = store.getState().runtimeResetNonce;
+  store.getState().applyRuntimeFrame(createRuntimeFrame());
+  store.getState().resetRound();
+
+  const state = store.getState();
+  assert.equal(state.gamePhase, "fighting");
+  assert.equal(state.runtimeResetNonce, beforeReset + 1);
+  assert.deepEqual(state.player.position, [-2, 0, 0]);
+  assert.deepEqual(state.cpu.position, [2, 0, 0]);
+
+  store.getState().returnToMenu();
+});
+
 test("runtime frame ingest mirrors authored move state and combat events", () => {
   const store = useFighting;
   store.getState().returnToMenu();

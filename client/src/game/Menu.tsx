@@ -204,7 +204,7 @@ const Menu = () => {
             <div className="relative z-10 grid gap-6 lg:grid-cols-[2fr_1fr]">
               <div className="p-5" style={{
                 background: 'linear-gradient(135deg, rgba(26, 26, 46, 0.6), rgba(10, 10, 15, 0.8))',
-                border: '1px solid rgba(255, 255, 255, 0.04)',
+                border: '1px solid rgba(255, 255, 255, 0.08)',
                 clipPath: 'polygon(0 0, calc(100% - 12px) 0, 100% 12px, 100% 100%, 12px 100%, 0 calc(100% - 12px))',
               }}>
                 <h3 className="text-sm font-tech font-bold text-white uppercase tracking-wider">Keyboard</h3>
@@ -221,7 +221,7 @@ const Menu = () => {
                     </ControlCard>
                   ))}
                   <ControlCard title="Ink Tools">
-                    <p className="text-xs text-white/50">Use HUD buttons to toggle Silhouette Overlay & cycle Ink Quality.</p>
+                    <p className="text-xs text-white/60">Use HUD buttons to toggle Silhouette Overlay & cycle Ink Quality.</p>
                   </ControlCard>
                 </div>
               </div>
@@ -231,7 +231,7 @@ const Menu = () => {
                 clipPath: 'polygon(0 0, calc(100% - 12px) 0, 100% 12px, 100% 100%, 12px 100%, 0 calc(100% - 12px))',
               }}>
                 <h3 className="text-sm font-tech font-bold text-white uppercase tracking-wider">Controller</h3>
-                <p className="text-xs text-white/40 mt-1">Press any button to join Player 2.</p>
+                <p className="text-xs text-white/55 mt-1">Press any button to join Player 2.</p>
                 <div className="mt-5 space-y-3">
                   <KeyRow keys={["A / Cross"]} description="Light" compact />
                   <KeyRow keys={["B / Circle"]} description="Heavy" compact />
@@ -268,7 +268,7 @@ const Menu = () => {
           <div className="flex items-center gap-4">
             <div>
               <h1 className="font-display text-2xl text-white leading-none">StickBrawler</h1>
-              <p className="text-[9px] font-tech uppercase tracking-[0.5em] text-[#00f0ff]/60 mt-1">Ink-Fueled Arena</p>
+              <p className="text-[9px] font-tech uppercase tracking-[0.5em] text-[#00f0ff]/80 mt-1">Ink-Fueled Arena</p>
             </div>
           </div>
 
@@ -302,10 +302,10 @@ const Menu = () => {
             <MusicToggle variant="outline" />
             {status === "authenticated" && user ? (
               <>
-                <span className="text-xs font-tech text-white/40">{user.username}</span>
+                <span className="text-xs font-tech text-white/60">{user.username}</span>
                 <button
                   onClick={handleLogout}
-                  className="clip-angular-sm border border-white/10 bg-white/5 px-3 py-1.5 text-[10px] font-tech font-bold uppercase tracking-wider text-white/50 hover:text-white hover:bg-white/10"
+                  className="clip-angular-sm border border-white/10 bg-white/5 px-3 py-1.5 text-[10px] font-tech font-bold uppercase tracking-wider text-white/60 hover:text-white hover:bg-white/10"
                 >
                   Logout
                 </button>
@@ -343,7 +343,7 @@ const NavButton = ({
     className={`clip-angular-sm px-4 py-2 text-[10px] font-tech font-bold uppercase tracking-wider transition ${
       active
         ? "bg-[#00f0ff] text-ink-black shadow-[0_0_16px_rgba(0,240,255,0.3)]"
-        : "border border-white/8 bg-white/3 text-white/40 hover:text-white/70 hover:bg-white/6"
+        : "border border-white/10 bg-white/5 text-white/55 hover:text-white/80 hover:bg-white/8"
     }`}
   >
     {label}
@@ -359,10 +359,10 @@ const ControlCard = ({
   subtitle?: string;
   children: ReactNode;
 }) => (
-  <details className="p-4 text-sm text-white/60 border border-white/5 bg-white/[0.02]" style={{ clipPath: 'polygon(0 0, calc(100% - 8px) 0, 100% 8px, 100% 100%, 8px 100%, 0 calc(100% - 8px))' }} open>
+  <details className="p-4 text-sm text-white/70 border border-white/8 bg-white/[0.03]" style={{ clipPath: 'polygon(0 0, calc(100% - 8px) 0, 100% 8px, 100% 100%, 8px 100%, 0 calc(100% - 8px))' }} open>
     <summary className="cursor-pointer list-none">
       <p className="text-xs font-tech font-bold text-white uppercase tracking-wider">{title}</p>
-      {subtitle && <p className="text-[10px] text-white/30 font-tech mt-0.5">{subtitle}</p>}
+      {subtitle && <p className="text-[10px] text-white/50 font-tech mt-0.5">{subtitle}</p>}
     </summary>
     <div className="mt-3 space-y-1">{children}</div>
   </details>
@@ -390,7 +390,7 @@ const KeyRow = ({
         </span>
       ))}
     </div>
-    <p className="text-[10px] font-tech text-white/40">{description}</p>
+    <p className="text-[10px] font-tech text-white/55">{description}</p>
   </div>
 );
 

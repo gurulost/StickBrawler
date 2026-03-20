@@ -203,8 +203,8 @@ const UI = () => {
   const renderMeter = (label: string, value: number, colorClass: string, glowColor: string) => (
     <div className="mt-1.5">
       <div className="flex justify-between text-[10px] font-tech uppercase tracking-wider">
-        <span className="text-white/50">{label}</span>
-        <span className="text-white/60 font-semibold">{Math.round(value)}</span>
+        <span className="text-white/60">{label}</span>
+        <span className="text-white/70 font-semibold">{Math.round(value)}</span>
       </div>
       <div className="w-full bg-white/5 h-1.5 clip-angular-sm overflow-hidden mt-0.5">
         <div
@@ -333,7 +333,7 @@ const UI = () => {
         <button
           onClick={toggleSilhouetteDebug}
           className={`px-2.5 py-1.5 clip-angular-sm text-[10px] font-tech font-bold uppercase tracking-wider transition ${
-            showSilhouetteDebug ? "bg-[#b347ff]/60 text-white" : "bg-white/8 text-white/50 hover:bg-white/12"
+            showSilhouetteDebug ? "bg-[#b347ff]/60 text-white" : "bg-white/8 text-white/60 hover:bg-white/15"
           }`}
           title="Toggle spline/outline debug overlay"
         >
@@ -341,14 +341,14 @@ const UI = () => {
         </button>
         <button
           onClick={cycleInkQuality}
-          className="px-2.5 py-1.5 clip-angular-sm text-[10px] font-tech font-bold uppercase tracking-wider bg-white/8 text-white/50 hover:bg-white/12 hover:text-white/70"
+          className="px-2.5 py-1.5 clip-angular-sm text-[10px] font-tech font-bold uppercase tracking-wider bg-white/8 text-white/60 hover:bg-white/15 hover:text-white/80"
           title="Cycle ink material quality/perf profile"
         >
           Ink: {inkQuality === "cinematic" ? "Cine" : inkQuality === "balanced" ? "Bal" : "Perf"}
         </button>
         <button
           onClick={toggleControls}
-          className="px-2.5 py-1.5 clip-angular-sm text-[10px] font-tech font-bold uppercase tracking-wider bg-white/8 text-white/50 hover:bg-white/12 hover:text-white/70"
+          className="px-2.5 py-1.5 clip-angular-sm text-[10px] font-tech font-bold uppercase tracking-wider bg-white/8 text-white/60 hover:bg-white/15 hover:text-white/80"
         >
           Controls
         </button>
@@ -550,7 +550,7 @@ const UI = () => {
         >
           <div className="absolute top-0 left-3 right-3 h-[1px] bg-gradient-to-r from-transparent via-white/20 to-transparent" />
           <span className="font-tech text-xl font-bold text-white tracking-wider tabular-nums">{formatTime(roundTime)}</span>
-          <span className="text-[9px] font-tech tracking-[0.3em] text-white/30 uppercase">{timerSubtitle}</span>
+          <span className="text-[9px] font-tech tracking-[0.3em] text-white/50 uppercase">{timerSubtitle}</span>
         </div>
 
         {/* Player 2 / CPU Health Panel */}
@@ -628,11 +628,11 @@ const UI = () => {
             background: 'linear-gradient(90deg, transparent, rgba(10, 10, 15, 0.8), transparent)',
           }}
         >
-          <span className="text-[10px] font-tech uppercase tracking-widest text-white/30">{playerOneLabel}</span>
+          <span className="text-[10px] font-tech uppercase tracking-widest text-white/50">{playerOneLabel}</span>
           <span className={`font-tech text-lg font-bold ${playerScore > cpuScore ? 'text-[#00f0ff] neon-text-cyan' : 'text-white/60'}`}>{playerScore}</span>
           <span className="text-white/15 font-tech">|</span>
           <span className={`font-tech text-lg font-bold ${cpuScore > playerScore ? 'text-[#ff2d7b] neon-text-magenta' : 'text-white/60'}`}>{cpuScore}</span>
-          <span className="text-[10px] font-tech uppercase tracking-widest text-white/30">{opponentLabel}</span>
+          <span className="text-[10px] font-tech uppercase tracking-widest text-white/50">{opponentLabel}</span>
         </div>
       </div>
 
@@ -718,7 +718,7 @@ const UI = () => {
           />
 
           <div className="relative z-10 flex flex-col items-center">
-            <div className="mb-3 text-[10px] font-tech uppercase tracking-[0.5em] text-white/30">Match Complete</div>
+            <div className="mb-3 text-[10px] font-tech uppercase tracking-[0.5em] text-white/50">Match Complete</div>
             <div className="text-5xl font-display mb-6 animate-slide-up">
               {playerWon ? (
                 <span className="neon-text-cyan">{winnerMessage}</span>
@@ -729,7 +729,7 @@ const UI = () => {
 
             <div className="font-tech text-2xl text-white/80 mb-3 tracking-wider">
               <span className="text-[#00f0ff]">{playerScore}</span>
-              <span className="text-white/15 mx-3">|</span>
+              <span className="text-white/30 mx-3">|</span>
               <span className="text-[#ff2d7b]">{cpuScore}</span>
             </div>
             <div className="font-tech text-xs uppercase tracking-[0.4em] text-[#ffe600] mb-10">
@@ -856,7 +856,7 @@ const UI = () => {
               Restart Round
             </button>
             <button
-              className="px-8 py-3 clip-angular font-tech font-bold uppercase tracking-wider text-sm bg-white/5 text-white/50 border border-white/5 transition-all hover:bg-white/10 hover:text-white/70"
+              className="px-8 py-3 clip-angular font-tech font-bold uppercase tracking-wider text-sm bg-white/5 text-white/60 border border-white/10 transition-all hover:bg-white/10 hover:text-white/80"
               onClick={() => {
                 togglePause();
                 returnToMenu();
@@ -865,7 +865,7 @@ const UI = () => {
               Exit to Menu
             </button>
           </div>
-          <p className="text-[10px] font-tech text-white/20 uppercase tracking-[0.4em]">Press Esc to resume</p>
+          <p className="text-[10px] font-tech text-white/40 uppercase tracking-[0.4em]">Press Esc to resume</p>
         </div>
       )}
     </div>

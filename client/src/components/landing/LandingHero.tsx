@@ -138,7 +138,7 @@ export function LandingHero({
             initial={{ opacity: 0, y: 15 }}
             animate={heroInView ? { opacity: 1, y: 0 } : {}}
             transition={{ duration: 0.5, delay: 0.35 }}
-            className="max-w-xl text-sm text-white/50 leading-relaxed"
+            className="max-w-xl text-sm text-white/65 leading-relaxed"
           >
             Shape your silhouette, layer brush-stroke VFX, and battle in a deterministic arena that mirrors the
             server runtime. Every match is a sketch come alive.
@@ -163,7 +163,7 @@ export function LandingHero({
 
           {/* Arena Selection */}
           <div className="space-y-2 pt-2">
-            <p className="text-[9px] font-tech font-bold uppercase tracking-[0.4em] text-white/25">
+            <p className="text-[9px] font-tech font-bold uppercase tracking-[0.4em] text-white/50">
               Arena
             </p>
             <div className="flex flex-wrap gap-2">
@@ -176,7 +176,7 @@ export function LandingHero({
                     className={`clip-angular-sm px-4 py-2 text-[10px] font-tech font-bold uppercase tracking-wider transition ${
                       active
                         ? "bg-white text-ink-black shadow-[0_0_12px_rgba(255,255,255,0.15)]"
-                        : "border border-white/10 text-white/40 hover:text-white/70 hover:bg-white/5"
+                        : "border border-white/10 text-white/55 hover:text-white/80 hover:bg-white/5"
                     }`}
                   >
                     {arena.name}
@@ -185,7 +185,7 @@ export function LandingHero({
               })}
             </div>
             {selectedArena && (
-              <p className="text-[10px] font-tech text-white/25">{selectedArena.description}</p>
+              <p className="text-[10px] font-tech text-white/50">{selectedArena.description}</p>
             )}
           </div>
 
@@ -209,13 +209,13 @@ export function LandingHero({
             </button>
             <button
               onClick={onLeaderboard}
-              className="clip-angular-sm border border-white/8 bg-white/3 px-4 py-3 text-[10px] font-tech font-bold uppercase tracking-wider text-white/35 hover:text-white/60"
+              className="clip-angular-sm border border-white/8 bg-white/3 px-4 py-3 text-[10px] font-tech font-bold uppercase tracking-wider text-white/55 hover:text-white/70"
             >
               Leaderboard
             </button>
             <button
               onClick={onControls}
-              className="clip-angular-sm border border-white/8 bg-white/3 px-4 py-3 text-[10px] font-tech font-bold uppercase tracking-wider text-white/35 hover:text-white/60"
+              className="clip-angular-sm border border-white/8 bg-white/3 px-4 py-3 text-[10px] font-tech font-bold uppercase tracking-wider text-white/55 hover:text-white/70"
             >
               Controls
             </button>
@@ -227,19 +227,19 @@ export function LandingHero({
             border: '1px solid rgba(255, 255, 255, 0.04)',
             clipPath: 'polygon(0 0, calc(100% - 10px) 0, 100% 10px, 100% 100%, 10px 100%, 0 calc(100% - 10px))',
           }}>
-            <div className="flex items-center gap-2 text-xs font-tech text-white/40">
+            <div className="flex items-center gap-2 text-xs font-tech text-white/55">
               <span className="text-sm">{controllerConnected ? "🕹️" : "⌨️"}</span>
               {controllerConnected ? "Gamepad ready" : "Keyboard active"}
             </div>
-            <div className="flex items-center gap-2 text-xs font-tech text-white/40">
+            <div className="flex items-center gap-2 text-xs font-tech text-white/55">
               <button
                 onClick={() => setMatchMode(matchMode === "single" ? "local" : "single")}
-                className="clip-angular-sm bg-white/5 px-3 py-1 text-[10px] font-tech font-bold uppercase tracking-wider text-white/50 hover:bg-white/10 hover:text-white/70"
+                className="clip-angular-sm bg-white/5 px-3 py-1 text-[10px] font-tech font-bold uppercase tracking-wider text-white/60 hover:bg-white/10 hover:text-white/80"
               >
                 {matchMode === "single" ? "Switch to Local 2P" : "Switch to Solo"}
               </button>
             </div>
-            <div className="flex items-center gap-2 text-xs font-tech text-white/40">
+            <div className="flex items-center gap-2 text-xs font-tech text-white/55">
               <button
                 onClick={toggleMute}
                 className="clip-angular-sm border border-white/8 px-2 py-1 text-sm hover:bg-white/5"
@@ -266,7 +266,7 @@ export function LandingHero({
           }}>
             <div className="mb-3 flex items-center gap-2">
               <span className="w-2 h-2 bg-[#00f0ff] clip-angular-sm" />
-              <span className="text-[10px] font-tech font-bold text-white/50 uppercase tracking-wider">Arena Selection</span>
+              <span className="text-[10px] font-tech font-bold text-white/65 uppercase tracking-wider">Arena Selection</span>
             </div>
             <div className="mb-3 flex flex-wrap gap-2">
               {arenaOptions.map((arena) => (
@@ -283,7 +283,7 @@ export function LandingHero({
                 </button>
               ))}
             </div>
-            <p className="text-[10px] font-tech text-white/20">
+            <p className="text-[10px] font-tech text-white/45">
               {selectedArena?.description || "Select an arena to view details"}
             </p>
           </div>

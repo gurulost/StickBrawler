@@ -13,7 +13,7 @@ export function FeatureGrid() {
             className="relative overflow-hidden noise-overlay group animate-[slideUp_0.5s_ease-out_both]"
             style={{
               background: 'linear-gradient(135deg, rgba(26, 26, 46, 0.6), rgba(10, 10, 15, 0.9))',
-              border: '1px solid rgba(255, 255, 255, 0.04)',
+              border: '1px solid rgba(255, 255, 255, 0.06)',
               clipPath: 'polygon(0 0, calc(100% - 16px) 0, 100% 16px, 100% 100%, 16px 100%, 0 calc(100% - 16px))',
               padding: '1.25rem',
               animationDelay: `${index * 0.1}s`,
@@ -47,7 +47,7 @@ export function FeatureGrid() {
                   <h3 className="text-lg font-tech font-bold text-white">{feature.title}</h3>
                 </div>
               </div>
-              <p className="mt-3 text-xs text-white/35 leading-relaxed">{feature.description}</p>
+              <p className="mt-3 text-xs text-white/55 leading-relaxed">{feature.description}</p>
               <div
                 className="mt-4 overflow-hidden border border-white/[0.03]"
                 style={{ clipPath: 'polygon(0 0, calc(100% - 8px) 0, 100% 8px, 100% 100%, 8px 100%, 0 calc(100% - 8px))' }}
@@ -59,7 +59,7 @@ export function FeatureGrid() {
                     className="h-36 w-full object-cover opacity-60 transition-opacity group-hover:opacity-80"
                   />
                 ) : (
-                  <div className="flex h-36 items-center justify-center text-white/10 font-tech text-xs uppercase tracking-widest">Coming soon</div>
+                  <div className="flex h-36 items-center justify-center text-white/20 font-tech text-xs uppercase tracking-widest">Coming soon</div>
                 )}
               </div>
             </div>

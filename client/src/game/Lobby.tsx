@@ -50,7 +50,7 @@ const SlotCard = ({
       className="relative overflow-hidden space-y-4"
       style={{
         background: 'linear-gradient(135deg, rgba(26, 26, 46, 0.6), rgba(10, 10, 15, 0.9))',
-        border: '1px solid rgba(255, 255, 255, 0.04)',
+        border: '1px solid rgba(255, 255, 255, 0.08)',
         clipPath: 'polygon(0 0, calc(100% - 16px) 0, 100% 16px, 100% 100%, 16px 100%, 0 calc(100% - 16px))',
         padding: '1.5rem',
       }}
@@ -63,7 +63,7 @@ const SlotCard = ({
 
       <div className="flex items-center justify-between relative z-10">
         <div>
-          <p className="text-[9px] font-tech tracking-[0.3em] uppercase" style={{ color: `${accentColor}80` }}>
+          <p className="text-[9px] font-tech tracking-[0.3em] uppercase" style={{ color: `${accentColor}cc` }}>
             {slot === "player1" ? "Slot A" : "Slot B"}
           </p>
           <h3 className="text-2xl font-display text-white">{label}</h3>
@@ -80,10 +80,10 @@ const SlotCard = ({
         </span>
       </div>
 
-      <p className="text-xs font-tech text-white/30 relative z-10">{hint}</p>
+      <p className="text-xs font-tech text-white/55 relative z-10">{hint}</p>
 
       <div className="space-y-2 relative z-10">
-        <p className="text-[9px] font-tech font-bold tracking-[0.3em] uppercase" style={{ color: `${accentColor}60` }}>Fighter</p>
+        <p className="text-[9px] font-tech font-bold tracking-[0.3em] uppercase" style={{ color: `${accentColor}b3` }}>Fighter</p>
         <div className="flex gap-2">
           {fighterOptions.map((option) => (
             <button
@@ -91,7 +91,7 @@ const SlotCard = ({
               className={`flex-1 clip-angular-sm py-2 text-xs font-tech font-bold uppercase tracking-wider transition ${
                 fighterId === option.value
                   ? "text-black"
-                  : "bg-white/5 text-white/50 hover:bg-white/10 hover:text-white/70 border border-white/5"
+                  : "bg-white/5 text-white/70 hover:bg-white/10 hover:text-white/85 border border-white/10"
               }`}
               style={fighterId === option.value ? {
                 background: `linear-gradient(135deg, ${accentColor}, ${accentColor}cc)`,
@@ -118,13 +118,13 @@ const SlotCard = ({
         </button>
       )}
 
-      <div className="pt-4 border-t border-white/[0.04] relative z-10">
+      <div className="pt-4 border-t border-white/[0.08] relative z-10">
         {isHuman ? (
           <button
             className={`w-full py-3 clip-angular font-tech font-bold uppercase tracking-wider text-sm transition ${
               ready
                 ? "text-black"
-                : "bg-white/5 text-white/50 hover:bg-white/10 hover:text-white/70 border border-white/5"
+                : "bg-white/5 text-white/70 hover:bg-white/10 hover:text-white/85 border border-white/10"
             }`}
             style={ready ? {
               background: 'linear-gradient(135deg, #39ff14, #00f0ff)',
@@ -135,7 +135,7 @@ const SlotCard = ({
             {ready ? "Ready!" : "Ready Up"}
           </button>
         ) : (
-          <div className="text-xs font-tech text-center text-[#ffe600]/60 uppercase tracking-wider">CPU ready</div>
+          <div className="text-xs font-tech text-center text-[#ffe600]/80 uppercase tracking-wider">CPU ready</div>
         )}
       </div>
     </div>
@@ -182,9 +182,9 @@ const Lobby = () => {
       }} />
 
       <div className="text-center space-y-2 relative z-10">
-        <p className="tracking-[0.4em] text-[10px] font-tech text-[#00f0ff]/50 uppercase">Local Versus</p>
+        <p className="tracking-[0.4em] text-[10px] font-tech text-[#00f0ff]/75 uppercase">Local Versus</p>
         <h1 className="font-display text-4xl md:text-5xl">Battle Lobby</h1>
-        <p className="text-white/30 text-xs font-tech max-w-xl">
+        <p className="text-white/55 text-xs font-tech max-w-xl">
           Claim your slot, ready up, and sync your controllers before stepping into the arena.
         </p>
       </div>
@@ -250,7 +250,7 @@ const Lobby = () => {
           className={`px-10 py-3 clip-angular font-tech font-bold uppercase tracking-wider text-sm transition ${
             canStart
               ? "text-black hover:scale-105"
-              : "bg-white/5 text-white/20 cursor-not-allowed border border-white/5"
+              : "bg-white/5 text-white/40 cursor-not-allowed border border-white/10"
           }`}
           style={canStart ? {
             background: 'linear-gradient(135deg, #39ff14, #00f0ff)',
@@ -262,7 +262,7 @@ const Lobby = () => {
           Enter Arena
         </button>
         <button
-          className="px-10 py-3 clip-angular font-tech font-bold uppercase tracking-wider text-sm bg-white/5 text-white/40 border border-white/5 hover:bg-white/8 hover:text-white/60"
+          className="px-10 py-3 clip-angular font-tech font-bold uppercase tracking-wider text-sm bg-white/5 text-white/60 border border-white/10 hover:bg-white/10 hover:text-white/80"
           onClick={returnToMenu}
         >
           Back to Menu

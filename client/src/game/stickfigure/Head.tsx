@@ -1,93 +1,212 @@
-import { colorThemes, figureStyles, accessories, useCustomization } from "../../lib/stores/useCustomization";
+import { colorThemes, figureStyles, useCustomization } from "../../lib/stores/useCustomization";
 import type { FC } from "react";
-import * as THREE from "three";
-import { useInkMaterial, useOutlineMaterial } from "./inkMaterial";
+import InkPart from "./InkPart";
 
 export type ColorThemeValues = (typeof colorThemes)[keyof typeof colorThemes];
 export type FigureStyleValues = (typeof figureStyles)[keyof typeof figureStyles];
-export type AccessoryValues = (typeof accessories)[keyof typeof accessories] & { color: string };
-
 interface HeadProps {
   colors: ColorThemeValues;
   style: FigureStyleValues;
-  accessory: AccessoryValues;
   isAttacking: boolean;
   lean: number;
   isPlayer: boolean;
 }
 
-const Head: FC<HeadProps> = ({ colors, style, accessory, isAttacking, lean, isPlayer }) => {
+const Head: FC<HeadProps> = ({ colors, style, isAttacking, lean, isPlayer }) => {
   const { getPlayerInkParams, getCPUInkParams } = useCustomization();
   const inkParams = isPlayer ? getPlayerInkParams() : getCPUInkParams();
-  
-  const inkMaterial = useInkMaterial({
-    baseColor: colors.primary,
-    rimColor: inkParams.rimColor,
-    shadeBands: inkParams.shadeBands,
-    glow: isAttacking ? inkParams.glow + 0.15 : inkParams.glow,
-  });
-  const outlineMaterial = useOutlineMaterial(inkParams.outlineColor);
+
   const headScale = style.headSize;
+  const styleVariant = style.specialGeometry;
+  const glow = isAttacking ? inkParams.glow + 0.15 : inkParams.glow;
   const outlineScale = 1 + inkParams.lineWidth;
+  const accentColor = colors.emissive ?? colors.secondary;
+  const rimColor = colors.glow ?? inkParams.rimColor;
 
   return (
-    <>
-      <group position={[lean * 0.12, 1.8, 0]} rotation={[0, 0, lean * 0.25]}>
-        <mesh castShadow material={inkMaterial}>
-          <sphereGeometry args={[headScale, 32, 32]} />
-        </mesh>
-        <mesh castShadow scale={[outlineScale, outlineScale, outlineScale]} material={outlineMaterial}>
-          <sphereGeometry args={[headScale, 32, 32]} />
-        </mesh>
-      </group>
-
-      {accessory.geometry && (
-        <group position={[lean * 0.12, 1.8 + style.headSize * 0.5, 0]} rotation={[0, 0, lean * 0.25]}>
-          {(Array.isArray(accessory.geometry) ? accessory.geometry : [accessory.geometry]).map((geom: any, idx) => {
-            if (!geom) return null;
-            const geoBuilder = () => {
-              switch (geom.type) {
-                case "cone":
-                case "coneGeometry":
-                  return <coneGeometry args={geom.args as any} />;
-                case "torusGeometry":
-                  return <torusGeometry args={geom.args as any} />;
-                case "planeGeometry":
-                  return <planeGeometry args={geom.args as any} />;
-                case "boxGeometry":
-                  return <boxGeometry args={geom.args as any} />;
-                case "circleGeometry":
-                  return <circleGeometry args={geom.args as any} />;
-                case "sphereGeometry":
-                  return <sphereGeometry args={geom.args as any} />;
-                case "cylinderGeometry":
-                  return <cylinderGeometry args={geom.args as any} />;
-                case "octahedronGeometry":
-                  return <octahedronGeometry args={geom.args as any} />;
-                default:
-                  return <boxGeometry args={[0.1, 0.1, 0.1]} />;
-              }
-            };
-            const strokeWidth = inkParams.lineWidth;
-            const accessoryMaterial = useInkMaterial({
-              baseColor: accessory.color ?? colors.secondary,
-              rimColor: accessory.rimColor ?? inkParams.rimColor,
-              shadeBands: accessory.shadeBands ?? inkParams.shadeBands,
-              glow: accessory.emissive ? Math.max(0.3, inkParams.glow + 0.2) : inkParams.glow,
-            });
-            const outlineMat = useOutlineMaterial(accessory.outlineColor ?? inkParams.outlineColor, accessory.emissive ? 0.95 : 0.8);
-            return (
-              <group key={idx} position={geom.position as [number, number, number]} rotation={geom.rotation as [number, number, number]}>
-                <mesh castShadow material={accessoryMaterial}>{geoBuilder()}</mesh>
-                <mesh castShadow material={outlineMat} scale={[1 + strokeWidth, 1 + strokeWidth, 1 + strokeWidth]}>
-                  {geoBuilder()}
-                </mesh>
-              </group>
-            );
-          })}
-        </group>
+    <group position={[lean * 0.12, 1.8, 0]} rotation={[0, 0, lean * 0.25]}>
+      {styleVariant === "mechanical" ? (
+        <>
+          <InkPart
+            baseColor={colors.primary}
+            rimColor={rimColor}
+            shadeBands={inkParams.shadeBands}
+            glow={glow + 0.06}
+            outlineColor={inkParams.outlineColor}
+            outlineScale={outlineScale}
+            renderGeometry={() => <boxGeometry args={[headScale * 1.7, headScale * 1.48, headScale * 1.35]} />}
+          />
+          <InkPart
+            position={[0, -0.03, headScale * 0.48]}
+            baseColor={accentColor}
+            rimColor="#ffffff"
+            shadeBands={2}
+            glow={glow + 0.22}
+            outlineColor={inkParams.outlineColor}
+            outlineScale={outlineScale}
+            renderGeometry={() => <boxGeometry args={[headScale * 1.32, headScale * 0.28, headScale * 0.14]} />}
+          />
+          <InkPart
+            position={[headScale * 0.68, headScale * 0.3, 0]}
+            rotation={[0, 0, Math.PI / 8]}
+            baseColor={accentColor}
+            rimColor={rimColor}
+            shadeBands={2}
+            glow={glow + 0.08}
+            outlineColor={inkParams.outlineColor}
+            outlineScale={outlineScale}
+            renderGeometry={() => <cylinderGeometry args={[headScale * 0.06, headScale * 0.06, headScale * 0.5, 12]} />}
+          />
+        </>
+      ) : styleVariant === "translucent" ? (
+        <>
+          <InkPart
+            baseColor={colors.primary}
+            rimColor={rimColor}
+            shadeBands={inkParams.shadeBands + 1}
+            glow={glow + 0.16}
+            opacity={0.68}
+            outlineColor={inkParams.outlineColor}
+            outlineOpacity={0.45}
+            outlineScale={outlineScale}
+            renderGeometry={() => <sphereGeometry args={[headScale, 32, 32]} />}
+          />
+          <InkPart
+            scale={0.62}
+            baseColor={accentColor}
+            rimColor="#ffffff"
+            shadeBands={4}
+            glow={glow + 0.28}
+            opacity={0.88}
+            outlineColor={inkParams.outlineColor}
+            outlineOpacity={0.4}
+            outlineScale={outlineScale}
+            renderGeometry={() => <sphereGeometry args={[headScale, 28, 28]} />}
+          />
+        </>
+      ) : styleVariant === "crystalline" ? (
+        <>
+          <InkPart
+            baseColor={colors.primary}
+            rimColor={rimColor}
+            shadeBands={4}
+            glow={glow + 0.1}
+            outlineColor={inkParams.outlineColor}
+            outlineScale={outlineScale}
+            renderGeometry={() => <octahedronGeometry args={[headScale * 1.18, 0]} />}
+          />
+          <InkPart
+            position={[-headScale * 0.55, headScale * 0.1, 0]}
+            rotation={[0, 0, -0.22]}
+            baseColor={accentColor}
+            rimColor="#ffffff"
+            shadeBands={4}
+            glow={glow + 0.18}
+            outlineColor={inkParams.outlineColor}
+            outlineScale={outlineScale}
+            renderGeometry={() => <octahedronGeometry args={[headScale * 0.32, 0]} />}
+          />
+          <InkPart
+            position={[headScale * 0.55, headScale * 0.1, 0]}
+            rotation={[0, 0, 0.22]}
+            baseColor={accentColor}
+            rimColor="#ffffff"
+            shadeBands={4}
+            glow={glow + 0.18}
+            outlineColor={inkParams.outlineColor}
+            outlineScale={outlineScale}
+            renderGeometry={() => <octahedronGeometry args={[headScale * 0.32, 0]} />}
+          />
+        </>
+      ) : styleVariant === "angular" ? (
+        <>
+          <InkPart
+            baseColor={colors.primary}
+            rimColor={rimColor}
+            shadeBands={inkParams.shadeBands}
+            glow={glow + 0.04}
+            outlineColor={inkParams.outlineColor}
+            outlineScale={outlineScale}
+            renderGeometry={() => <octahedronGeometry args={[headScale * 1.14, 0]} />}
+          />
+          <InkPart
+            position={[0, headScale * 0.18, headScale * 0.05]}
+            baseColor={accentColor}
+            rimColor={rimColor}
+            shadeBands={3}
+            glow={glow + 0.08}
+            outlineColor={inkParams.outlineColor}
+            outlineScale={outlineScale}
+            renderGeometry={() => <boxGeometry args={[headScale * 0.9, headScale * 0.18, headScale * 0.28]} />}
+          />
+        </>
+      ) : styleVariant === "streamlined" ? (
+        <>
+          <InkPart
+            scale={[0.88, 1.04, 1.14]}
+            baseColor={colors.primary}
+            rimColor={rimColor}
+            shadeBands={inkParams.shadeBands}
+            glow={glow + 0.1}
+            outlineColor={inkParams.outlineColor}
+            outlineScale={outlineScale}
+            renderGeometry={() => <sphereGeometry args={[headScale, 32, 32]} />}
+          />
+          <InkPart
+            position={[0, -headScale * 0.06, headScale * 0.42]}
+            baseColor={accentColor}
+            rimColor="#ffffff"
+            shadeBands={3}
+            glow={glow + 0.18}
+            outlineColor={inkParams.outlineColor}
+            outlineScale={outlineScale}
+            renderGeometry={() => <boxGeometry args={[headScale * 0.74, headScale * 0.12, headScale * 0.08]} />}
+          />
+        </>
+      ) : styleVariant === "rounded" ? (
+        <>
+          <InkPart
+            baseColor={colors.primary}
+            rimColor={rimColor}
+            shadeBands={inkParams.shadeBands}
+            glow={glow + 0.08}
+            outlineColor={inkParams.outlineColor}
+            outlineScale={outlineScale}
+            renderGeometry={() => <sphereGeometry args={[headScale, 32, 32]} />}
+          />
+          <InkPart
+            position={[-headScale * 0.55, -headScale * 0.08, headScale * 0.06]}
+            baseColor={accentColor}
+            rimColor={rimColor}
+            shadeBands={4}
+            glow={glow + 0.12}
+            outlineColor={inkParams.outlineColor}
+            outlineScale={outlineScale}
+            renderGeometry={() => <sphereGeometry args={[headScale * 0.24, 18, 18]} />}
+          />
+          <InkPart
+            position={[headScale * 0.55, -headScale * 0.08, headScale * 0.06]}
+            baseColor={accentColor}
+            rimColor={rimColor}
+            shadeBands={4}
+            glow={glow + 0.12}
+            outlineColor={inkParams.outlineColor}
+            outlineScale={outlineScale}
+            renderGeometry={() => <sphereGeometry args={[headScale * 0.24, 18, 18]} />}
+          />
+        </>
+      ) : (
+        <InkPart
+          baseColor={colors.primary}
+          rimColor={rimColor}
+          shadeBands={inkParams.shadeBands}
+          glow={glow}
+          outlineColor={inkParams.outlineColor}
+          outlineScale={outlineScale}
+          renderGeometry={() => <sphereGeometry args={[headScale, 32, 32]} />}
+        />
       )}
-    </>
+    </group>
   );
 };
 

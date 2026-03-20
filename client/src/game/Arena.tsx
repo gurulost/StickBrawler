@@ -1,4 +1,5 @@
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, useRef } from "react";
+import { useFrame, useThree } from "@react-three/fiber";
 import { ARENA_WIDTH, FLOOR_Y, PLATFORMS, ARENA_DEPTH } from "./Physics";
 import {
   getArenaTheme,
@@ -6,6 +7,7 @@ import {
   type ArenaTheme,
 } from "./arenas";
 import * as THREE from "three";
+import { useFighting } from "../lib/stores/useFighting";
 
 const createGradientTexture = (top: string, bottom: string) => {
   if (typeof document === "undefined") return null;
@@ -26,6 +28,35 @@ const createGradientTexture = (top: string, bottom: string) => {
 
 type ArenaProps = {
   variant?: string;
+};
+
+const OPEN_PLATFORM_TOP_THICKNESS = 0.3;
+const OPEN_PLATFORM_TOP_DEFAULT_OPACITY = 0.9;
+const OPEN_PLATFORM_TOP_OCCLUDED_OPACITY = 0.28;
+const OPEN_SUPPORT_DEFAULT_OPACITY = 0.68;
+const OPEN_SUPPORT_OCCLUDED_OPACITY = 0.06;
+const OPEN_PLATFORM_OCCLUSION_BLEND = 7.5;
+const OPEN_COMBAT_LANE_WIDTH = 3.2;
+const OPEN_DECORATION_COUNT = 4;
+const FIGHT_PRESENTATION_PHASES = new Set(["fighting", "round_end", "match_end"]);
+
+const clampValue = (value: number, min: number, max: number) =>
+  Math.max(min, Math.min(max, value));
+
+type PlatformOcclusionState = {
+  support: number;
+  top: number;
+};
+
+type OpenArenaPlatformProps = {
+  platform: {
+    x1: number;
+    x2: number;
+    z1: number;
+    z2: number;
+    y: number;
+  };
+  theme: ArenaTheme;
 };
 
 const Arena = ({ variant }: ArenaProps) => {
@@ -78,7 +109,11 @@ const OpenArena = ({
   skylineTexture: THREE.CanvasTexture | null;
 }) => {
   const wallHeight = ARENA_WIDTH / 3;
-  const decorationCount = Math.floor(ARENA_WIDTH / 3);
+  const decorationCount = OPEN_DECORATION_COUNT;
+  const decorationOffsets = Array.from({ length: decorationCount }).map((_, index) => {
+    const spread = index / (decorationCount - 1) - 0.5;
+    return spread * ARENA_WIDTH * 0.62;
+  });
 
   const gridHelper = useMemo(() => {
     const helper = new THREE.GridHelper(
@@ -88,7 +123,7 @@ const OpenArena = ({
       theme.colors.gridColor2,
     );
     (helper.material as THREE.Material).transparent = true;
-    (helper.material as THREE.Material).opacity = 0.35;
+    (helper.material as THREE.Material).opacity = 0.18;
     helper.position.y = FLOOR_Y + 0.01;
     return helper;
   }, [theme.colors.gridColor1, theme.colors.gridColor2]);
@@ -117,62 +152,42 @@ const OpenArena = ({
       </mesh>
       <primitive object={gridHelper} />
 
+      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, FLOOR_Y + 0.025, 0]}>
+        <planeGeometry args={[ARENA_WIDTH * 0.88, OPEN_COMBAT_LANE_WIDTH]} />
+        <meshBasicMaterial
+          color={theme.accentLeft}
+          transparent
+          opacity={0.12}
+          depthWrite={false}
+        />
+      </mesh>
+      <mesh position={[0, wallHeight * 0.42, -ARENA_WIDTH * 0.38]}>
+        <planeGeometry args={[ARENA_WIDTH * 1.18, wallHeight * 0.82]} />
+        <meshBasicMaterial
+          color={theme.accentRight}
+          transparent
+          opacity={0.08}
+          depthWrite={false}
+        />
+      </mesh>
+      <mesh position={[0, wallHeight * 0.42, -ARENA_WIDTH * 0.379]}>
+        <planeGeometry args={[ARENA_WIDTH * 0.42, wallHeight * 0.56]} />
+        <meshBasicMaterial
+          color="#ffffff"
+          transparent
+          opacity={0.05}
+          depthWrite={false}
+        />
+      </mesh>
+
       {/* Platforms for multi-level combat */}
-      {PLATFORMS.map((platform, index) => {
-        const width = platform.x2 - platform.x1;
-        const depth = platform.z2 - platform.z1;
-        const centerX = (platform.x1 + platform.x2) / 2;
-        const centerZ = (platform.z1 + platform.z2) / 2;
-
-        return (
-          <group key={`platform-${index}`}>
-            <mesh
-              position={[centerX, platform.y, centerZ]}
-              castShadow
-              receiveShadow
-            >
-              <boxGeometry args={[width, 0.3, depth]} />
-              <meshStandardMaterial
-                color={theme.platformColor}
-                roughness={0.4}
-              />
-            </mesh>
-
-            {/* Support columns */}
-            <mesh
-              position={[platform.x1 + 0.5, platform.y / 2, platform.z1 + 0.5]}
-              castShadow
-            >
-              <boxGeometry args={[0.5, platform.y, 0.5]} />
-              <meshStandardMaterial color={theme.pillarColor} />
-            </mesh>
-
-            <mesh
-              position={[platform.x2 - 0.5, platform.y / 2, platform.z1 + 0.5]}
-              castShadow
-            >
-              <boxGeometry args={[0.5, platform.y, 0.5]} />
-              <meshStandardMaterial color={theme.pillarColor} />
-            </mesh>
-
-            <mesh
-              position={[platform.x1 + 0.5, platform.y / 2, platform.z2 - 0.5]}
-              castShadow
-            >
-              <boxGeometry args={[0.5, platform.y, 0.5]} />
-              <meshStandardMaterial color={theme.pillarColor} />
-            </mesh>
-
-            <mesh
-              position={[platform.x2 - 0.5, platform.y / 2, platform.z2 - 0.5]}
-              castShadow
-            >
-              <boxGeometry args={[0.5, platform.y, 0.5]} />
-              <meshStandardMaterial color={theme.pillarColor} />
-            </mesh>
-          </group>
-        );
-      })}
+      {PLATFORMS.map((platform, index) => (
+        <ReadableOpenArenaPlatform
+          key={`platform-${index}`}
+          platform={platform}
+          theme={theme}
+        />
+      ))}
 
       {/* Background sky */}
       <mesh position={[0, ARENA_WIDTH / 2, -ARENA_WIDTH / 2]}>
@@ -184,42 +199,47 @@ const OpenArena = ({
       </mesh>
 
       {/* Boundaries */}
-      <mesh position={[-ARENA_WIDTH / 2, wallHeight / 2, 0]} castShadow>
-        <boxGeometry args={[1.2, wallHeight, ARENA_WIDTH / 2]} />
-        <meshStandardMaterial color={theme.pillarColor} roughness={0.4} />
+      <mesh position={[-ARENA_WIDTH / 2 + 0.25, wallHeight * 0.42, 0]} castShadow>
+        <boxGeometry args={[0.75, wallHeight * 0.84, ARENA_WIDTH / 3.6]} />
+        <meshStandardMaterial color={theme.pillarColor} roughness={0.48} transparent opacity={0.74} />
       </mesh>
 
-      <mesh position={[ARENA_WIDTH / 2, wallHeight / 2, 0]} castShadow>
-        <boxGeometry args={[1.2, wallHeight, ARENA_WIDTH / 2]} />
-        <meshStandardMaterial color={theme.pillarColor} roughness={0.7} />
+      <mesh position={[ARENA_WIDTH / 2 - 0.25, wallHeight * 0.42, 0]} castShadow>
+        <boxGeometry args={[0.75, wallHeight * 0.84, ARENA_WIDTH / 3.6]} />
+        <meshStandardMaterial color={theme.pillarColor} roughness={0.58} transparent opacity={0.74} />
       </mesh>
 
       {/* Decorative elements along the edges */}
-      {Array.from({ length: decorationCount }).map((_, i) => {
-        const offset = -ARENA_WIDTH / 4 + (i * ARENA_WIDTH) / decorationCount;
+      {decorationOffsets.map((offset, i) => {
         if (theme.id === "auroraFlux") {
           return (
             <group key={`decor-crystal-${i}`}>
               <mesh
                 castShadow
-                position={[-ARENA_WIDTH / 2 + 1, 1.5, offset]}
+                position={[-ARENA_WIDTH / 2 + 0.85, 1.3, offset]}
                 rotation={[0, 0, Math.PI / 4]}
               >
-                <coneGeometry args={[0.8, 3, 4]} />
+                <coneGeometry args={[0.52, 2.2, 4]} />
                 <meshStandardMaterial
                   color={theme.accentLeft}
                   emissive={theme.accentLeft}
+                  emissiveIntensity={0.42}
+                  transparent
+                  opacity={0.55}
                 />
               </mesh>
               <mesh
                 castShadow
-                position={[ARENA_WIDTH / 2 - 1, 1.5, -offset]}
+                position={[ARENA_WIDTH / 2 - 0.85, 1.3, -offset]}
                 rotation={[0, 0, -Math.PI / 4]}
               >
-                <coneGeometry args={[0.8, 3, 4]} />
+                <coneGeometry args={[0.52, 2.2, 4]} />
                 <meshStandardMaterial
                   color={theme.accentRight}
                   emissive={theme.accentRight}
+                  emissiveIntensity={0.42}
+                  transparent
+                  opacity={0.55}
                 />
               </mesh>
             </group>
@@ -228,20 +248,26 @@ const OpenArena = ({
         return (
           <group
             key={`decor-arch-${i}`}
-            position={[-ARENA_WIDTH / 2 + 0.5, 0, offset]}
+            position={[-ARENA_WIDTH / 2 + 0.25, 0, offset]}
           >
-            <mesh castShadow position={[0, 2, 0]}>
-              <torusGeometry args={[1, 0.08, 16, 64, Math.PI]} />
+            <mesh castShadow position={[0, 1.9, 0]}>
+              <torusGeometry args={[0.86, 0.06, 16, 64, Math.PI]} />
               <meshStandardMaterial
                 emissive={theme.accentLeft}
                 color="#fef3ff"
+                emissiveIntensity={0.34}
+                transparent
+                opacity={0.5}
               />
             </mesh>
-            <mesh castShadow position={[ARENA_WIDTH - 1, 2, 0]}>
-              <torusGeometry args={[1, 0.08, 16, 64, Math.PI]} />
+            <mesh castShadow position={[ARENA_WIDTH - 0.5, 1.9, 0]}>
+              <torusGeometry args={[0.86, 0.06, 16, 64, Math.PI]} />
               <meshStandardMaterial
                 emissive={theme.accentRight}
                 color="#ecfeff"
+                emissiveIntensity={0.34}
+                transparent
+                opacity={0.5}
               />
             </mesh>
           </group>
@@ -249,11 +275,7 @@ const OpenArena = ({
       })}
 
       {/* Enhanced lighting setup for the larger arena */}
-      <hemisphereLight
-        skyColor={theme.ambientColor}
-        groundColor="#f0fdf4"
-        intensity={0.8}
-      />
+      <hemisphereLight args={[theme.ambientColor, "#f0fdf4", 0.8]} />
       <directionalLight
         intensity={theme.lighting.directionalIntensity}
         position={[ARENA_WIDTH / 2, ARENA_WIDTH / 1.8, ARENA_WIDTH / 2]}
@@ -283,6 +305,192 @@ const OpenArena = ({
         ]}
         color={theme.rimLight.color}
       />
+    </group>
+  );
+};
+
+const ReadableOpenArenaPlatform = ({
+  platform,
+  theme,
+}: OpenArenaPlatformProps) => {
+  const { camera } = useThree();
+  const topMaterialRef = useRef<THREE.MeshStandardMaterial | null>(null);
+  const supportMaterialsRef = useRef<(THREE.MeshStandardMaterial | null)[]>([]);
+  const occlusionStateRef = useRef<PlatformOcclusionState>({ support: 0, top: 0 });
+  const rayRef = useRef(new THREE.Ray());
+  const intersectionRef = useRef(new THREE.Vector3());
+  const subjectRef = useRef(new THREE.Vector3());
+
+  const width = platform.x2 - platform.x1;
+  const depth = platform.z2 - platform.z1;
+  const centerX = (platform.x1 + platform.x2) / 2;
+  const centerZ = (platform.z1 + platform.z2) / 2;
+  const supportInset = width <= 4 || depth <= 4 ? 0.42 : 0.58;
+  const reducedSupports =
+    platform.y >= 4 || (Math.abs(centerX) <= 4.5 && Math.abs(centerZ) <= 2.5);
+  const supportSize =
+    platform.y >= 6 ? 0.22 : platform.y >= 4 ? 0.28 : 0.34;
+  const platformBox = useMemo(
+    () =>
+      new THREE.Box3(
+        new THREE.Vector3(
+          platform.x1,
+          FLOOR_Y,
+          platform.z1,
+        ),
+        new THREE.Vector3(
+          platform.x2,
+          platform.y + OPEN_PLATFORM_TOP_THICKNESS / 2,
+          platform.z2,
+        ),
+      ),
+    [platform.x1, platform.x2, platform.y, platform.z1, platform.z2],
+  );
+  const supportPositions = useMemo<[number, number, number][]>(
+    () => [
+      [platform.x1 + supportInset, platform.y / 2, platform.z1 + supportInset],
+      [platform.x2 - supportInset, platform.y / 2, platform.z1 + supportInset],
+      [platform.x1 + supportInset, platform.y / 2, platform.z2 - supportInset],
+      [platform.x2 - supportInset, platform.y / 2, platform.z2 - supportInset],
+    ],
+    [platform.x1, platform.x2, platform.y, platform.z1, platform.z2, supportInset],
+  );
+  const visibleSupportPositions = useMemo<[number, number, number][]>(
+    () =>
+      reducedSupports
+        ? [...supportPositions].sort((left, right) => left[2] - right[2]).slice(0, 2)
+        : supportPositions,
+    [reducedSupports, supportPositions],
+  );
+
+  useFrame((_, delta) => {
+    const { player, cpu, gamePhase } = useFighting.getState();
+    const blend = 1 - Math.exp(-delta * OPEN_PLATFORM_OCCLUSION_BLEND);
+
+    let nextSupportOcclusion = 0;
+    let nextTopOcclusion = 0;
+
+    if (FIGHT_PRESENTATION_PHASES.has(gamePhase)) {
+      const subjects: [number, number, number][] = [player.position, cpu.position];
+      for (const subjectPosition of subjects) {
+        subjectRef.current.set(
+          subjectPosition[0],
+          subjectPosition[1] + 1.1,
+          subjectPosition[2],
+        );
+        const toSubject = intersectionRef.current.subVectors(
+          subjectRef.current,
+          camera.position,
+        );
+        const distanceToSubject = toSubject.length();
+        if (distanceToSubject <= 0.001) continue;
+        toSubject.divideScalar(distanceToSubject);
+        rayRef.current.set(camera.position, toSubject);
+        const hit = rayRef.current.intersectBox(platformBox, intersectionRef.current);
+        if (!hit) continue;
+        const hitDistance = hit.distanceTo(camera.position);
+        if (hitDistance >= distanceToSubject - 0.3) continue;
+
+        const clearance = clampValue(
+          (distanceToSubject - hitDistance) / Math.max(distanceToSubject, 1),
+          0,
+          1,
+        );
+        const subjectBelowTop = subjectPosition[1] <= platform.y + 0.35;
+        nextSupportOcclusion = Math.max(
+          nextSupportOcclusion,
+          clampValue(0.45 + clearance * 2.2, 0, 1),
+        );
+        if (subjectBelowTop) {
+          nextTopOcclusion = Math.max(
+            nextTopOcclusion,
+            clampValue(0.35 + clearance * 2.8, 0, 1),
+          );
+        }
+      }
+    }
+
+    occlusionStateRef.current.support +=
+      (nextSupportOcclusion - occlusionStateRef.current.support) * blend;
+    occlusionStateRef.current.top +=
+      (nextTopOcclusion - occlusionStateRef.current.top) * blend;
+
+    const topOpacity = THREE.MathUtils.lerp(
+      OPEN_PLATFORM_TOP_DEFAULT_OPACITY,
+      OPEN_PLATFORM_TOP_OCCLUDED_OPACITY,
+      occlusionStateRef.current.top,
+    );
+    const supportOpacity = THREE.MathUtils.lerp(
+      OPEN_SUPPORT_DEFAULT_OPACITY,
+      OPEN_SUPPORT_OCCLUDED_OPACITY,
+      occlusionStateRef.current.support,
+    );
+
+    if (topMaterialRef.current) {
+      topMaterialRef.current.opacity = topOpacity;
+      topMaterialRef.current.transparent = topOpacity < 0.999;
+      topMaterialRef.current.depthWrite = topOpacity > 0.5;
+    }
+
+    for (const material of supportMaterialsRef.current) {
+      if (!material) continue;
+      material.opacity = supportOpacity;
+      material.transparent = supportOpacity < 0.999;
+      material.depthWrite = supportOpacity > 0.35;
+    }
+  });
+
+  return (
+    <group>
+      <mesh
+        rotation={[-Math.PI / 2, 0, 0]}
+        position={[centerX, platform.y - 0.14, centerZ]}
+      >
+        <planeGeometry args={[width * 0.82, depth * 0.64]} />
+        <meshBasicMaterial
+          color={theme.accentRight}
+          transparent
+          opacity={reducedSupports ? 0.16 : 0.09}
+          depthWrite={false}
+        />
+      </mesh>
+      <mesh
+        position={[centerX, platform.y, centerZ]}
+        castShadow
+        receiveShadow
+      >
+        <boxGeometry args={[width, OPEN_PLATFORM_TOP_THICKNESS, depth]} />
+        <meshStandardMaterial
+          ref={topMaterialRef}
+          color={theme.platformColor}
+          roughness={0.4}
+          emissive={theme.accentLeft}
+          emissiveIntensity={0.08}
+          transparent
+          opacity={OPEN_PLATFORM_TOP_DEFAULT_OPACITY}
+        />
+      </mesh>
+
+      {visibleSupportPositions.map((position, index) => (
+        <mesh
+          key={`support-${index}`}
+          position={position}
+          castShadow
+        >
+          <boxGeometry args={[supportSize, platform.y, supportSize]} />
+          <meshStandardMaterial
+            ref={(material) => {
+              supportMaterialsRef.current[index] = material;
+            }}
+            color={theme.pillarColor}
+            roughness={0.55}
+            emissive={theme.accentRight}
+            emissiveIntensity={0.04}
+            transparent
+            opacity={OPEN_SUPPORT_DEFAULT_OPACITY}
+          />
+        </mesh>
+      ))}
     </group>
   );
 };

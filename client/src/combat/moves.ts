@@ -1,4 +1,4 @@
-import type { MoveDefinition } from "./types";
+import type { CombatSocketId, MoveDefinition } from "./types";
 
 const defaultWindows = (startup: number, active: number, recovery: number) => ({
   startup: { start: 1, end: startup },
@@ -20,6 +20,7 @@ export const coreMoves: Record<string, MoveDefinition> = {
       {
         id: "jab-hit",
         frames: { start: 6, end: 9 },
+        socket: "rightHand",
         radius: 0.35,
         offset: [0.8, 1.2, 0],
         height: 0.4,
@@ -54,6 +55,7 @@ export const coreMoves: Record<string, MoveDefinition> = {
       {
         id: "hook-hit",
         frames: { start: 7, end: 11 },
+        socket: "rightHand",
         radius: 0.45,
         offset: [0.9, 1.1, 0.1],
         height: 0.5,
@@ -87,6 +89,7 @@ export const coreMoves: Record<string, MoveDefinition> = {
       {
         id: "launcher-lift",
         frames: { start: 11, end: 16 },
+        socket: "rightHand",
         radius: 0.5,
         offset: [0.2, 0.6, 0],
         height: 1,
@@ -117,6 +120,7 @@ export const coreMoves: Record<string, MoveDefinition> = {
       {
         id: "dive-hit",
         frames: { start: 5, end: 16 },
+        socket: "rightFoot",
         radius: 0.55,
         offset: [0.4, 0.2, 0],
         height: 0.8,
@@ -147,6 +151,7 @@ export const coreMoves: Record<string, MoveDefinition> = {
       {
         id: "guard-break",
         frames: { start: 17, end: 20 },
+        socket: "rightHand",
         radius: 0.65,
         offset: [1, 1.2, 0],
         height: 1,
@@ -164,6 +169,16 @@ export const coreMoves: Record<string, MoveDefinition> = {
     ],
     meterCost: { stamina: 10 },
     autoTurn: true,
+  },
+  dodge: {
+    id: "dodge",
+    name: "Sidestep Roll",
+    category: "special",
+    totalFrames: 20,
+    windows: defaultWindows(2, 8, 10),
+    hitboxes: [],
+    invulnerableFrames: [{ start: 2, end: 9 }],
+    meterCost: { stamina: 4 },
   },
   parry: {
     id: "parry",
@@ -193,6 +208,7 @@ export const coreMoves: Record<string, MoveDefinition> = {
       {
         id: "riposte-hit",
         frames: { start: 7, end: 12 },
+        socket: "rightHand",
         radius: 0.6,
         offset: [0.7, 1, 0],
         height: 1,
@@ -221,9 +237,11 @@ const createSwordHitbox = (
   launchAngleDeg = 20,
   knockbackBase = 9,
   knockbackScaling = 0.35,
+  socket: CombatSocketId = "rightHand",
 ) => ({
   id,
   frames: { start: frames[0], end: frames[1] },
+  socket,
   radius,
   offset,
   height,
@@ -245,7 +263,7 @@ Object.assign(coreMoves, {
     category: "light",
     totalFrames: 20,
     windows: defaultWindows(4, 4, 12),
-    hitboxes: [createSwordHitbox("hero-jab", [5, 8], [0.75, 1.1, 0], 0.35, 0.4, 3, 10, 5, 0.2)],
+    hitboxes: [createSwordHitbox("hero-jab", [5, 8], [0.75, 1.1, 0], 0.35, 0.4, 3, 10, 5, 0.2, "rightHand")],
     cancelBranches: [
       {
         to: "hero_tilt_side",
@@ -262,7 +280,7 @@ Object.assign(coreMoves, {
     category: "light",
     totalFrames: 26,
     windows: defaultWindows(7, 5, 14),
-    hitboxes: [createSwordHitbox("hero-tilt", [8, 12], [1, 1.15, 0.05], 0.4, 0.45, 6, 20, 8, 0.3)],
+    hitboxes: [createSwordHitbox("hero-tilt", [8, 12], [1, 1.15, 0.05], 0.4, 0.45, 6, 20, 8, 0.3, "rightHand")],
     meterGain: { stamina: 3, specialMeter: 1 },
   },
   hero_sweep: {
@@ -275,6 +293,7 @@ Object.assign(coreMoves, {
       {
         id: "hero-sweep",
         frames: { start: 10, end: 14 },
+        socket: "rightFoot",
         radius: 0.65,
         offset: [0.9, 0.35, 0],
         height: 0.3,
@@ -294,7 +313,7 @@ Object.assign(coreMoves, {
     category: "medium",
     totalFrames: 36,
     windows: defaultWindows(9, 5, 22),
-    hitboxes: [createSwordHitbox("hero-launch", [10, 14], [0.4, 0.8, 0], 0.45, 1, 8, 70, 11, 0.5)],
+    hitboxes: [createSwordHitbox("hero-launch", [10, 14], [0.4, 0.8, 0], 0.45, 1, 8, 70, 11, 0.5, "rightHand")],
     meterCost: { stamina: 6 },
     autoTurn: true,
   },
@@ -304,7 +323,7 @@ Object.assign(coreMoves, {
     category: "heavy",
     totalFrames: 52,
     windows: defaultWindows(18, 4, 30),
-    hitboxes: [createSwordHitbox("hero-smash", [19, 23], [1.2, 1.3, 0], 0.75, 1, 16, 35, 16, 0.8)],
+    hitboxes: [createSwordHitbox("hero-smash", [19, 23], [1.2, 1.3, 0], 0.75, 1, 16, 35, 16, 0.8, "rightHand")],
     meterCost: { stamina: 12 },
     autoTurn: true,
   },
@@ -314,7 +333,7 @@ Object.assign(coreMoves, {
     category: "aerial",
     totalFrames: 34,
     windows: defaultWindows(5, 10, 19),
-    hitboxes: [createSwordHitbox("hero-nair", [6, 15], [0.4, 0.8, 0], 0.45, 0.8, 6, 25, 9, 0.35)],
+    hitboxes: [createSwordHitbox("hero-nair", [6, 15], [0.4, 0.8, 0], 0.45, 0.8, 6, 25, 9, 0.35, "rightHand")],
     aerialOnly: true,
   },
   hero_air_forward: {
@@ -323,7 +342,7 @@ Object.assign(coreMoves, {
     category: "aerial",
     totalFrames: 40,
     windows: defaultWindows(7, 7, 26),
-    hitboxes: [createSwordHitbox("hero-fair", [9, 15], [0.9, 0.9, 0], 0.6, 0.9, 9, 30, 11, 0.5)],
+    hitboxes: [createSwordHitbox("hero-fair", [9, 15], [0.9, 0.9, 0], 0.6, 0.9, 9, 30, 11, 0.5, "rightHand")],
     aerialOnly: true,
   },
   hero_air_down_spike: {
@@ -337,6 +356,7 @@ Object.assign(coreMoves, {
       {
         id: "hero-dair",
         frames: { start: 11, end: 16 },
+        socket: "rightFoot",
         radius: 0.55,
         offset: [0, 0.4, 0],
         height: 0.8,
@@ -357,7 +377,7 @@ Object.assign(coreMoves, {
     category: "special",
     totalFrames: 32,
     windows: defaultWindows(10, 4, 18),
-    hitboxes: [createSwordHitbox("hero-burst", [11, 14], [0.6, 1, 0], 0.4, 0.9, 7, 35, 9, 0.4)],
+    hitboxes: [createSwordHitbox("hero-burst", [11, 14], [0.6, 1, 0], 0.4, 0.9, 7, 35, 9, 0.4, "rightHand")],
     meterCost: { stamina: 4, specialMeter: 3 },
   },
   hero_dash_strike: {
@@ -366,7 +386,7 @@ Object.assign(coreMoves, {
     category: "special",
     totalFrames: 42,
     windows: defaultWindows(8, 6, 28),
-    hitboxes: [createSwordHitbox("hero-dash", [9, 14], [1.2, 1.1, 0], 0.6, 0.9, 10, 25, 13, 0.55)],
+    hitboxes: [createSwordHitbox("hero-dash", [9, 14], [1.2, 1.1, 0], 0.6, 0.9, 10, 25, 13, 0.55, "rightHand")],
     meterCost: { stamina: 8 },
     autoTurn: true,
   },
@@ -376,7 +396,7 @@ Object.assign(coreMoves, {
     category: "special",
     totalFrames: 48,
     windows: defaultWindows(6, 8, 34),
-    hitboxes: [createSwordHitbox("hero-rise", [7, 14], [0.3, 0.6, 0], 0.45, 1.1, 7, 85, 10, 0.4)],
+    hitboxes: [createSwordHitbox("hero-rise", [7, 14], [0.3, 0.6, 0], 0.45, 1.1, 7, 85, 10, 0.4, "rightHand")],
     meterCost: { stamina: 6, specialMeter: 5 },
     autoTurn: true,
   },
@@ -402,7 +422,7 @@ Object.assign(coreMoves, {
     category: "light",
     totalFrames: 24,
     windows: defaultWindows(4, 6, 14),
-    hitboxes: [createSwordHitbox("vill-jab", [5, 10], [0.7, 1, 0], 0.35, 0.45, 2.5, 8, 4, 0.15)],
+    hitboxes: [createSwordHitbox("vill-jab", [5, 10], [0.7, 1, 0], 0.35, 0.45, 2.5, 8, 4, 0.15, "rightHand")],
     cancelBranches: [
       { to: "vill_low_stab", window: { start: 11, end: 16 }, condition: "onHit" },
     ],
@@ -413,7 +433,7 @@ Object.assign(coreMoves, {
     category: "heavy",
     totalFrames: 56,
     windows: defaultWindows(20, 4, 32),
-    hitboxes: [createSwordHitbox("vill-smash", [21, 24], [1.3, 1.2, 0], 0.8, 1.1, 18, 40, 18, 0.9)],
+    hitboxes: [createSwordHitbox("vill-smash", [21, 24], [1.3, 1.2, 0], 0.8, 1.1, 18, 40, 18, 0.9, "rightHand")],
     meterCost: { stamina: 11 },
     autoTurn: true,
   },
@@ -427,6 +447,7 @@ Object.assign(coreMoves, {
       {
         id: "vill-low",
         frames: { start: 9, end: 14 },
+        socket: "rightHand",
         radius: 0.55,
         offset: [0.95, 0.4, 0],
         height: 0.3,
@@ -451,6 +472,7 @@ Object.assign(coreMoves, {
       {
         id: "vill-dive",
         frames: { start: 13, end: 18 },
+        socket: "rightFoot",
         radius: 0.6,
         offset: [0, 0.35, 0],
         height: 0.75,
@@ -470,7 +492,7 @@ Object.assign(coreMoves, {
     category: "special",
     totalFrames: 44,
     windows: defaultWindows(12, 6, 26),
-    hitboxes: [createSwordHitbox("vill-orb", [13, 18], [0.5, 0.9, 0], 0.4, 1, 5, 30, 7, 0.3)],
+    hitboxes: [createSwordHitbox("vill-orb", [13, 18], [0.5, 0.9, 0], 0.4, 1, 5, 30, 7, 0.3, "rightHand")],
     meterCost: { specialMeter: 5 },
   },
   vill_sidestep_strike: {
@@ -479,7 +501,7 @@ Object.assign(coreMoves, {
     category: "special",
     totalFrames: 38,
     windows: defaultWindows(8, 5, 25),
-    hitboxes: [createSwordHitbox("vill-step", [9, 13], [0.8, 1, 0], 0.5, 0.9, 9, 30, 12, 0.5)],
+    hitboxes: [createSwordHitbox("vill-step", [9, 13], [0.8, 1, 0], 0.5, 0.9, 9, 30, 12, 0.5, "rightHand")],
     invulnerableFrames: [{ start: 4, end: 8 }],
     meterCost: { stamina: 7 },
   },
@@ -489,7 +511,7 @@ Object.assign(coreMoves, {
     category: "special",
     totalFrames: 46,
     windows: defaultWindows(6, 6, 34),
-    hitboxes: [createSwordHitbox("vill-tele", [7, 12], [0.2, 0.6, 0], 0.4, 1, 6, 80, 9, 0.35)],
+    hitboxes: [createSwordHitbox("vill-tele", [7, 12], [0.2, 0.6, 0], 0.4, 1, 6, 80, 9, 0.35, "rightHand")],
     invulnerableFrames: [{ start: 1, end: 6 }],
     meterCost: { specialMeter: 6 },
   },
@@ -499,7 +521,7 @@ Object.assign(coreMoves, {
     category: "special",
     totalFrames: 50,
     windows: defaultWindows(14, 6, 30),
-    hitboxes: [createSwordHitbox("vill-trap", [15, 20], [0.4, 0.3, 0], 0.5, 0.4, 4, 15, 5, 0.2)],
+    hitboxes: [createSwordHitbox("vill-trap", [15, 20], [0.4, 0.3, 0], 0.5, 0.4, 4, 15, 5, 0.2, "rightHand")],
     meterCost: { stamina: 4, specialMeter: 3 },
   },
 });

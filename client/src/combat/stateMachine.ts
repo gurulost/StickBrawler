@@ -40,6 +40,13 @@ export class CombatStateMachine {
       return this.applyMeters(nextState);
     }
 
+    if (nextState.blockstunFrames > 0) {
+      nextState.blockstunFrames -= ctx.delta;
+      nextState.action = "blockstun";
+      nextState = this.passiveRegen(nextState, ctx);
+      return this.applyMeters(nextState);
+    }
+
     if (ctx.inputs.dodge && nextState.guardMeter > 10) {
       nextState = this.enterDodge(nextState);
       return this.applyMeters(nextState);
@@ -118,10 +125,11 @@ export class CombatStateMachine {
     }
 
     const branch = move.cancelBranches?.find((b) => {
-      if (ctx.inputs[b.to]) return this.frameInWindow(updatedFrame, b.window);
-      if (b.condition === "onHit" && ctx.inputs["confirm-hit"]) {
-        return this.frameInWindow(updatedFrame, b.window);
-      }
+      if (!this.frameInWindow(updatedFrame, b.window)) return false;
+      if (!b.condition) return Boolean(ctx.inputs[b.to]);
+      if (b.condition === "onHit") return Boolean(ctx.inputs["confirm-hit"]);
+      if (b.condition === "onBlock") return Boolean(ctx.inputs["confirm-block"]);
+      if (b.condition === "onWhiff") return Boolean(ctx.inputs["confirm-whiff"]);
       return false;
     });
 

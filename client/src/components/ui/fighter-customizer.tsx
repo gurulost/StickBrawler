@@ -851,7 +851,7 @@ const accessoryColorPalette = [
   { color: '#8888ff', name: 'Mystic Blue' },
 ];
 
-export function FighterCustomizer() {
+export function FighterCustomizer({ previewsActive = true }: { previewsActive?: boolean }) {
   const [activeTab, setActiveTab] = useState('player');
   const [showSaveDialog, setShowSaveDialog] = useState(false);
   const [characterName, setCharacterName] = useState('');
@@ -1422,8 +1422,8 @@ export function FighterCustomizer() {
                     </TabsTrigger>
                   </TabsList>
                   
-                  <TabsContent value="player">
-                    <CharacterPreview isPlayer={true} className="mb-4" />
+                  <TabsContent value="player" forceMount>
+                    <CharacterPreview animate={previewsActive && activeTab === 'player'} isPlayer={true} className="mb-4 h-80 rounded-2xl ring-1 ring-blue-400/30 shadow-[0_18px_55px_rgba(37,99,235,0.28)]" />
                     <div className="text-center space-y-2">
                       <Badge variant="outline" className="bg-blue-900/30 text-blue-200 border-blue-600">
                         Player Fighter
@@ -1432,8 +1432,8 @@ export function FighterCustomizer() {
                     </div>
                   </TabsContent>
                   
-                  <TabsContent value="cpu">
-                    <CharacterPreview isPlayer={false} className="mb-4" />
+                  <TabsContent value="cpu" forceMount>
+                    <CharacterPreview animate={previewsActive && activeTab === 'cpu'} isPlayer={false} className="mb-4 h-80 rounded-2xl ring-1 ring-rose-400/30 shadow-[0_18px_55px_rgba(244,63,94,0.24)]" />
                     <div className="text-center space-y-2">
                       <Badge variant="outline" className="bg-red-900/30 text-red-200 border-red-600">
                         CPU Opponent

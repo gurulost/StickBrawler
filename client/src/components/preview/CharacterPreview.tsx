@@ -4,11 +4,13 @@ import { OrbitControls, Environment } from "@react-three/drei";
 import StickFigure from "../../game/StickFigure";
 import { useCustomization } from "../../lib/stores/useCustomization";
 import { ParticleEffect, AuraEffect } from "../ui/particle-effects";
+import type { FighterId } from "../../combat/moveTable";
 
 const basePreviewState = {
   health: 100,
   position: [0, 0, 0] as [number, number, number],
   direction: 1 as 1 | -1,
+  fighterId: "stick_hero" as const,
   isJumping: false,
   isAttacking: false,
   isBlocking: false,
@@ -36,11 +38,77 @@ interface CharacterPreviewProps {
   animate?: boolean;
 }
 
+function PreviewStage({ accentColor, glowColor }: { accentColor: string; glowColor: string }) {
+  return (
+    <group>
+      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.06, 0]} receiveShadow>
+        <circleGeometry args={[1.65, 64]} />
+        <meshStandardMaterial
+          color="#10233d"
+          emissive={accentColor}
+          emissiveIntensity={0.16}
+          roughness={0.55}
+          metalness={0.2}
+        />
+      </mesh>
+      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.055, 0]}>
+        <torusGeometry args={[1.18, 0.045, 16, 56]} />
+        <meshBasicMaterial color={glowColor} transparent opacity={0.42} />
+      </mesh>
+      <mesh position={[0, 1.1, -1.2]}>
+        <torusGeometry args={[1.2, 0.03, 16, 56]} />
+        <meshBasicMaterial color={glowColor} transparent opacity={0.28} />
+      </mesh>
+      <mesh position={[0, 0.95, -1.24]}>
+        <circleGeometry args={[1.02, 64]} />
+        <meshBasicMaterial color={accentColor} transparent opacity={0.12} />
+      </mesh>
+      <mesh position={[0, -0.02, 0]}>
+        <cylinderGeometry args={[0.78, 0.92, 0.12, 48]} />
+        <meshStandardMaterial
+          color="#162b49"
+          emissive={glowColor}
+          emissiveIntensity={0.08}
+          roughness={0.35}
+          metalness={0.42}
+        />
+      </mesh>
+    </group>
+  );
+}
+
 export function CharacterPreview({ isPlayer, className = "", animate = false }: CharacterPreviewProps) {
-  const { getPlayerColors, getPlayerStyle, getCPUColors, getCPUStyle } = useCustomization();
+  const {
+    getPlayerColors,
+    getPlayerStyle,
+    getPlayerLoadout,
+    getCPUColors,
+    getCPUStyle,
+    getCPULoadout,
+  } = useCustomization();
   const colors = isPlayer ? getPlayerColors() : getCPUColors();
   const style = isPlayer ? getPlayerStyle() : getCPUStyle();
+  const loadout = isPlayer ? getPlayerLoadout() : getCPULoadout();
   const [pose, setPose] = useState(() => ({ ...basePreviewState }));
+  const fighterId: FighterId = isPlayer ? "stick_hero" : "stick_villain";
+  const previewRenderKey = useMemo(
+    () =>
+      [
+        loadout.colorTheme,
+        loadout.figureStyle,
+        loadout.figureBlendTargetStyle ?? "base",
+        loadout.figureBlendAmount,
+        loadout.accessory,
+        loadout.accessoryColor,
+        loadout.animationStyle,
+        loadout.inkStyle,
+        JSON.stringify(loadout.figureStyleOverrides ?? {}),
+        JSON.stringify(loadout.inkOverrides ?? {}),
+      ].join("|"),
+    [loadout],
+  );
+  const particleKey = `${colors?.specialEffect ?? "none"}:${style?.particleCount ?? 0}`;
+  const auraKey = `${colors?.glow ?? "none"}:${style?.glowIntensity ?? 0}`;
 
   useEffect(() => {
     if (!animate) return;
@@ -84,28 +152,52 @@ export function CharacterPreview({ isPlayer, className = "", animate = false }: 
     };
   }, [animate]);
 
-  const characterState = useMemo(() => ({ ...basePreviewState, ...pose }), [pose]);
+  const characterState = useMemo(
+    () => ({
+      ...basePreviewState,
+      ...pose,
+      fighterId,
+    }),
+    [fighterId, pose],
+  );
 
   return (
     <div
-      className={`h-64 w-full bg-gradient-to-b from-gray-900 to-gray-800 rounded-lg overflow-hidden ${className} relative`}
+      className={`h-64 w-full rounded-lg overflow-hidden ${className} relative bg-[radial-gradient(circle_at_top,_rgba(96,165,250,0.26),_rgba(15,23,42,0.95)_58%)]`}
     >
-      <Canvas camera={{ position: [0, 0.8, 4], fov: 60 }} style={{ width: "100%", height: "100%" }}>
+      <Canvas
+        camera={{ position: [0, 1.08, 3.2], fov: 48 }}
+        style={{ width: "100%", height: "100%" }}
+        shadows
+      >
         <Suspense fallback={null}>
-          <ambientLight intensity={0.4} />
-          <directionalLight position={[10, 10, 5]} intensity={1} />
-          <pointLight position={[-10, -10, -5]} intensity={0.5} />
+          <ambientLight intensity={0.55} />
+          <directionalLight position={[2.5, 4.5, 3]} intensity={1.25} castShadow />
+          <directionalLight position={[-3, 2.5, -2]} intensity={0.5} />
+          <pointLight position={[0, 2.4, 2.1]} intensity={0.9} color={colors?.glow ?? "#ffffff"} />
+          <pointLight position={[0, 1.1, -2]} intensity={0.45} color={colors?.secondary ?? "#93c5fd"} />
+          <PreviewStage
+            accentColor={colors?.secondary ?? "#2563eb"}
+            glowColor={colors?.glow ?? "#93c5fd"}
+          />
           {colors?.specialEffect && (
             <ParticleEffect
+              key={particleKey}
               theme={colors.specialEffect}
               count={style?.particleCount || 5}
               intensity={style?.glowIntensity || 0.5}
             />
           )}
           {colors?.glow && (
-            <AuraEffect color={colors.glow} intensity={style?.glowIntensity || 0.5} radius={1.2} />
+            <AuraEffect
+              key={auraKey}
+              color={colors.glow}
+              intensity={style?.glowIntensity || 0.5}
+              radius={1.2}
+            />
           )}
           <StickFigure
+            key={previewRenderKey}
             isPlayer={isPlayer}
             characterState={characterState}
             onPositionChange={() => {}}
@@ -118,9 +210,9 @@ export function CharacterPreview({ isPlayer, className = "", animate = false }: 
           <OrbitControls
             enablePan={false}
             enableZoom
-            minDistance={2.5}
-            maxDistance={6}
-            target={[0, 0.9, 0]}
+            minDistance={2.2}
+            maxDistance={5.4}
+            target={[0, 1.05, 0]}
             maxPolarAngle={Math.PI / 1.8}
             minPolarAngle={Math.PI / 4}
           />
@@ -137,6 +229,7 @@ export function CharacterPreview({ isPlayer, className = "", animate = false }: 
           <span className="text-xs text-white font-medium">{style.name}</span>
         </div>
       )}
+      <div className="pointer-events-none absolute inset-x-4 bottom-3 h-10 rounded-full bg-[radial-gradient(circle,_rgba(255,255,255,0.18),_rgba(15,23,42,0)_72%)] blur-md" />
     </div>
   );
 }

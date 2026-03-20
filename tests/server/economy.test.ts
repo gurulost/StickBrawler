@@ -10,13 +10,13 @@ async function createTestApp() {
   const app = express();
   app.use(express.json());
   app.use(express.urlencoded({ extended: false }));
-  await registerRoutes(app);
-  return app;
+  const server = await registerRoutes(app);
+  return { app, server };
 }
 
 test("economy API upserts and validates snapshots", { concurrency: 1 }, async () => {
   await storage.reset();
-  const app = await createTestApp();
+  const { app, server } = await createTestApp();
   const profileId = "eco_test_profile";
 
   const payload = {
@@ -37,24 +37,32 @@ test("economy API upserts and validates snapshots", { concurrency: 1 }, async ()
     },
   };
 
-  await request(app).put("/api/economy").send(payload).expect(202);
+  try {
+    await request(app).put("/api/economy").send(payload).expect(202);
 
-  const fetched = await request(app).get(`/api/economy/${profileId}`).expect(200);
-  assert.equal(fetched.body.coins, 250);
-  assert.equal(fetched.body.lifetimeCoins, 500);
-  assert.equal(fetched.body.unlocks.colorThemes.length, 2);
+    const fetched = await request(app).get(`/api/economy/${profileId}`).expect(200);
+    assert.equal(fetched.body.coins, 250);
+    assert.equal(fetched.body.lifetimeCoins, 500);
+    assert.equal(fetched.body.unlocks.colorThemes.length, 2);
 
-  await request(app)
-    .put("/api/economy")
-    .send({ ...payload, coins: 1111, lifetimeCoins: 2222 })
-    .expect(202);
+    await request(app)
+      .put("/api/economy")
+      .send({ ...payload, coins: 1111, lifetimeCoins: 2222 })
+      .expect(202);
 
-  const updated = await request(app).get(`/api/economy/${profileId}`).expect(200);
-  assert.equal(updated.body.coins, 1111);
-  assert.equal(updated.body.lifetimeCoins, 2222);
+    const updated = await request(app).get(`/api/economy/${profileId}`).expect(200);
+    assert.equal(updated.body.coins, 1111);
+    assert.equal(updated.body.lifetimeCoins, 2222);
 
-  await request(app)
-    .put("/api/economy")
-    .send({ profileId: "bad", coins: -5, lifetimeCoins: -10, unlocks: {} })
-    .expect(422);
+    await request(app)
+      .put("/api/economy")
+      .send({ profileId: "bad", coins: -5, lifetimeCoins: -10, unlocks: {} })
+      .expect(422);
+  } finally {
+    if (server.listening) {
+      await new Promise<void>((resolve, reject) => {
+        server.close((error?: Error) => (error ? reject(error) : resolve()));
+      });
+    }
+  }
 });

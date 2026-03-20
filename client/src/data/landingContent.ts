@@ -16,25 +16,25 @@ export const landingFeatureCards: Array<{
     image: "/screens/customizer.png",
   },
   {
-    title: "Local Co‑Op & Shared Runtime",
+    title: "Local Versus & Shared Runtime",
     description:
-      "Two players share the same deterministic MatchRuntime mirrored on the backend for validation.",
+      "Solo and couch-versus matches run on the same deterministic MatchRuntime mirrored on the backend for validation.",
     accent: "CO-OP",
     icon: Users2,
     image: "/screens/local-coop.png",
   },
   {
-    title: "Economy & Loadouts",
+    title: "Guest-Ready Loadouts",
     description:
-      "Hashed loadouts sync with the economy API so every ink tweak persists securely between sessions.",
+      "Ink loadouts stay playable offline first, with optional profile sync layered in when account services are available.",
     accent: "ECONOMY",
     icon: WalletMinimal,
     image: "/screens/economy.png",
   },
   {
-    title: "Telemetry + Anti‑Cheat",
+    title: "Combat Telemetry",
     description:
-      "Guard breaks, combos, and hit data stream into dashboards for score signing and live tuning.",
+      "Guard breaks, combos, and hit data are buffered for leaderboard integrity and balance tuning during the local slice.",
     accent: "TELEMETRY",
     icon: Activity,
     image: "/screens/telemetry.png",

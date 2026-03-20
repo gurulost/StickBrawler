@@ -3,6 +3,7 @@ import express, { type Request, Response, NextFunction } from "express";
 import session from "express-session";
 import passport from "passport";
 import connectPgSimple from "connect-pg-simple";
+import createMemoryStore from "memorystore";
 import { Pool } from "@neondatabase/serverless";
 import { registerRoutes } from "./routes";
 import { registerAuthRoutes } from "./auth-routes";
@@ -17,10 +18,20 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 
 const PgSession = connectPgSimple(session);
-const sessionStore = new PgSession({
-  pool: new Pool({ connectionString: env.DATABASE_URL }),
-  createTableIfMissing: true,
-});
+const MemoryStore = createMemoryStore(session);
+
+const sessionStore = env.DATABASE_URL
+  ? new PgSession({
+      pool: new Pool({ connectionString: env.DATABASE_URL }),
+      createTableIfMissing: true,
+    })
+  : new MemoryStore({
+      checkPeriod: 24 * 60 * 60 * 1000,
+    });
+
+if (!env.DATABASE_URL) {
+  log("DATABASE_URL not set, using in-memory sessions.", "auth");
+}
 
 app.use(
   session({
@@ -92,14 +103,9 @@ app.use((req, res, next) => {
     serveStatic(app);
   }
 
-  // ALWAYS serve the app on port 5000
-  // this serves both the API and the client
-  const port = 5000;
-  server.listen({
-    port,
-    host: "0.0.0.0",
-    reusePort: true,
-  }, () => {
+  // Serve both the API and client from one HTTP server.
+  const port = env.PORT;
+  server.listen(port, () => {
     log(`serving on port ${port}`);
   });
 

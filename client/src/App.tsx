@@ -124,8 +124,8 @@ function App() {
               <Canvas
                 shadows
                 camera={{
-                  position: [0, 12, 24], // Even higher and further back for better view of expanded arena
-                  fov: 60,               // Wider field of view
+                  position: [0, 10.5, 18],
+                  fov: 52,
                   near: 0.1,
                   far: 1000              // Increased far plane for larger environment
                 }}

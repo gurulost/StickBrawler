@@ -1,7 +1,11 @@
 import { z } from "zod";
 import { storage } from "./storage";
 
+const telemetrySourceSchema = z.enum(["player", "cpu"]);
+const telemetrySlotSchema = z.enum(["player1", "player2", "cpu"]);
+
 export const hitTelemetrySchema = z.object({
+  type: z.literal("hit"),
   source: z.enum(["player", "cpu"]),
   slot: z.enum(["player1", "player2", "cpu"]),
   comboCount: z.number().int().nonnegative(),
@@ -21,11 +25,43 @@ export const hitTelemetrySchema = z.object({
   }),
 });
 
-const buffer: z.infer<typeof hitTelemetrySchema>[] = [];
+export const techTelemetrySchema = z.object({
+  type: z.literal("tech"),
+  source: telemetrySourceSchema,
+  slot: telemetrySlotSchema,
+  result: z.enum(["success", "fail"]),
+  landingLag: z.number().nonnegative(),
+  timestamp: z.number().nonnegative(),
+});
+
+export const inputTelemetrySchema = z.object({
+  type: z.literal("input"),
+  source: telemetrySourceSchema,
+  slot: telemetrySlotSchema,
+  direction: z.enum(["neutral", "forward", "back", "left", "right", "up", "down"]),
+  attackStrength: z.enum(["light", "medium", "heavy", "power"]).optional(),
+  attackAltitude: z.enum(["ground", "air"]).optional(),
+  specialSlot: z.enum(["neutral", "forward", "back", "up", "down"]).optional(),
+  specialAltitude: z.enum(["ground", "air"]).optional(),
+  defendModes: z.array(z.string()),
+  moveId: z.string().optional(),
+  grounded: z.boolean(),
+  timestamp: z.number().nonnegative(),
+});
+
+export const combatTelemetrySchema = z.discriminatedUnion("type", [
+  hitTelemetrySchema,
+  techTelemetrySchema,
+  inputTelemetrySchema,
+]);
+
+export type CombatTelemetryEntry = z.infer<typeof combatTelemetrySchema>;
+
+const buffer: CombatTelemetryEntry[] = [];
 const MAX_ENTRIES = 1024;
 const FLUSH_INTERVAL_MS = 30000; // Flush to database every 30 seconds
 
-export function storeTelemetry(entries: z.infer<typeof hitTelemetrySchema>[]) {
+export function storeTelemetry(entries: CombatTelemetryEntry[]) {
   for (const entry of entries) {
     buffer.push(entry);
     if (buffer.length > MAX_ENTRIES) {
@@ -57,6 +93,7 @@ export function summarizeTelemetry() {
     cpu: init(),
   };
   for (const entry of snapshot) {
+    if (entry.type !== "hit") continue;
     const target = summary[entry.slot];
     if (!target) continue;
     target.hits += 1;
@@ -79,7 +116,7 @@ async function flushTelemetryToDatabase() {
       entries.map(entry => ({
         slot: entry.slot,
         timestamp: entry.timestamp,
-        comboCount: entry.comboCount,
+        comboCount: entry.type === "hit" ? entry.comboCount : 0,
         data: entry,
       }))
     );
@@ -100,5 +137,6 @@ async function flushTelemetryToDatabase() {
   }
 }
 
-// Start periodic flush
-setInterval(flushTelemetryToDatabase, FLUSH_INTERVAL_MS);
+// Start periodic flush without pinning the Node process in tests.
+const telemetryFlushInterval = setInterval(flushTelemetryToDatabase, FLUSH_INTERVAL_MS);
+telemetryFlushInterval.unref?.();

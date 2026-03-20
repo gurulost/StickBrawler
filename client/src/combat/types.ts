@@ -8,6 +8,14 @@ export type MoveCategory =
 
 export type MovePhase = "startup" | "active" | "recovery";
 
+export type CombatSocketId =
+  | "head"
+  | "torso"
+  | "leftHand"
+  | "rightHand"
+  | "leftFoot"
+  | "rightFoot";
+
 export interface FrameWindow {
   start: number; // inclusive frame index
   end: number; // inclusive frame index
@@ -16,6 +24,7 @@ export interface FrameWindow {
 export interface HitboxDefinition {
   id: string;
   frames: FrameWindow;
+  socket?: CombatSocketId;
   radius: number;
   offset: [number, number, number];
   height: number;

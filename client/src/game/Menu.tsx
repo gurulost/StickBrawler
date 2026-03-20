@@ -20,6 +20,8 @@ const Menu = () => {
   const [activePanel, setActivePanel] = useState<Panel>("main");
   const [controllerConnected, setControllerConnected] = useState(false);
   const [showAuthModal, setShowAuthModal] = useState(false);
+  const [onlineAvailable, setOnlineAvailable] = useState(false);
+  const [customizationMounted, setCustomizationMounted] = useState(false);
 
   useEffect(() => {
     const refreshPads = () => {
@@ -35,9 +37,37 @@ const Menu = () => {
     };
   }, []);
 
+  useEffect(() => {
+    let cancelled = false;
+    fetch("/api/online/health")
+      .then((response) => (response.ok ? response.json() : null))
+      .then((data) => {
+        if (cancelled) return;
+        setOnlineAvailable(Boolean(data?.websocketEnabled && data?.status === "running"));
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setOnlineAvailable(false);
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!onlineAvailable && activePanel === "online") {
+      setActivePanel("main");
+    }
+  }, [activePanel, onlineAvailable]);
 
   const handleStartGame = () => {
     startGame(matchMode);
+  };
+
+  const handleOpenCustomization = () => {
+    setCustomizationMounted(true);
+    setActivePanel("customization");
   };
 
   const handleStartOnlineMatch = (matchId: string) => {
@@ -63,26 +93,63 @@ const Menu = () => {
     }
   };
 
+  const renderPersistentPanels = () => {
+    if (!customizationMounted && activePanel !== "main") {
+      return null;
+    }
+
+    return (
+      <>
+        <div className={activePanel === "main" ? "" : "hidden"} aria-hidden={activePanel !== "main"}>
+          <LandingHero
+            onPlay={handleStartGame}
+            onCustomize={handleOpenCustomization}
+            onLeaderboard={() => setActivePanel("leaderboard")}
+            onControls={() => setActivePanel("controls")}
+            matchMode={matchMode}
+            setMatchMode={(mode: MatchMode) => setMatchMode(mode)}
+            controllerConnected={controllerConnected}
+            isMuted={isMuted}
+            toggleMute={toggleMute}
+            masterVolume={masterVolume}
+            onVolumeChange={handleVolumeChange}
+            arenaId={arenaId}
+            arenaOptions={ARENA_OPTIONS}
+            onArenaSelect={setArenaId}
+            previewsActive={activePanel === "main"}
+          />
+          <FeatureGrid />
+        </div>
+
+        {customizationMounted && (
+          <div className={activePanel === "customization" ? "" : "hidden"} aria-hidden={activePanel !== "customization"}>
+            <section className="rounded-3xl border border-white/10 bg-black/40 p-6 backdrop-blur">
+              <header className="mb-6 flex flex-wrap items-center justify-between gap-4">
+                <div>
+                  <p className="text-xs uppercase tracking-[0.4em] text-emerald-200">Ink Customizer</p>
+                  <h2 className="text-2xl font-bold text-white">Craft your silhouette</h2>
+                </div>
+                <button
+                  onClick={() => setActivePanel("main")}
+                  className="rounded-full border border-white/20 px-4 py-2 text-xs font-semibold uppercase tracking-wide text-white/80 hover:text-white"
+                >
+                  Back to Hero
+                </button>
+              </header>
+              <FighterCustomizer previewsActive={activePanel === "customization"} />
+            </section>
+          </div>
+        )}
+      </>
+    );
+  };
+
   const renderPanel = () => {
+    if (activePanel === "main" || activePanel === "customization") {
+      return renderPersistentPanels();
+    }
+
     switch (activePanel) {
-      case "customization":
-        return (
-          <section className="rounded-3xl border border-white/10 bg-black/40 p-6 backdrop-blur">
-            <header className="mb-6 flex flex-wrap items-center justify-between gap-4">
-              <div>
-                <p className="text-xs uppercase tracking-[0.4em] text-emerald-200">Ink Customizer</p>
-                <h2 className="text-2xl font-bold text-white">Craft your silhouette</h2>
-              </div>
-              <button
-                onClick={() => setActivePanel("main")}
-                className="rounded-full border border-white/20 px-4 py-2 text-xs font-semibold uppercase tracking-wide text-white/80 hover:text-white"
-              >
-                Back to Hero
-              </button>
-            </header>
-            <FighterCustomizer />
-          </section>
-        );
       case "leaderboard":
         return (
           <section className="rounded-3xl border border-white/10 bg-black/40 p-6 backdrop-blur">
@@ -166,27 +233,7 @@ const Menu = () => {
           </section>
         );
       default:
-        return (
-          <>
-            <LandingHero
-              onPlay={handleStartGame}
-              onCustomize={() => setActivePanel("customization")}
-              onLeaderboard={() => setActivePanel("leaderboard")}
-              onControls={() => setActivePanel("controls")}
-              matchMode={matchMode}
-              setMatchMode={(mode: MatchMode) => setMatchMode(mode)}
-              controllerConnected={controllerConnected}
-              isMuted={isMuted}
-              toggleMute={toggleMute}
-              masterVolume={masterVolume}
-              onVolumeChange={handleVolumeChange}
-              arenaId={arenaId}
-              arenaOptions={ARENA_OPTIONS}
-              onArenaSelect={setArenaId}
-            />
-            <FeatureGrid />
-          </>
-        );
+        return renderPersistentPanels();
     }
   };
 
@@ -202,14 +249,16 @@ const Menu = () => {
           </div>
           <nav className="flex flex-wrap gap-2">
             <NavButton active={activePanel === "main"} onClick={() => setActivePanel("main")} label="Hero" />
-            <NavButton
-              active={activePanel === "online"}
-              onClick={() => setActivePanel("online")}
-              label="Online"
-            />
+            {onlineAvailable && (
+              <NavButton
+                active={activePanel === "online"}
+                onClick={() => setActivePanel("online")}
+                label="Online"
+              />
+            )}
             <NavButton
               active={activePanel === "customization"}
-              onClick={() => setActivePanel("customization")}
+              onClick={handleOpenCustomization}
               label="Customize"
             />
             <NavButton

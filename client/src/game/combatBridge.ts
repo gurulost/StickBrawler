@@ -16,29 +16,30 @@ const VERTICAL_DI_STRENGTH = 0.25;
 
 export function toCombatState(character: CharacterState): FighterCombatState {
   return {
-    action: character.isAttacking
-      ? "attack"
-      : character.isBlocking
-        ? "blockstun"
-        : character.isJumping
-          ? "jump"
-          : character.isDodging
-            ? "dodge"
-            : "idle",
+    action: character.action ??
+      (character.isAttacking
+        ? "attack"
+        : character.isBlocking
+          ? "blockstun"
+          : character.isJumping
+            ? "jump"
+            : character.isDodging
+              ? "dodge"
+              : "idle"),
     facing: character.direction,
     fighterId: character.fighterId,
-    moveId: undefined,
-    moveFrame: undefined,
-    hitstunFrames: 0,
-    blockstunFrames: 0,
-    guardMeter: DEFAULT_GUARD_METER,
-    staminaMeter: DEFAULT_STAMINA_METER,
-    specialMeter: DEFAULT_SPECIAL_METER,
+    moveId: character.moveId,
+    moveFrame: character.moveFrame,
+    hitstunFrames: character.hitstunFrames ?? 0,
+    blockstunFrames: character.blockstunFrames ?? 0,
+    guardMeter: character.guardMeter ?? DEFAULT_GUARD_METER,
+    staminaMeter: character.staminaMeter ?? DEFAULT_STAMINA_METER,
+    specialMeter: character.specialMeter ?? DEFAULT_SPECIAL_METER,
     comboCounter: character.comboCount,
     juggleDecay: 0,
     position: character.position,
     velocity: character.velocity,
-    inAir: character.position[1] > 0.15 || character.isJumping,
+    inAir: character.inAir ?? (character.position[1] > 0.15 || character.isJumping),
   };
 }
 

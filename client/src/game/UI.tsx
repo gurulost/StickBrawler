@@ -13,6 +13,12 @@ type TelemetryDigest = Partial<
       { hits: number; totalDamage: number; maxCombo: number }
     >
   >;
+
+type CombatTag = {
+  label: string;
+  className: string;
+};
+
 const UI = () => {
   const {
     player,
@@ -23,6 +29,7 @@ const UI = () => {
     maxRoundTime,
     gamePhase,
     resetRound,
+    restartMatch,
     returnToMenu,
     calculateFinalScore,
     submitScore,
@@ -53,6 +60,10 @@ const UI = () => {
   const playerOneBadge = slots.player1.type === "human" ? "Human" : "CPU";
   const opponentBadge = slots.player2.type === "human" ? "Human" : "CPU";
   const timerSubtitle = isLocalMultiplayer ? "Local Versus" : "Solo vs CPU";
+  const playerSpecialReady = player.specialMeter >= 100;
+  const cpuSpecialReady = cpu.specialMeter >= 100;
+  const playerGuardCritical = player.guardMeter > 0 && player.guardMeter <= 20;
+  const cpuGuardCritical = cpu.guardMeter > 0 && cpu.guardMeter <= 20;
 
   // Animation states for UI elements
   const [showControls, setShowControls] = useState(false);
@@ -84,7 +95,7 @@ const UI = () => {
   
   // Play win sound effect and submit score
   useEffect(() => {
-    if (gamePhase === 'round_end' && !scoreSubmitted) {
+    if (gamePhase === 'match_end' && !scoreSubmitted) {
       if (player.health > cpu.health) {
         playSuccess();
       }
@@ -190,6 +201,101 @@ const UI = () => {
       </div>
     </div>
   );
+
+  const playerCombatTags: CombatTag[] = [
+    playerSpecialReady
+      ? {
+          label: "Special Ready",
+          className:
+            "border-indigo-300/60 bg-indigo-500/20 text-indigo-50 shadow-[0_0_28px_rgba(99,102,241,0.35)] animate-pulse",
+        }
+      : null,
+    playerGuardCritical
+      ? {
+          label: "Guard Critical",
+          className: "border-sky-200/50 bg-sky-500/20 text-sky-50",
+        }
+      : null,
+    playerStatus === "guard_break"
+      ? {
+          label: "Guard Broken",
+          className: "border-white/30 bg-white/10 text-white",
+        }
+      : null,
+  ].filter((tag): tag is CombatTag => tag !== null);
+
+  const cpuCombatTags: CombatTag[] = [
+    cpuSpecialReady
+      ? {
+          label: "Special Ready",
+          className:
+            "border-fuchsia-300/60 bg-fuchsia-500/20 text-fuchsia-50 shadow-[0_0_28px_rgba(217,70,239,0.3)] animate-pulse",
+        }
+      : null,
+    cpuGuardCritical
+      ? {
+          label: "Guard Critical",
+          className: "border-amber-200/50 bg-amber-500/20 text-amber-50",
+        }
+      : null,
+    cpuStatus === "guard_break"
+      ? {
+          label: "Guard Broken",
+          className: "border-white/30 bg-white/10 text-white",
+        }
+      : null,
+  ].filter((tag): tag is CombatTag => tag !== null);
+
+  const centerCallout =
+    playerStatus === "guard_break"
+      ? {
+          label: `${playerOneLabel} guard shattered`,
+          className:
+            "border-sky-200/50 bg-gradient-to-r from-sky-500/85 to-cyan-400/75 text-white shadow-[0_10px_40px_rgba(56,189,248,0.32)]",
+        }
+      : cpuStatus === "guard_break"
+        ? {
+            label: `${opponentLabel} guard shattered`,
+            className:
+              "border-rose-200/50 bg-gradient-to-r from-rose-500/85 to-orange-400/75 text-white shadow-[0_10px_40px_rgba(251,113,133,0.3)]",
+          }
+        : playerSpecialReady && cpuSpecialReady
+          ? {
+              label: "Both fighters are special-ready",
+              className:
+                "border-violet-200/50 bg-gradient-to-r from-indigo-500/80 via-violet-500/80 to-fuchsia-500/80 text-white shadow-[0_10px_40px_rgba(139,92,246,0.34)]",
+            }
+          : playerSpecialReady
+            ? {
+                label: `${playerOneLabel} special ready`,
+                className:
+                  "border-indigo-200/50 bg-gradient-to-r from-indigo-500/80 to-blue-400/80 text-white shadow-[0_10px_34px_rgba(99,102,241,0.32)]",
+              }
+            : cpuSpecialReady
+              ? {
+                  label: `${opponentLabel} special ready`,
+                  className:
+                    "border-fuchsia-200/50 bg-gradient-to-r from-fuchsia-500/80 to-rose-400/80 text-white shadow-[0_10px_34px_rgba(217,70,239,0.3)]",
+                }
+              : playerGuardCritical && cpuGuardCritical
+                ? {
+                    label: "Both guards are critical",
+                    className:
+                      "border-amber-200/50 bg-gradient-to-r from-amber-500/80 to-orange-400/80 text-black shadow-[0_10px_34px_rgba(245,158,11,0.3)]",
+                  }
+                : playerGuardCritical
+                  ? {
+                      label: `${playerOneLabel} guard is cracking`,
+                      className:
+                        "border-sky-200/50 bg-gradient-to-r from-sky-400/80 to-cyan-300/80 text-slate-950 shadow-[0_10px_34px_rgba(56,189,248,0.28)]",
+                    }
+                  : cpuGuardCritical
+                    ? {
+                        label: `${opponentLabel} guard is cracking`,
+                        className:
+                          "border-amber-200/50 bg-gradient-to-r from-amber-400/85 to-yellow-300/85 text-slate-950 shadow-[0_10px_34px_rgba(251,191,36,0.28)]",
+                      }
+                    : null;
   
   return (
     <div className="absolute top-0 left-0 w-full h-full pointer-events-none">
@@ -221,6 +327,28 @@ const UI = () => {
         >
           Ink: {inkQuality === "cinematic" ? "Cine" : inkQuality === "balanced" ? "Balanced" : "Perf"}
         </button>
+        <button
+          onClick={toggleControls}
+          className="px-3 py-2 rounded-full text-xs font-semibold bg-white/15 text-white hover:bg-white/25"
+        >
+          {showControls ? "Controls On" : "Controls"}
+        </button>
+        {process.env.NODE_ENV === 'development' && (
+          <>
+            <button 
+              onClick={toggleDebugMode}
+              className="px-3 py-2 rounded-full text-xs font-semibold bg-pink-600/85 text-white shadow-lg transition hover:bg-pink-500"
+            >
+              {debugMode ? "Debug On" : "Debug Off"}
+            </button>
+            <button 
+              onClick={toggleLowGraphicsMode}
+              className="px-3 py-2 rounded-full text-xs font-semibold bg-purple-600/85 text-white shadow-lg transition hover:bg-purple-500"
+            >
+              {lowGraphicsMode ? "Low Gfx On" : "Low Gfx Off"}
+            </button>
+          </>
+        )}
       </div>
       {impactFlash > 0 && (
         <div
@@ -273,8 +401,14 @@ const UI = () => {
       )}
       
       {/* Health bars with improved styling */}
-      <div className="flex justify-between p-4">
-        <div className="w-2/5">
+      <div className="flex justify-between gap-4 p-4">
+        <div
+          className={`w-2/5 rounded-[1.75rem] border px-4 py-3 backdrop-blur-md transition ${
+            playerSpecialReady
+              ? "border-indigo-300/60 bg-slate-950/55 shadow-[0_16px_48px_rgba(99,102,241,0.18)]"
+              : "border-white/12 bg-slate-950/42 shadow-[0_16px_48px_rgba(15,23,42,0.22)]"
+          }`}
+        >
           <div className="flex items-center gap-3">
             <div className="text-white font-bold text-lg mb-1 drop-shadow-md">{playerOneLabel}</div>
             <span className="px-2 py-0.5 rounded-full text-xs bg-white/15 text-indigo-100">{playerOneBadge}</span>
@@ -289,14 +423,32 @@ const UI = () => {
           {renderMeter("Guard", player.guardMeter, "bg-blue-500")}
           {renderMeter("Stamina", player.staminaMeter, "bg-cyan-400")}
           {renderMeter("Special", player.specialMeter, "bg-indigo-400")}
+          {playerCombatTags.length > 0 && (
+            <div className="mt-3 flex flex-wrap gap-2">
+              {playerCombatTags.map((tag) => (
+                <span
+                  key={tag.label}
+                  className={`rounded-full border px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] ${tag.className}`}
+                >
+                  {tag.label}
+                </span>
+              ))}
+            </div>
+          )}
         </div>
         
-        <div className="bg-black bg-opacity-70 text-white font-bold text-xl px-5 py-2 rounded-full shadow-lg flex flex-col items-center min-w-[150px]">
+        <div className="min-w-[170px] rounded-[1.75rem] border border-white/15 bg-slate-950/52 px-5 py-3 text-white shadow-[0_16px_48px_rgba(15,23,42,0.28)] backdrop-blur-md flex flex-col items-center">
           <span>{formatTime(roundTime)}</span>
           <span className="text-xs tracking-widest text-gray-300 uppercase">{timerSubtitle}</span>
         </div>
         
-        <div className="w-2/5 text-right">
+        <div
+          className={`w-2/5 rounded-[1.75rem] border px-4 py-3 text-right backdrop-blur-md transition ${
+            cpuSpecialReady
+              ? "border-fuchsia-300/60 bg-slate-950/55 shadow-[0_16px_48px_rgba(217,70,239,0.16)]"
+              : "border-white/12 bg-slate-950/42 shadow-[0_16px_48px_rgba(15,23,42,0.22)]"
+          }`}
+        >
           <div className="flex items-center justify-end gap-3">
             <span className="px-2 py-0.5 rounded-full text-xs bg-white/15 text-indigo-100">{opponentBadge}</span>
             <div className="text-white font-bold text-lg mb-1 drop-shadow-md">{opponentLabel}</div>
@@ -311,12 +463,24 @@ const UI = () => {
           {renderMeter("Guard", cpu.guardMeter, "bg-rose-500")}
           {renderMeter("Stamina", cpu.staminaMeter, "bg-amber-400")}
           {renderMeter("Special", cpu.specialMeter, "bg-fuchsia-500")}
+          {cpuCombatTags.length > 0 && (
+            <div className="mt-3 flex flex-wrap justify-end gap-2">
+              {cpuCombatTags.map((tag) => (
+                <span
+                  key={tag.label}
+                  className={`rounded-full border px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] ${tag.className}`}
+                >
+                  {tag.label}
+                </span>
+              ))}
+            </div>
+          )}
         </div>
       </div>
       
       {/* Score display with animation */}
       <div className="absolute top-20 left-0 w-full text-center">
-        <div className="bg-black bg-opacity-70 text-white font-bold text-2xl px-8 py-2 rounded-full inline-block shadow-lg flex items-center gap-3">
+        <div className="inline-flex items-center gap-3 rounded-full bg-black/70 px-8 py-2 text-2xl font-bold text-white shadow-lg">
           <span className="text-sm uppercase tracking-wide text-gray-300">{playerOneLabel}</span>
           <span className={`${playerScore > cpuScore ? 'text-blue-400' : ''}`}>{playerScore}</span>
           <span className="text-gray-500">-</span>
@@ -324,6 +488,15 @@ const UI = () => {
           <span className="text-sm uppercase tracking-wide text-gray-300">{opponentLabel}</span>
         </div>
       </div>
+      {centerCallout && gamePhase === 'fighting' && (
+        <div className="absolute top-36 left-1/2 -translate-x-1/2 text-center">
+          <div
+            className={`rounded-full border px-5 py-2 text-xs font-semibold uppercase tracking-[0.28em] backdrop-blur-md ${centerCallout.className}`}
+          >
+            {centerCallout.label}
+          </div>
+        </div>
+      )}
       
       {/* Round end overlay with improved animation and effects */}
       {gamePhase === 'round_end' && (
@@ -357,14 +530,41 @@ const UI = () => {
           </div>
         </div>
       )}
-      
-      {/* Controls panel button */}
-      <button 
-        onClick={toggleControls}
-        className="absolute top-24 right-4 bg-black bg-opacity-70 text-white px-3 py-1 rounded-full pointer-events-auto shadow-lg hover:bg-opacity-90 transition-colors"
-      >
-        {showControls ? "Hide Controls" : "Show Controls"}
-      </button>
+      {gamePhase === 'match_end' && (
+        <div className="absolute inset-0 bg-gradient-to-b from-black to-gray-950 bg-opacity-95 flex flex-col items-center justify-center pointer-events-auto animate-fadeIn">
+          <div className="mb-3 text-xs uppercase tracking-[0.45em] text-white/60">Match Complete</div>
+          <div className="text-5xl font-bold text-white mb-6 animate-bounce">
+            {playerWon ? (
+              <span className="text-blue-400">{winnerMessage}</span>
+            ) : (
+              <span className="text-red-400">{winnerMessage}</span>
+            )}
+          </div>
+
+          <div className="text-2xl text-white mb-3">
+            Final Score: <span className="text-blue-400">{playerScore}</span> - <span className="text-red-400">{cpuScore}</span>
+          </div>
+          <div className="text-sm uppercase tracking-widest text-amber-200 mb-10">
+            Leaderboard Score {calculateFinalScore().toLocaleString()}
+          </div>
+
+          <div className="flex gap-6">
+            <button
+              className="bg-emerald-500 hover:bg-emerald-400 text-black font-bold py-3 px-8 rounded-full transition-colors shadow-lg transform hover:scale-105"
+              onClick={restartMatch}
+            >
+              Run It Back
+            </button>
+
+            <button
+              className="bg-gray-700 hover:bg-gray-800 text-white font-bold py-3 px-8 rounded-full transition-colors shadow-lg transform hover:scale-105"
+              onClick={returnToMenu}
+            >
+              Main Menu
+            </button>
+          </div>
+        </div>
+      )}
       
       {/* Enhanced controls panel */}
       {showControls && (
@@ -414,24 +614,6 @@ const UI = () => {
           className="w-24"
         />
       </div>
-      
-      {/* Debug and performance buttons - only visible in development */}
-      {process.env.NODE_ENV === 'development' && (
-        <div className="absolute top-4 right-4 flex flex-col gap-2 pointer-events-auto">
-          <button 
-            onClick={toggleDebugMode}
-            className="bg-pink-600 text-white px-2 py-1 rounded text-xs shadow-lg"
-          >
-            {debugMode ? "Debug: ON" : "Debug: OFF"}
-          </button>
-          <button 
-            onClick={toggleLowGraphicsMode}
-            className="bg-purple-600 text-white px-2 py-1 rounded text-xs shadow-lg"
-          >
-            {lowGraphicsMode ? "Low Graphics: ON" : "Low Graphics: OFF"}
-          </button>
-        </div>
-      )}
       
       {/* Pause menu */}
       {paused && gamePhase === 'fighting' && (

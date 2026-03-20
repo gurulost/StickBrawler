@@ -21,3 +21,14 @@ test("server match runtime processes keyboard frames", () => {
   const after = runtime.snapshot();
   assert.ok(after.player.position[0] > initial.player.position[0]);
 });
+
+test("server match runtime applies CPU attack state to CPU, not player", () => {
+  const runtime = new ServerMatchRuntime();
+  const actions = (runtime as any).createFightingActions();
+
+  actions.setCPUAttacking(true);
+
+  const after = runtime.snapshot();
+  assert.equal(after.cpu.isAttacking, true);
+  assert.equal(after.player.isAttacking, false);
+});

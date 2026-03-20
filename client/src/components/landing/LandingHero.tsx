@@ -19,6 +19,7 @@ interface LandingHeroProps {
   arenaId: string;
   arenaOptions: Array<{ id: string; name: string; description: string }>;
   onArenaSelect: (id: string) => void;
+  previewsActive?: boolean;
 }
 
 export function LandingHero({
@@ -36,6 +37,7 @@ export function LandingHero({
   arenaId,
   arenaOptions,
   onArenaSelect,
+  previewsActive = true,
 }: LandingHeroProps) {
   const sectionRef = useRef<HTMLElement | null>(null);
   const [heroInView, setHeroInView] = useState(false);
@@ -92,7 +94,7 @@ export function LandingHero({
             New Ink Era
           </span>
           <h1 className="text-4xl font-extrabold text-white md:text-5xl lg:text-6xl">
-            Hand-drawn fighters. Procedural ink. Local co‑op chaos.
+            Hand-drawn fighters. Procedural ink. Local versus chaos.
           </h1>
           <p className="max-w-xl text-lg text-slate-200/90">
             Shape your silhouette, layer brush-stroke VFX, and battle in a deterministic arena that mirrors the
@@ -171,7 +173,7 @@ export function LandingHero({
                 onClick={() => setMatchMode(matchMode === "single" ? "local" : "single")}
                 className="rounded-full bg-white/10 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-white transition hover:bg-white/20"
               >
-                {matchMode === "single" ? "Switch to Local Co‑Op" : "Switch to Single"}
+                {matchMode === "single" ? "Switch to Local Versus" : "Switch to Single"}
               </button>
             </div>
             <div className="flex items-center gap-2 text-sm text-white/80">
@@ -232,10 +234,10 @@ export function LandingHero({
           className="grid gap-6 lg:grid-rows-[1fr_auto]"
         >
           {heroInView && (
-            <CharacterPreview animate isPlayer className="shadow-[0_20px_80px_rgba(147,197,253,0.25)]" />
+            <CharacterPreview animate={previewsActive} isPlayer className="shadow-[0_20px_80px_rgba(147,197,253,0.25)]" />
           )}
           {secondPreviewReady && (
-            <CharacterPreview animate isPlayer={false} className="shadow-[0_20px_80px_rgba(248,113,113,0.25)]" />
+            <CharacterPreview animate={previewsActive} isPlayer={false} className="shadow-[0_20px_80px_rgba(248,113,113,0.25)]" />
           )}
         </motion.div>
       </div>

@@ -6,6 +6,13 @@ import { useCustomization } from './useCustomization';
 import type { CoinAwardPayload } from './useCustomization';
 import { DEFAULT_ARENA_ID, ARENA_THEMES } from '../../game/arenas';
 import type { FighterId } from "../../combat/moveTable";
+import type { FighterActionState } from "../../combat/types";
+import type {
+  CombatEvent,
+  FighterPresentationSnapshot,
+  PresentationMovePhase,
+  RuntimeFrameSnapshot,
+} from "../../game/combatPresentation";
 
 export type GamePhase = 'menu' | 'lobby' | 'fighting' | 'round_end' | 'match_end';
 export type MatchMode = "single" | "local" | "online";
@@ -16,6 +23,19 @@ export interface CharacterState {
   position: [number, number, number]; // [x, y, z]
   direction: 1 | -1; // 1 for right, -1 for left
   fighterId: FighterId;
+  grounded?: boolean;
+  inAir?: boolean;
+  action?: FighterActionState;
+  moveId?: string;
+  moveInstanceId?: number;
+  moveFrame?: number;
+  movePhase?: PresentationMovePhase;
+  hitLagFrames?: number;
+  hitstunFrames?: number;
+  blockstunFrames?: number;
+  canAct?: boolean;
+  invulnerable?: boolean;
+  armored?: boolean;
   isJumping: boolean;
   isAttacking: boolean;
   isBlocking: boolean;
@@ -38,6 +58,14 @@ export interface CharacterState {
   comboCount: number;     // Current combo counter
   comboTimer: number;     // Time remaining in combo window
   lastMoveType: string;   // Last move performed (to prevent same-move spam)
+  lastStartedMoveId?: string;
+  lastHitMoveId?: string;
+  justStartedMove?: boolean;
+  justLanded?: boolean;
+  justHit?: boolean;
+  justBlocked?: boolean;
+  justParried?: boolean;
+  justGuardBroke?: boolean;
   
   velocity: [number, number, number];
 }
@@ -59,6 +87,8 @@ interface FightingState {
   paused: boolean;
   player: CharacterState;
   cpu: CharacterState;
+  playerEvents: CombatEvent[];
+  cpuEvents: CombatEvent[];
   playerScore: number;
   cpuScore: number;
   playerStatus?: "guard_break";
@@ -71,12 +101,15 @@ interface FightingState {
   // High score tracking
   submitScore: (finalScore: number) => Promise<void>;
   calculateFinalScore: () => number;
+  applyRuntimeFrame: (frame: RuntimeFrameSnapshot) => void;
+  applyCombatEvents: (events: CombatEvent[]) => void;
 
   // Actions
   startGame: (mode?: MatchMode) => void;
   beginMatch: () => void;
   endRound: (winner: 'player' | 'cpu' | 'timeout') => void;
   resetRound: () => void;
+  restartMatch: () => void;
   returnToMenu: () => void;
   
   // Character actions
@@ -136,6 +169,7 @@ const GUARD_BREAK_THRESHOLD = 5;
 const DEFAULT_POSITION_PLAYER: [number, number, number] = [-2, 0, 0];
 const DEFAULT_POSITION_CPU: [number, number, number] = [2, 0, 0];
 const DEFAULT_ROUND_TIME = 60; // 60 seconds per round
+const ROUNDS_TO_WIN = 2;
 
 const createDefaultSlots = (mode: MatchMode): SlotState => ({
   player1: { type: "human", ready: false, label: "Player 1", fighterId: "stick_hero" },
@@ -148,6 +182,9 @@ const createDefaultSlots = (mode: MatchMode): SlotState => ({
 });
 
 const roundToHundredth = (value: number) => Math.round(value * 100) / 100;
+
+const resolveRoundPhase = (playerScore: number, cpuScore: number): GamePhase =>
+  playerScore >= ROUNDS_TO_WIN || cpuScore >= ROUNDS_TO_WIN ? 'match_end' : 'round_end';
 
 const getCoinStore = () => useCustomization.getState();
 
@@ -241,6 +278,19 @@ const createDefaultCharacterState = (
   position,
   direction,
   fighterId,
+  grounded: true,
+  inAir: false,
+  action: 'idle',
+  moveId: undefined,
+  moveInstanceId: undefined,
+  moveFrame: 0,
+  movePhase: 'none',
+  hitLagFrames: 0,
+  hitstunFrames: 0,
+  blockstunFrames: 0,
+  canAct: true,
+  invulnerable: false,
+  armored: false,
   isJumping: false,
   isAttacking: false,
   isBlocking: false,
@@ -263,9 +313,80 @@ const createDefaultCharacterState = (
   comboCount: 0,
   comboTimer: 0,
   lastMoveType: '',
+  lastStartedMoveId: undefined,
+  lastHitMoveId: undefined,
+  justStartedMove: false,
+  justLanded: false,
+  justHit: false,
+  justBlocked: false,
+  justParried: false,
+  justGuardBroke: false,
   
   velocity: [0, 0, 0],
 });
+
+const toCharacterState = (
+  snapshot: FighterPresentationSnapshot,
+  previous: CharacterState,
+): CharacterState => ({
+  ...previous,
+  health: snapshot.health,
+  position: snapshot.position,
+  velocity: snapshot.velocity,
+  direction: snapshot.facing,
+  fighterId: snapshot.fighterId,
+  grounded: snapshot.grounded,
+  inAir: snapshot.inAir,
+  action: snapshot.action,
+  moveId: snapshot.moveId,
+  moveInstanceId: snapshot.moveInstanceId,
+  moveFrame: snapshot.moveFrame,
+  movePhase: snapshot.movePhase,
+  hitLagFrames: snapshot.hitLagFrames,
+  hitstunFrames: snapshot.hitstunFrames,
+  blockstunFrames: snapshot.blockstunFrames,
+  canAct: snapshot.canAct,
+  invulnerable: snapshot.invulnerable,
+  armored: snapshot.armored,
+  guardMeter: snapshot.guardMeter,
+  staminaMeter: snapshot.staminaMeter,
+  specialMeter: snapshot.specialMeter,
+  comboCount: snapshot.comboCounter,
+  comboTimer: snapshot.comboTimer,
+  attackCooldown: snapshot.attackCooldown,
+  dodgeCooldown: snapshot.dodgeCooldown,
+  grabCooldown: snapshot.grabCooldown,
+  moveCooldown: snapshot.moveCooldown,
+  isJumping: snapshot.inAir,
+  isAttacking: snapshot.action === 'attack',
+  isBlocking: snapshot.isBlocking,
+  isDodging: snapshot.isDodging,
+  isGrabbing: snapshot.isGrabbing,
+  isTaunting: snapshot.isTaunting,
+  isAirAttacking: snapshot.isAirAttacking,
+  airJumpsLeft: snapshot.airJumpsLeft,
+  lastMoveType:
+    snapshot.lastStartedMoveId ??
+    snapshot.lastConfirmedMoveId ??
+    snapshot.moveId ??
+    previous.lastMoveType,
+  lastStartedMoveId: snapshot.lastStartedMoveId,
+  lastHitMoveId: snapshot.lastConfirmedMoveId,
+  justStartedMove: Boolean(snapshot.justStartedMove),
+  justLanded: Boolean(snapshot.justLanded),
+  justHit: Boolean(snapshot.justHit),
+  justBlocked: Boolean(snapshot.justBlocked),
+  justParried: Boolean(snapshot.justParried),
+  justGuardBroke: Boolean(snapshot.justGuardBroke),
+});
+
+const filterSlotEvents = (events: CombatEvent[], slot: "player" | "cpu") =>
+  events.filter((event) => {
+    if ("slot" in event) {
+      return event.slot === slot;
+    }
+    return event.attacker === slot || event.defender === slot;
+  });
 
 export const useFighting = create<FightingState>((set, get) => ({
   gamePhase: 'menu',
@@ -274,6 +395,8 @@ export const useFighting = create<FightingState>((set, get) => ({
   paused: false,
   player: createDefaultCharacterState(DEFAULT_POSITION_PLAYER, 1, "stick_hero"),
   cpu: createDefaultCharacterState(DEFAULT_POSITION_CPU, -1, "stick_villain"),
+  playerEvents: [],
+  cpuEvents: [],
   playerScore: 0,
   cpuScore: 0,
   playerStatus: undefined,
@@ -282,6 +405,57 @@ export const useFighting = create<FightingState>((set, get) => ({
   maxRoundTime: DEFAULT_ROUND_TIME,
   currentGameScore: 0,
   arenaId: DEFAULT_ARENA_ID,
+  applyRuntimeFrame: (frame) => set((state) => {
+    const nextPlayer = toCharacterState(frame.player, state.player);
+    const nextCPU = toCharacterState(frame.cpu, state.cpu);
+    const nextState: Partial<FightingState> = {
+      player: nextPlayer,
+      cpu: nextCPU,
+    };
+
+    if (state.gamePhase === 'fighting') {
+      if (state.cpu.health > 0 && nextCPU.health <= 0) {
+        const playerScore = state.playerScore + 1;
+        awardRoundResolutionCoins('player', 'ko', {
+          playerHealth: nextPlayer.health,
+          cpuHealth: nextCPU.health,
+        });
+        nextState.playerScore = playerScore;
+        nextState.gamePhase = resolveRoundPhase(playerScore, state.cpuScore);
+      } else if (state.player.health > 0 && nextPlayer.health <= 0) {
+        const cpuScore = state.cpuScore + 1;
+        awardRoundResolutionCoins('cpu', 'ko', {
+          playerHealth: nextPlayer.health,
+          cpuHealth: nextCPU.health,
+        });
+        nextState.cpuScore = cpuScore;
+        nextState.gamePhase = resolveRoundPhase(state.playerScore, cpuScore);
+      }
+    }
+
+    return nextState;
+  }),
+  applyCombatEvents: (events) => set((state) => {
+    const playerEvents = filterSlotEvents(events, "player");
+    const cpuEvents = filterSlotEvents(events, "cpu");
+
+    events.forEach((event) => {
+      if (event.type !== "hit" || event.blocked || event.attacker !== "player") return;
+      const comboDepth = state.player.comboCount > 0 ? Math.max(1, state.player.comboCount) : 0;
+      const predictedCpuHealth = Math.max(0, state.cpu.health - event.damage);
+      awardDamageCoins({
+        damage: event.damage,
+        comboDepth,
+        finisher: predictedCpuHealth <= 0 && state.gamePhase === 'fighting',
+        playerHealth: state.player.health,
+      });
+    });
+
+    return {
+      playerEvents,
+      cpuEvents,
+    };
+  }),
   
   startGame: (mode) => set((state) => {
     const targetMode = mode ?? state.matchMode;
@@ -292,6 +466,8 @@ export const useFighting = create<FightingState>((set, get) => ({
       paused: false,
       playerScore: 0,
       cpuScore: 0,
+      playerEvents: [],
+      cpuEvents: [],
       player: createDefaultCharacterState(DEFAULT_POSITION_PLAYER, 1, slots.player1.fighterId),
       cpu: createDefaultCharacterState(DEFAULT_POSITION_CPU, -1, slots.player2.fighterId),
       roundTime: DEFAULT_ROUND_TIME,
@@ -309,6 +485,8 @@ export const useFighting = create<FightingState>((set, get) => ({
     return {
       gamePhase: 'fighting',
       paused: false,
+      playerEvents: [],
+      cpuEvents: [],
       player: createDefaultCharacterState(DEFAULT_POSITION_PLAYER, 1, playerFighter),
       cpu: createDefaultCharacterState(DEFAULT_POSITION_CPU, -1, opponentFighter),
       roundTime: DEFAULT_ROUND_TIME,
@@ -334,7 +512,7 @@ export const useFighting = create<FightingState>((set, get) => ({
     }
     
     return {
-      gamePhase: 'round_end',
+      gamePhase: resolveRoundPhase(playerScore, cpuScore),
       paused: false,
       playerScore,
       cpuScore
@@ -344,6 +522,20 @@ export const useFighting = create<FightingState>((set, get) => ({
   resetRound: () => set((state) => ({
     gamePhase: 'fighting',
     paused: false,
+    playerEvents: [],
+    cpuEvents: [],
+    player: createDefaultCharacterState(DEFAULT_POSITION_PLAYER, 1, state.slots.player1.fighterId),
+    cpu: createDefaultCharacterState(DEFAULT_POSITION_CPU, -1, state.slots.player2.fighterId),
+    roundTime: DEFAULT_ROUND_TIME,
+  })),
+
+  restartMatch: () => set((state) => ({
+    gamePhase: 'fighting',
+    paused: false,
+    playerScore: 0,
+    cpuScore: 0,
+    playerEvents: [],
+    cpuEvents: [],
     player: createDefaultCharacterState(DEFAULT_POSITION_PLAYER, 1, state.slots.player1.fighterId),
     cpu: createDefaultCharacterState(DEFAULT_POSITION_CPU, -1, state.slots.player2.fighterId),
     roundTime: DEFAULT_ROUND_TIME,
@@ -354,6 +546,8 @@ export const useFighting = create<FightingState>((set, get) => ({
     paused: false,
     playerScore: 0,
     cpuScore: 0,
+    playerEvents: [],
+    cpuEvents: [],
     slots: createDefaultSlots(state.matchMode),
   })),
   
@@ -387,18 +581,6 @@ export const useFighting = create<FightingState>((set, get) => ({
   })),
   
   setPlayerAttacking: (isAttacking) => set((state) => {
-    // Only set cooldown when starting an attack and no cooldown is active
-    if (isAttacking && !state.player.isAttacking && state.player.attackCooldown === 0) {
-      return {
-        player: {
-          ...state.player,
-          isAttacking,
-          attackCooldown: 500 // 500ms cooldown in milliseconds
-        }
-      };
-    }
-    
-    // Just update attacking state without changing cooldown
     return {
       player: {
         ...state.player,
@@ -415,61 +597,27 @@ export const useFighting = create<FightingState>((set, get) => ({
   })),
   
   damagePlayer: (amount) => set((state) => {
-    // If player is blocking, reduce damage by 80%
-    let actualDamage = state.player.isBlocking ? amount * 0.2 : amount;
-    
-    // If player is dodging, reduce damage by 95%
-    if (state.player.isDodging) {
-      actualDamage = amount * 0.05;
-    }
-    
-    // If CPU has a combo going, apply combo multiplier with reasonable cap
-    if (state.cpu.comboCount > 0) {
-      // Cap combo multiplier at 2.5x (maximum 7-8 hit combos)
-      const comboMultiplier = Math.min(2.5, 1 + (state.cpu.comboCount * 0.15));
-      actualDamage = actualDamage * comboMultiplier;
-    }
-    
-    const newHealth = Math.max(0, state.player.health - actualDamage);
-    
-    // Update CPU's combo counter
-    let updatedCPU = {...state.cpu};
-    
-    // If this is another hit within the combo window, increment combo counter
-    if (state.cpu.comboTimer > 0) {
-      updatedCPU.comboCount = Math.min(10, state.cpu.comboCount + 1); // Cap combo at 10 hits
-      updatedCPU.comboTimer = COMBO_WINDOW; // Reset combo timer
-    } else {
-      // Start a new combo
-      updatedCPU.comboCount = 1;
-      updatedCPU.comboTimer = COMBO_WINDOW;
-    }
-    
-    // Reset player's combo when taking damage (combo breaker)
-    let updatedPlayer = {
+    const newHealth = Math.max(0, state.player.health - amount);
+    const updatedPlayer = {
       ...state.player,
       health: newHealth,
-      comboCount: 0,
-      comboTimer: 0
     };
-    
-    // If health is 0, end the round
+
     if (newHealth === 0 && state.gamePhase === 'fighting') {
+      const cpuScore = state.cpuScore + 1;
       awardRoundResolutionCoins('cpu', 'ko', {
         playerHealth: newHealth,
         cpuHealth: state.cpu.health,
       });
       return {
         player: updatedPlayer,
-        cpu: updatedCPU,
-        gamePhase: 'round_end',
-        cpuScore: state.cpuScore + 1
+        gamePhase: resolveRoundPhase(state.playerScore, cpuScore),
+        cpuScore
       };
     }
-    
+
     return {
-      player: updatedPlayer,
-      cpu: updatedCPU
+      player: updatedPlayer
     };
   }),
   
@@ -503,18 +651,6 @@ export const useFighting = create<FightingState>((set, get) => ({
   })),
   
   setCPUAttacking: (isAttacking) => set((state) => {
-    // Only set cooldown when starting an attack and no cooldown is active
-    if (isAttacking && !state.cpu.isAttacking && state.cpu.attackCooldown === 0) {
-      return {
-        cpu: {
-          ...state.cpu,
-          isAttacking,
-          attackCooldown: 500 // 500ms cooldown in milliseconds
-        }
-      };
-    }
-    
-    // Just update attacking state without changing cooldown
     return {
       cpu: {
         ...state.cpu,
@@ -531,105 +667,49 @@ export const useFighting = create<FightingState>((set, get) => ({
   })),
   
   damageCPU: (amount) => set((state) => {
-    // If CPU is blocking, reduce damage by 80%
-    let actualDamage = state.cpu.isBlocking ? amount * 0.2 : amount;
-    
-    // If CPU is dodging, reduce damage by 95%
-    if (state.cpu.isDodging) {
-      actualDamage = amount * 0.05;
-    }
-    
-    // If player has a combo going, apply combo multiplier with reasonable cap
-    if (state.player.comboCount > 0) {
-      // Cap combo multiplier at 2.5x (maximum 7-8 hit combos)
-      const comboMultiplier = Math.min(2.5, 1 + (state.player.comboCount * 0.15));
-      actualDamage = actualDamage * comboMultiplier;
-    }
-    
-    // Apply the damage
-    const newHealth = Math.max(0, state.cpu.health - actualDamage);
-    const comboDepthBeforeHit =
-      state.player.comboTimer > 0 ? Math.max(1, state.player.comboCount) : 0;
+    const newHealth = Math.max(0, state.cpu.health - amount);
     const deliveredKO = newHealth === 0 && state.gamePhase === 'fighting';
-    awardDamageCoins({
-      damage: actualDamage,
-      comboDepth: comboDepthBeforeHit,
-      finisher: deliveredKO,
-      playerHealth: state.player.health,
-    });
     if (deliveredKO) {
       awardRoundResolutionCoins('player', 'ko', {
         playerHealth: state.player.health,
         cpuHealth: newHealth,
       });
     }
-    
-    // Update player's combo counter
-    let updatedPlayer = {...state.player};
-    
-    // If this is another hit within the combo window, increment combo counter
-    if (state.player.comboTimer > 0) {
-      updatedPlayer.comboCount = Math.min(10, state.player.comboCount + 1); // Cap combo at 10 hits
-      updatedPlayer.comboTimer = COMBO_WINDOW; // Reset combo timer
-    } else {
-      // Start a new combo
-      updatedPlayer.comboCount = 1;
-      updatedPlayer.comboTimer = COMBO_WINDOW;
-    }
-    
-    // Reset CPU's combo when taking damage (combo breaker)
-    let updatedCPU = {
+
+    const updatedCPU = {
       ...state.cpu,
       health: newHealth,
-      comboCount: 0,
-      comboTimer: 0
     };
-    
-    // If health is 0, end the round
+
     if (newHealth === 0 && state.gamePhase === 'fighting') {
+      const playerScore = state.playerScore + 1;
       return {
         cpu: updatedCPU,
-        player: updatedPlayer,
-        gamePhase: 'round_end',
-        playerScore: state.playerScore + 1
+        gamePhase: resolveRoundPhase(playerScore, state.cpuScore),
+        playerScore
       };
     }
-    
+
     return {
-      cpu: updatedCPU,
-      player: updatedPlayer
+      cpu: updatedCPU
     };
   }),
   
   // New Player Action Methods
   setPlayerDodging: (isDodging) => set((state) => {
-    // Start dodge cooldown when beginning to dodge
-    let newCooldown = state.player.dodgeCooldown;
-    if (isDodging && !state.player.isDodging) {
-      newCooldown = 20; // Dodge has longer cooldown than attacks
-    }
-    
     return {
       player: {
         ...state.player,
-        isDodging,
-        dodgeCooldown: newCooldown
+        isDodging
       }
     };
   }),
 
   setPlayerGrabbing: (isGrabbing) => set((state) => {
-    // Start grab cooldown when beginning to grab
-    let newCooldown = state.player.grabCooldown;
-    if (isGrabbing && !state.player.isGrabbing) {
-      newCooldown = 30; // Grab has longer cooldown
-    }
-    
     return {
       player: {
         ...state.player,
-        isGrabbing,
-        grabCooldown: newCooldown
+        isGrabbing
       }
     };
   }),
@@ -642,22 +722,10 @@ export const useFighting = create<FightingState>((set, get) => ({
   })),
 
   setPlayerAirAttacking: (isAirAttacking) => set((state) => {
-    if (isAirAttacking && !state.player.isJumping) {
-      // Can't air attack if not in the air
-      return {}; // No change
-    }
-    
-    // Air attacks have a separate state from ground attacks
-    let newCooldown = state.player.attackCooldown;
-    if (isAirAttacking && !state.player.isAirAttacking) {
-      newCooldown = 15; // Air attacks have longer cooldown
-    }
-    
     return {
       player: {
         ...state.player,
-        isAirAttacking,
-        attackCooldown: newCooldown
+        isAirAttacking
       }
     };
   }),
@@ -692,52 +760,28 @@ export const useFighting = create<FightingState>((set, get) => ({
 
   // New CPU Action Methods
   setCPUDodging: (isDodging) => set((state) => {
-    // Start dodge cooldown when beginning to dodge
-    let newCooldown = state.cpu.dodgeCooldown;
-    if (isDodging && !state.cpu.isDodging) {
-      newCooldown = 20; // Dodge has longer cooldown than attacks
-    }
-    
     return {
       cpu: {
         ...state.cpu,
-        isDodging,
-        dodgeCooldown: newCooldown
+        isDodging
       }
     };
   }),
 
   setCPUGrabbing: (isGrabbing) => set((state) => {
-    let newCooldown = state.cpu.grabCooldown;
-    if (isGrabbing && !state.cpu.isGrabbing) {
-      newCooldown = 30;
-    }
     return {
       cpu: {
         ...state.cpu,
         isGrabbing,
-        grabCooldown: newCooldown,
       },
     };
   }),
 
   setCPUAirAttacking: (isAirAttacking) => set((state) => {
-    if (isAirAttacking && !state.cpu.isJumping) {
-      // Can't air attack if not in the air
-      return {}; // No change
-    }
-    
-    // Air attacks have a separate state from ground attacks
-    let newCooldown = state.cpu.attackCooldown;
-    if (isAirAttacking && !state.cpu.isAirAttacking) {
-      newCooldown = 15; // Air attacks have longer cooldown
-    }
-    
     return {
       cpu: {
         ...state.cpu,
-        isAirAttacking,
-        attackCooldown: newCooldown
+        isAirAttacking
       }
     };
   }),
@@ -942,7 +986,10 @@ export const useFighting = create<FightingState>((set, get) => ({
       
       return {
         roundTime: newTime,
-        gamePhase: 'round_end',
+        gamePhase: resolveRoundPhase(
+          winner === 'player' ? state.playerScore + 1 : state.playerScore,
+          winner === 'cpu' ? state.cpuScore + 1 : state.cpuScore,
+        ),
         paused: false,
         playerScore: winner === 'player' ? state.playerScore + 1 : state.playerScore,
         cpuScore: winner === 'cpu' ? state.cpuScore + 1 : state.cpuScore

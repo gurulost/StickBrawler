@@ -127,6 +127,11 @@ export class ServerMatchRuntime {
 
   private createFightingActions() {
     return {
+      applyRuntimeFrame: (frame: any) => {
+        this.player = { ...this.player, ...frame.player };
+        this.cpu = { ...this.cpu, ...frame.cpu };
+      },
+      applyCombatEvents: () => {},
       movePlayer: (x: number, y: number, z: number) => {
         this.player.position = [x, y, z];
       },
@@ -155,7 +160,7 @@ export class ServerMatchRuntime {
         this.player.isAttacking = attacking;
       },
       setCPUAttacking: (attacking: boolean) => {
-        this.player.isAttacking = attacking;
+        this.cpu.isAttacking = attacking;
       },
       setPlayerBlocking: (blocking: boolean) => {
         this.player.isBlocking = blocking;

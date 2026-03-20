@@ -27,6 +27,7 @@ import {
   AIR_SPEED_MULTIPLIER,
   AIR_TURN_LOCK_PENALTY,
   AIR_STRAFE_IMPULSE,
+  COMBO_WINDOW,
 } from "./Physics";
 import {
   CombatStateMachine,
@@ -38,6 +39,12 @@ import {
 import { applyKnockbackToVelocity, comboScale, toCombatState, type DirectionalInfluence } from "./combatBridge";
 import type { CharacterState, GamePhase, MatchMode } from "../lib/stores/useFighting";
 import { Controls } from "../lib/stores/useControls";
+import type {
+  CombatEvent,
+  FighterPresentationSnapshot,
+  FighterRuntimeSlot,
+  RuntimeFrameSnapshot,
+} from "./combatPresentation";
 import {
   recordTelemetry,
   drainTelemetry,
@@ -59,13 +66,19 @@ import {
   pressToStrength,
   normalizeAttackDirection,
   toSpecialSlot,
+  type MoveKey,
   type FighterMoveTable,
 } from "../combat/moveTable";
-import type { PlayerInputSnapshot } from "../hooks/use-player-controls";
 import type { PlayerSlot } from "../hooks/use-player-controls";
 import { useInputDebug } from "../lib/stores/useInputDebug";
 
 interface FightingActions {
+  applyRuntimeFrame: (frame: RuntimeFrameSnapshot) => void;
+  applyCombatEvents: (events: CombatEvent[]) => void;
+  updateRoundTime: (time: number) => void;
+}
+
+interface FrameMutationActions {
   movePlayer: (x: number, y: number, z: number) => void;
   moveCPU: (x: number, y: number, z: number) => void;
   updatePlayerVelocity: (vx: number, vy: number, vz: number) => void;
@@ -79,16 +92,16 @@ interface FightingActions {
   setPlayerBlocking: (blocking: boolean) => void;
   setCPUBlocking: (blocking: boolean) => void;
   setPlayerDodging: (dodging: boolean) => void;
+  setCPUDodging: (dodging: boolean) => void;
   setPlayerGrabbing: (grabbing: boolean) => void;
+  setCPUGrabbing: (grabbing: boolean) => void;
   setPlayerTaunting: (taunting: boolean) => void;
   setPlayerAirAttacking: (airAttacking: boolean) => void;
-  resetPlayerAirJumps: () => void;
-  usePlayerAirJump?: () => void;
-  setCPUDodging: (dodging: boolean) => void;
-  setCPUGrabbing: (grabbing: boolean) => void;
   setCPUAirAttacking: (airAttacking: boolean) => void;
+  resetPlayerAirJumps: () => void;
   resetCPUAirJumps: () => void;
-  useCPUAirJump?: () => void;
+  usePlayerAirJump?: () => boolean;
+  useCPUAirJump?: () => boolean;
   damagePlayer: (amount: number) => void;
   damageCPU: (amount: number) => void;
   updateRoundTime: (time: number) => void;
@@ -183,6 +196,12 @@ const TECH_FAIL_GRACE = 0.06;
 const TECH_SUCCESS_IFRAMES = 0.12;
 const TECH_ROLL_DISTANCE = 1.2;
 const HARD_KNOCKDOWN_LAG = 0.5;
+const COMBAT_PLANE_Z = 0;
+const COMBAT_PLANE_BAND = 0.85;
+const COMBAT_PLANE_SPRING = 7.5;
+const HITSTUN_BASE_FRAMES = 9;
+const BLOCKSTUN_BASE_FRAMES = 7;
+const INPUT_TELEMETRY_MIN_INTERVAL_MS = 1000;
 
 interface ActionTimers {
   dodge: number;
@@ -240,6 +259,18 @@ const createActionTimers = (): ActionTimers => ({
   dodgeChainCount: 0,
   staminaRegenDelay: 0,
   staminaFloor: STAMINA_FLOOR_RESET,
+});
+
+type ConfirmFlags = {
+  hit: boolean;
+  block: boolean;
+  whiff: boolean;
+};
+
+const createConfirmFlags = (): ConfirmFlags => ({
+  hit: false,
+  block: false,
+  whiff: false,
 });
 
 type DefendResolution = {
@@ -331,23 +362,46 @@ export class MatchRuntime {
   private readonly engine: GameEngine;
   private readonly playerMachine = new CombatStateMachine();
   private readonly cpuMachine = new CombatStateMachine();
+  private playerState: CharacterState;
+  private cpuState: CharacterState;
   private playerCombatState: FighterCombatState;
   private cpuCombatState: FighterCombatState;
   private readonly playerHitRegistry = new Set<string>();
   private readonly cpuHitRegistry = new Set<string>();
   private playerPrevMoveId?: string;
   private cpuPrevMoveId?: string;
+  private playerMoveInstanceId?: number;
+  private cpuMoveInstanceId?: number;
+  private playerMoveCounter = 0;
+  private cpuMoveCounter = 0;
+  private playerLastConfirmedMoveId?: string;
+  private cpuLastConfirmedMoveId?: string;
+  private playerMoveHadConfirm = false;
+  private cpuMoveHadConfirm = false;
+  private playerConfirmFlags: ConfirmFlags = createConfirmFlags();
+  private cpuConfirmFlags: ConfirmFlags = createConfirmFlags();
   private playerHitLag = 0;
   private cpuHitLag = 0;
   private readonly cpuBrain = new CpuBrain({ style: CpuStyle.BALANCED });
   private playerTimers: ActionTimers = createActionTimers();
   private cpuTimers: ActionTimers = createActionTimers();
   private previousInputs: DualInputState = createEmptyInputs();
+  private inputTelemetryState: Record<
+    TelemetrySlot,
+    { signature: string; timestamp: number }
+  > = {
+    player1: { signature: "", timestamp: Number.NEGATIVE_INFINITY },
+    player2: { signature: "", timestamp: Number.NEGATIVE_INFINITY },
+    cpu: { signature: "", timestamp: Number.NEGATIVE_INFINITY },
+  };
+  private eventId = 0;
   
   /** Deterministic RNG for gameplay decisions (air jumps, etc.) - seeded per match */
   private readonly rng: DeterministicRandom;
 
   constructor(private readonly deps: MatchRuntimeDeps, snapshot: { player: CharacterState; cpu: CharacterState }) {
+    this.playerState = structuredClone(snapshot.player);
+    this.cpuState = structuredClone(snapshot.cpu);
     this.playerCombatState = toCombatState(snapshot.player);
     this.cpuCombatState = toCombatState(snapshot.cpu);
     
@@ -395,17 +449,35 @@ export class MatchRuntime {
   }
 
   reset(snapshot: { player: CharacterState; cpu: CharacterState }) {
+    this.playerState = structuredClone(snapshot.player);
+    this.cpuState = structuredClone(snapshot.cpu);
     this.playerCombatState = toCombatState(snapshot.player);
     this.cpuCombatState = toCombatState(snapshot.cpu);
     this.playerHitRegistry.clear();
     this.cpuHitRegistry.clear();
     this.playerPrevMoveId = undefined;
     this.cpuPrevMoveId = undefined;
+    this.playerMoveInstanceId = undefined;
+    this.cpuMoveInstanceId = undefined;
+    this.playerMoveCounter = 0;
+    this.cpuMoveCounter = 0;
+    this.playerLastConfirmedMoveId = undefined;
+    this.cpuLastConfirmedMoveId = undefined;
+    this.playerMoveHadConfirm = false;
+    this.cpuMoveHadConfirm = false;
+    this.playerConfirmFlags = createConfirmFlags();
+    this.cpuConfirmFlags = createConfirmFlags();
     this.playerHitLag = 0;
     this.cpuHitLag = 0;
     this.playerTimers = createActionTimers();
     this.cpuTimers = createActionTimers();
     this.previousInputs = createEmptyInputs();
+    this.inputTelemetryState = {
+      player1: { signature: "", timestamp: Number.NEGATIVE_INFINITY },
+      player2: { signature: "", timestamp: Number.NEGATIVE_INFINITY },
+      cpu: { signature: "", timestamp: Number.NEGATIVE_INFINITY },
+    };
+    this.eventId = 0;
     
     // Reset RNG with new deterministic seed for match consistency
     const seed = this.createMatchSeed(snapshot);
@@ -421,8 +493,15 @@ export class MatchRuntime {
   };
 
   private processFrame(payload: FramePayload) {
-    const { fighting, audio, getDebugMode, getMatchMode } = this.deps;
-    const { delta, inputs, player, cpu } = payload;
+    const { audio, getDebugMode, getMatchMode } = this.deps;
+    const { delta, inputs } = payload;
+    const previousPlayer = this.playerState;
+    const previousCpu = this.cpuState;
+    const player = structuredClone(previousPlayer);
+    const cpu = structuredClone(previousCpu);
+    const events: CombatEvent[] = [];
+    let playerGuardBreakThisFrame = false;
+    let cpuGuardBreakThisFrame = false;
     const intentFrame = payload.intents;
     const playerIntentFrame = intentFrame?.player1;
     const rawOpponentIntentFrame = intentFrame?.player2;
@@ -491,6 +570,168 @@ export class MatchRuntime {
     const cpuTechPressed =
       cpuTechIntent || !!cpuControlState.dodge || !!cpuControlState.shield;
 
+    const pushEvent = (event: any) => {
+      events.push({ id: ++this.eventId, ...event } as CombatEvent);
+    };
+
+    const advanceComboState = (attacker: CharacterState, defender: CharacterState) => {
+      if (attacker.comboTimer > 0) {
+        attacker.comboCount = Math.min(10, attacker.comboCount + 1);
+      } else {
+        attacker.comboCount = 1;
+      }
+      attacker.comboTimer = COMBO_WINDOW;
+      defender.comboCount = 0;
+      defender.comboTimer = 0;
+    };
+
+    const applyResolvedDamage = (
+      target: CharacterState,
+      attacker: CharacterState,
+      amount: number,
+    ) => {
+      if (amount <= 0) return;
+      target.health = Math.max(0, target.health - amount);
+      advanceComboState(attacker, target);
+    };
+
+    const updateCooldowns = (target: CharacterState, frameDelta: number) => {
+      const deltaMs = frameDelta * 1000;
+      target.attackCooldown = Math.max(0, target.attackCooldown - deltaMs);
+      target.dodgeCooldown = Math.max(0, target.dodgeCooldown - deltaMs);
+      target.grabCooldown = Math.max(0, target.grabCooldown - deltaMs);
+      target.moveCooldown = Math.max(0, target.moveCooldown - deltaMs);
+      target.comboTimer = Math.max(0, target.comboTimer - deltaMs);
+      if (target.comboTimer === 0) {
+        target.comboCount = 0;
+      }
+    };
+
+    const fighting: FrameMutationActions = {
+      movePlayer: (x: number, y: number, z: number) => {
+        player.position = [x, y, z];
+      },
+      moveCPU: (x: number, y: number, z: number) => {
+        cpu.position = [x, y, z];
+      },
+      updatePlayerVelocity: (vx: number, vy: number, vz: number) => {
+        player.velocity = [vx, vy, vz];
+      },
+      updateCPUVelocity: (vx: number, vy: number, vz: number) => {
+        cpu.velocity = [vx, vy, vz];
+      },
+      setPlayerDirection: (direction: 1 | -1) => {
+        player.direction = direction;
+      },
+      setCPUDirection: (direction: 1 | -1) => {
+        cpu.direction = direction;
+      },
+      setPlayerJumping: (jumping: boolean) => {
+        player.isJumping = jumping;
+      },
+      setCPUJumping: (jumping: boolean) => {
+        cpu.isJumping = jumping;
+      },
+      setPlayerAttacking: (attacking: boolean) => {
+        if (attacking && !player.isAttacking && player.attackCooldown === 0) {
+          player.attackCooldown = Math.max(player.attackCooldown, 500);
+        }
+        player.isAttacking = attacking;
+      },
+      setCPUAttacking: (attacking: boolean) => {
+        if (attacking && !cpu.isAttacking && cpu.attackCooldown === 0) {
+          cpu.attackCooldown = Math.max(cpu.attackCooldown, 500);
+        }
+        cpu.isAttacking = attacking;
+      },
+      setPlayerBlocking: (blocking: boolean) => {
+        player.isBlocking = blocking;
+      },
+      setCPUBlocking: (blocking: boolean) => {
+        cpu.isBlocking = blocking;
+      },
+      setPlayerDodging: (dodging: boolean) => {
+        if (dodging && !player.isDodging) {
+          player.dodgeCooldown = Math.max(player.dodgeCooldown, 20);
+        }
+        player.isDodging = dodging;
+      },
+      setCPUDodging: (dodging: boolean) => {
+        if (dodging && !cpu.isDodging) {
+          cpu.dodgeCooldown = Math.max(cpu.dodgeCooldown, 20);
+        }
+        cpu.isDodging = dodging;
+      },
+      setPlayerGrabbing: (grabbing: boolean) => {
+        if (grabbing && !player.isGrabbing) {
+          player.grabCooldown = Math.max(player.grabCooldown, 30);
+        }
+        player.isGrabbing = grabbing;
+      },
+      setCPUGrabbing: (grabbing: boolean) => {
+        if (grabbing && !cpu.isGrabbing) {
+          cpu.grabCooldown = Math.max(cpu.grabCooldown, 30);
+        }
+        cpu.isGrabbing = grabbing;
+      },
+      setPlayerTaunting: (taunting: boolean) => {
+        player.isTaunting = taunting;
+      },
+      setPlayerAirAttacking: (airAttacking: boolean) => {
+        player.isAirAttacking = airAttacking;
+        if (airAttacking && !player.isJumping) {
+          player.isJumping = true;
+        }
+      },
+      setCPUAirAttacking: (airAttacking: boolean) => {
+        cpu.isAirAttacking = airAttacking;
+        if (airAttacking && !cpu.isJumping) {
+          cpu.isJumping = true;
+        }
+      },
+      resetPlayerAirJumps: () => {
+        player.airJumpsLeft = 2;
+      },
+      resetCPUAirJumps: () => {
+        cpu.airJumpsLeft = 2;
+      },
+      usePlayerAirJump: () => {
+        if (player.airJumpsLeft <= 0) return false;
+        player.airJumpsLeft -= 1;
+        return true;
+      },
+      useCPUAirJump: () => {
+        if (cpu.airJumpsLeft <= 0) return false;
+        cpu.airJumpsLeft -= 1;
+        return true;
+      },
+      damagePlayer: (amount: number) => applyResolvedDamage(player, cpu, amount),
+      damageCPU: (amount: number) => applyResolvedDamage(cpu, player, amount),
+      updateRoundTime: (_time: number) => {},
+      updatePlayerCooldowns: (frameDelta: number) => updateCooldowns(player, frameDelta),
+      updateCPUCooldowns: (frameDelta: number) => updateCooldowns(cpu, frameDelta),
+      updatePlayerMeters: (meters: Partial<{ guard: number; stamina: number; special: number }>) => {
+        if (meters.guard !== undefined) player.guardMeter = Math.max(0, Math.min(80, meters.guard));
+        if (meters.stamina !== undefined) player.staminaMeter = Math.max(0, Math.min(100, meters.stamina));
+        if (meters.special !== undefined) player.specialMeter = Math.max(0, Math.min(100, meters.special));
+      },
+      updateCPUMeters: (meters: Partial<{ guard: number; stamina: number; special: number }>) => {
+        if (meters.guard !== undefined) cpu.guardMeter = Math.max(0, Math.min(80, meters.guard));
+        if (meters.stamina !== undefined) cpu.staminaMeter = Math.max(0, Math.min(100, meters.stamina));
+        if (meters.special !== undefined) cpu.specialMeter = Math.max(0, Math.min(100, meters.special));
+      },
+      updatePlayerGuardBreak: () => {
+        player.isBlocking = false;
+        player.isDodging = false;
+        playerGuardBreakThisFrame = true;
+      },
+      updateCPUGuardBreak: () => {
+        cpu.isBlocking = false;
+        cpu.isDodging = false;
+        cpuGuardBreakThisFrame = true;
+      },
+    };
+
     const applyGuardDamageToPlayer = (amount: number) => {
       if (amount <= 0) return;
       const current = this.playerCombatState.guardMeter;
@@ -504,6 +745,13 @@ export class MatchRuntime {
           fighting.setPlayerDodging(false);
           fighting.setPlayerAttacking(false);
           fighting.damagePlayer(5);
+          this.playerCombatState.action = "hitstun";
+          this.playerCombatState.hitstunFrames = Math.max(
+            this.playerCombatState.hitstunFrames,
+            GUARD_BREAK_STUN * 60,
+          );
+          this.playerCombatState.moveId = undefined;
+          this.playerCombatState.moveFrame = 0;
           fighting.updatePlayerVelocity(
             player.velocity[0] - player.direction * 0.35,
             Math.max(player.velocity[1], 0.2),
@@ -530,6 +778,13 @@ export class MatchRuntime {
           fighting.setCPUDodging(false);
           fighting.setCPUAttacking(false);
           fighting.damageCPU(5);
+          this.cpuCombatState.action = "hitstun";
+          this.cpuCombatState.hitstunFrames = Math.max(
+            this.cpuCombatState.hitstunFrames,
+            GUARD_BREAK_STUN * 60,
+          );
+          this.cpuCombatState.moveId = undefined;
+          this.cpuCombatState.moveFrame = 0;
           fighting.updateCPUVelocity(
             cpu.velocity[0] + cpu.direction * 0.35,
             Math.max(cpu.velocity[1], 0.2),
@@ -550,13 +805,17 @@ export class MatchRuntime {
       : buildCpuIntentFrame(cpuControlState, cpuIsAirborne);
     const playerDirectionalInfluence = deriveDirectionalInfluence(playerControls, playerIsAirborne);
     const cpuDirectionalInfluence = deriveDirectionalInfluence(cpuControlState, cpuIsAirborne);
-    this.advancePlayerTimers(delta, player, cpu);
-    this.advanceCpuTimers(delta, player, cpu);
+    this.advancePlayerTimers(delta, player, cpu, fighting);
+    this.advanceCpuTimers(delta, player, cpu, fighting);
 
     const intentMoveId = resolveIntentMoveId(playerIntentFrame, playerMoveTable);
     const requestedMove = intentMoveId ? coreMoves[intentMoveId] : undefined;
 
     const machineInputs: Record<string, boolean> = requestedMove ? { [requestedMove.id]: true } : {};
+    machineInputs["confirm-hit"] = this.playerConfirmFlags.hit;
+    machineInputs["confirm-block"] = this.playerConfirmFlags.block;
+    machineInputs["confirm-whiff"] = this.playerConfirmFlags.whiff;
+    this.playerConfirmFlags = createConfirmFlags();
     if (playerDefendState.roll) {
       machineInputs.dodge = true;
     }
@@ -600,13 +859,40 @@ export class MatchRuntime {
     });
 
     if (updatedCombatState.moveId !== this.playerPrevMoveId) {
+      if (this.playerPrevMoveId) {
+        pushEvent({
+          type: "moveEnd",
+          slot: "player",
+          moveId: this.playerPrevMoveId,
+          moveInstanceId: this.playerMoveInstanceId,
+          reason: updatedCombatState.moveId ? "cancel" : "complete",
+        });
+        if (!this.playerMoveHadConfirm) {
+          this.playerConfirmFlags.whiff = true;
+        }
+      }
       this.playerHitRegistry.clear();
       if (updatedCombatState.moveId) {
-        playMoveStartAudio(coreMoves[updatedCombatState.moveId], {
-          playPunch: audio.playPunch,
-          playKick: audio.playKick,
-          playSpecial: audio.playSpecial,
+        const moveDef = coreMoves[updatedCombatState.moveId];
+        this.playerMoveCounter += 1;
+        this.playerMoveInstanceId = this.playerMoveCounter;
+        this.playerMoveHadConfirm = false;
+        player.lastStartedMoveId = updatedCombatState.moveId;
+        pushEvent({
+          type: "moveStart",
+          slot: "player",
+          moveId: updatedCombatState.moveId,
+          moveInstanceId: this.playerMoveInstanceId,
         });
+        if (moveDef) {
+          playMoveStartAudio(moveDef, {
+            playPunch: audio.playPunch,
+            playKick: audio.playKick,
+            playSpecial: audio.playSpecial,
+          });
+        }
+      } else {
+        this.playerMoveInstanceId = undefined;
       }
       this.playerPrevMoveId = updatedCombatState.moveId;
     }
@@ -619,73 +905,115 @@ export class MatchRuntime {
 
     if (updatedCombatState.moveId) {
       const moveDef = coreMoves[updatedCombatState.moveId];
-      const hits = resolveHits({
-        attacker: updatedCombatState,
-        defender: cpuStateSnapshot,
-        move: moveDef,
-        scaledDamage: comboScale(player.comboCount),
-      });
-
-      const newHits = hits.filter((hit) => !this.playerHitRegistry.has(`${hit.moveId}:${hit.hitboxId}`));
-
-      if (newHits.length) {
-        let maxDamage = 0;
-        newHits.forEach((hit) => {
-          if (
-            (cpu.isDodging && this.cpuTimers.dodgeInvuln > 0) ||
-            this.cpuTimers.techInvuln > 0
-          ) {
-            return;
-          }
-          const blocking = cpu.isBlocking;
-          const baseDamage = Math.round(hit.damage);
-          maxDamage = Math.max(maxDamage, baseDamage);
-          if (blocking) {
-            const chip = Math.max(
-              MIN_CHIP_DAMAGE,
-              Math.round(baseDamage * CHIP_DAMAGE_RATIO),
-            );
-            fighting.damageCPU(chip);
-            applyGuardDamageToCpu(hit.guardDamage);
-            this.cpuTimers.guardRegenDelay = GUARD_REGEN_DELAY;
-          } else {
-            fighting.damageCPU(baseDamage);
-            if (hit.causesTrip) {
-              this.scheduleTrip("cpu", hit.knockbackVector[0]);
-            }
-          }
-          let [vx, vy, vz] = applyKnockbackToVelocity(cpu, hit, cpuDirectionalInfluence);
-          if (blocking) {
-            const push =
-              Math.min(
-                BLOCK_PUSH_MAX,
-                baseDamage * BLOCK_PUSH_SCALE + (hit.weight ?? 0),
-              ) || 0;
-            if (push > 0) {
-              const dx = cpu.position[0] - player.position[0];
-              const dz = cpu.position[2] - player.position[2];
-              const len = Math.hypot(dx, dz) || 1;
-              vx += (dx / len) * push;
-              vz += (dz / len) * push;
-            }
-          }
-          fighting.updateCPUVelocity(vx, vy, vz);
-          fighting.setCPUDirection(hit.knockbackVector[0] < 0 ? -1 : 1);
-          this.playerHitRegistry.add(`${hit.moveId}:${hit.hitboxId}`);
-          recordTelemetry({
-            type: "hit",
-            source: "player",
-            slot: "player1",
-            hit,
-            timestamp: performance.now(),
-            comboCount: player.comboCount,
-          });
-          this.playerHitLag = Math.max(this.playerHitLag, computeHitLagSeconds(hit.hitLag));
-          this.cpuHitLag = Math.max(this.cpuHitLag, computeHitLagSeconds(hit.hitLag));
+      if (moveDef) {
+        const defenderMove = cpuStateSnapshot.moveId ? coreMoves[cpuStateSnapshot.moveId] : undefined;
+        const hits = resolveHits({
+          attacker: updatedCombatState,
+          defender: cpuStateSnapshot,
+          move: moveDef,
+          defenderMove,
+          scaledDamage: comboScale(player.comboCount),
         });
-        const intensity = Math.min(1.5, maxDamage / 8);
-        audio.playHit(intensity);
-        this.deps.onImpact?.(intensity);
+
+        const newHits = hits.filter((hit) =>
+          !this.playerHitRegistry.has(`${this.playerMoveInstanceId ?? 0}:${hit.hitboxId}`),
+        );
+
+        if (newHits.length) {
+          let maxDamage = 0;
+          newHits.forEach((hit) => {
+            const defenderInvulnerable = isCombatInvulnerable(
+              this.cpuCombatState,
+              defenderMove,
+              this.cpuTimers,
+            );
+            if (defenderInvulnerable) {
+              return;
+            }
+            const defenderArmored = isCombatArmored(this.cpuCombatState, defenderMove);
+            const blocking = cpu.isBlocking;
+            const baseDamage = Math.round(hit.damage);
+            maxDamage = Math.max(maxDamage, baseDamage);
+            this.playerMoveHadConfirm = true;
+            this.playerLastConfirmedMoveId = hit.moveId;
+            if (blocking) {
+              const chip = Math.max(
+                MIN_CHIP_DAMAGE,
+                Math.round(baseDamage * CHIP_DAMAGE_RATIO),
+              );
+              fighting.damageCPU(chip);
+              applyGuardDamageToCpu(hit.guardDamage);
+              this.cpuTimers.guardRegenDelay = GUARD_REGEN_DELAY;
+              this.playerConfirmFlags.block = true;
+              this.cpuCombatState.blockstunFrames = Math.max(
+                this.cpuCombatState.blockstunFrames,
+                computeBlockstunFrames(hit),
+              );
+              this.cpuCombatState.action = "blockstun";
+              this.cpuCombatState.moveId = undefined;
+              this.cpuCombatState.moveFrame = 0;
+            } else {
+              fighting.damageCPU(baseDamage);
+              if (hit.causesTrip) {
+                this.scheduleTrip("cpu", hit.knockbackVector[0]);
+              }
+              this.playerConfirmFlags.hit = true;
+              if (!defenderArmored || moveDef.hitboxes.find((entry) => entry.id === hit.hitboxId)?.ignoresArmor) {
+                this.cpuCombatState.hitstunFrames = Math.max(
+                  this.cpuCombatState.hitstunFrames,
+                  computeHitstunFrames(hit),
+                );
+                this.cpuCombatState.action = "hitstun";
+                this.cpuCombatState.moveId = undefined;
+                this.cpuCombatState.moveFrame = 0;
+              }
+            }
+            let [vx, vy, vz] = applyKnockbackToVelocity(cpu, hit, cpuDirectionalInfluence);
+            if (blocking) {
+              const push =
+                Math.min(
+                  BLOCK_PUSH_MAX,
+                  baseDamage * BLOCK_PUSH_SCALE + Math.hypot(...hit.knockbackVector),
+                ) || 0;
+              if (push > 0) {
+                const dx = cpu.position[0] - player.position[0];
+                const dz = cpu.position[2] - player.position[2];
+                const len = Math.hypot(dx, dz) || 1;
+                vx += (dx / len) * push;
+                vz += (dz / len) * push;
+              }
+            }
+            fighting.updateCPUVelocity(vx, vy, vz);
+            fighting.setCPUDirection(hit.knockbackVector[0] < 0 ? -1 : 1);
+            this.playerHitRegistry.add(`${this.playerMoveInstanceId ?? 0}:${hit.hitboxId}`);
+            pushEvent({
+              type: "hit",
+              attacker: "player",
+              defender: "cpu",
+              moveId: hit.moveId,
+              moveInstanceId: this.playerMoveInstanceId,
+              hitboxId: hit.hitboxId,
+              blocked: blocking,
+              damage: blocking
+                ? Math.max(MIN_CHIP_DAMAGE, Math.round(baseDamage * CHIP_DAMAGE_RATIO))
+                : baseDamage,
+              impact: Math.min(1.5, baseDamage / 8),
+            });
+            recordTelemetry({
+              type: "hit",
+              source: "player",
+              slot: "player1",
+              hit,
+              timestamp: performance.now(),
+              comboCount: player.comboCount,
+            });
+            this.playerHitLag = Math.max(this.playerHitLag, computeHitLagSeconds(hit.hitLag));
+            this.cpuHitLag = Math.max(this.cpuHitLag, computeHitLagSeconds(hit.hitLag));
+          });
+          const intensity = Math.min(1.5, maxDamage / 8);
+          audio.playHit(intensity);
+          this.deps.onImpact?.(intensity);
+        }
       }
     } else {
       this.playerHitRegistry.clear();
@@ -694,6 +1022,10 @@ export class MatchRuntime {
     const cpuIntentMoveId = resolveIntentMoveId(cpuIntentFrame, cpuMoveTable);
     const cpuRequestedMove = cpuIntentMoveId ? coreMoves[cpuIntentMoveId] : undefined;
     const cpuMachineInputs: Record<string, boolean> = cpuRequestedMove ? { [cpuRequestedMove.id]: true } : {};
+    cpuMachineInputs["confirm-hit"] = this.cpuConfirmFlags.hit;
+    cpuMachineInputs["confirm-block"] = this.cpuConfirmFlags.block;
+    cpuMachineInputs["confirm-whiff"] = this.cpuConfirmFlags.whiff;
+    this.cpuConfirmFlags = createConfirmFlags();
     const cpuRollActive = cpuDefendState.roll;
     if (cpuRollActive) {
       cpuMachineInputs.dodge = true;
@@ -732,13 +1064,40 @@ export class MatchRuntime {
       availableMoves: coreMoves,
     });
     if (cpuUpdatedState.moveId !== this.cpuPrevMoveId) {
+      if (this.cpuPrevMoveId) {
+        pushEvent({
+          type: "moveEnd",
+          slot: "cpu",
+          moveId: this.cpuPrevMoveId,
+          moveInstanceId: this.cpuMoveInstanceId,
+          reason: cpuUpdatedState.moveId ? "cancel" : "complete",
+        });
+        if (!this.cpuMoveHadConfirm) {
+          this.cpuConfirmFlags.whiff = true;
+        }
+      }
       this.cpuHitRegistry.clear();
       if (cpuUpdatedState.moveId) {
-        playMoveStartAudio(coreMoves[cpuUpdatedState.moveId], {
-          playPunch: audio.playPunch,
-          playKick: audio.playKick,
-          playSpecial: audio.playSpecial,
+        const moveDef = coreMoves[cpuUpdatedState.moveId];
+        this.cpuMoveCounter += 1;
+        this.cpuMoveInstanceId = this.cpuMoveCounter;
+        this.cpuMoveHadConfirm = false;
+        cpu.lastStartedMoveId = cpuUpdatedState.moveId;
+        pushEvent({
+          type: "moveStart",
+          slot: "cpu",
+          moveId: cpuUpdatedState.moveId,
+          moveInstanceId: this.cpuMoveInstanceId,
         });
+        if (moveDef) {
+          playMoveStartAudio(moveDef, {
+            playPunch: audio.playPunch,
+            playKick: audio.playKick,
+            playSpecial: audio.playSpecial,
+          });
+        }
+      } else {
+        this.cpuMoveInstanceId = undefined;
       }
       this.cpuPrevMoveId = cpuUpdatedState.moveId;
     }
@@ -758,69 +1117,116 @@ export class MatchRuntime {
     }
     if (cpuUpdatedState.moveId) {
       const moveDef = coreMoves[cpuUpdatedState.moveId];
-      const hits = resolveHits({
-        attacker: cpuUpdatedState,
-        defender: this.playerCombatState,
-        move: moveDef,
-        scaledDamage: comboScale(cpu.comboCount),
-      });
-      const cpuNewHits = hits.filter((hit) => !this.cpuHitRegistry.has(`${hit.moveId}:${hit.hitboxId}`));
-      if (cpuNewHits.length) {
-        let maxDamage = 0;
-        cpuNewHits.forEach((hit) => {
-          if (player.isDodging && this.playerTimers.dodgeInvuln > 0) {
-            return;
-          }
-          const blocking = player.isBlocking;
-          const baseDamage = Math.round(hit.damage);
-          maxDamage = Math.max(maxDamage, baseDamage);
-          if (blocking) {
-            const chip = Math.max(
-              MIN_CHIP_DAMAGE,
-              Math.round(baseDamage * CHIP_DAMAGE_RATIO),
-            );
-            fighting.damagePlayer(chip);
-            applyGuardDamageToPlayer(hit.guardDamage);
-            this.playerTimers.guardRegenDelay = GUARD_REGEN_DELAY;
-            audio.playBlock();
-          } else {
-            fighting.damagePlayer(baseDamage);
-            if (hit.causesTrip) {
-              this.scheduleTrip("player", hit.knockbackVector[0]);
-            }
-          }
-          let [vx, vy, vz] = applyKnockbackToVelocity(player, hit, playerDirectionalInfluence);
-          if (blocking) {
-            const push =
-              Math.min(
-                BLOCK_PUSH_MAX,
-                baseDamage * BLOCK_PUSH_SCALE + (hit.weight ?? 0),
-              ) || 0;
-            if (push > 0) {
-              const dx = player.position[0] - cpu.position[0];
-              const dz = player.position[2] - cpu.position[2];
-              const len = Math.hypot(dx, dz) || 1;
-              vx += (dx / len) * push;
-              vz += (dz / len) * push;
-            }
-          }
-          fighting.updatePlayerVelocity(vx, vy, vz);
-          fighting.setPlayerDirection(hit.knockbackVector[0] < 0 ? -1 : 1);
-          this.cpuHitRegistry.add(`${hit.moveId}:${hit.hitboxId}`);
-          recordTelemetry({
-            type: "hit",
-            source: opponentSource,
-            slot: opponentSlot,
-            hit,
-            timestamp: performance.now(),
-            comboCount: cpu.comboCount,
-          });
-          this.playerHitLag = Math.max(this.playerHitLag, computeHitLagSeconds(hit.hitLag));
-          this.cpuHitLag = Math.max(this.cpuHitLag, computeHitLagSeconds(hit.hitLag));
+      if (moveDef) {
+        const defenderMove = this.playerCombatState.moveId
+          ? coreMoves[this.playerCombatState.moveId]
+          : undefined;
+        const hits = resolveHits({
+          attacker: cpuUpdatedState,
+          defender: this.playerCombatState,
+          move: moveDef,
+          defenderMove,
+          scaledDamage: comboScale(cpu.comboCount),
         });
-        const intensity = Math.min(1.5, maxDamage / 8);
-        audio.playHit(intensity);
-        this.deps.onImpact?.(intensity);
+        const cpuNewHits = hits.filter((hit) =>
+          !this.cpuHitRegistry.has(`${this.cpuMoveInstanceId ?? 0}:${hit.hitboxId}`),
+        );
+        if (cpuNewHits.length) {
+          let maxDamage = 0;
+          cpuNewHits.forEach((hit) => {
+            const defenderInvulnerable = isCombatInvulnerable(
+              this.playerCombatState,
+              defenderMove,
+              this.playerTimers,
+            );
+            if (defenderInvulnerable) {
+              return;
+            }
+            const defenderArmored = isCombatArmored(this.playerCombatState, defenderMove);
+            const blocking = player.isBlocking;
+            const baseDamage = Math.round(hit.damage);
+            maxDamage = Math.max(maxDamage, baseDamage);
+            this.cpuMoveHadConfirm = true;
+            this.cpuLastConfirmedMoveId = hit.moveId;
+            if (blocking) {
+              const chip = Math.max(
+                MIN_CHIP_DAMAGE,
+                Math.round(baseDamage * CHIP_DAMAGE_RATIO),
+              );
+              fighting.damagePlayer(chip);
+              applyGuardDamageToPlayer(hit.guardDamage);
+              this.playerTimers.guardRegenDelay = GUARD_REGEN_DELAY;
+              audio.playBlock();
+              this.cpuConfirmFlags.block = true;
+              this.playerCombatState.blockstunFrames = Math.max(
+                this.playerCombatState.blockstunFrames,
+                computeBlockstunFrames(hit),
+              );
+              this.playerCombatState.action = "blockstun";
+              this.playerCombatState.moveId = undefined;
+              this.playerCombatState.moveFrame = 0;
+            } else {
+              fighting.damagePlayer(baseDamage);
+              if (hit.causesTrip) {
+                this.scheduleTrip("player", hit.knockbackVector[0]);
+              }
+              this.cpuConfirmFlags.hit = true;
+              if (!defenderArmored || moveDef.hitboxes.find((entry) => entry.id === hit.hitboxId)?.ignoresArmor) {
+                this.playerCombatState.hitstunFrames = Math.max(
+                  this.playerCombatState.hitstunFrames,
+                  computeHitstunFrames(hit),
+                );
+                this.playerCombatState.action = "hitstun";
+                this.playerCombatState.moveId = undefined;
+                this.playerCombatState.moveFrame = 0;
+              }
+            }
+            let [vx, vy, vz] = applyKnockbackToVelocity(player, hit, playerDirectionalInfluence);
+            if (blocking) {
+              const push =
+                Math.min(
+                  BLOCK_PUSH_MAX,
+                  baseDamage * BLOCK_PUSH_SCALE + Math.hypot(...hit.knockbackVector),
+                ) || 0;
+              if (push > 0) {
+                const dx = player.position[0] - cpu.position[0];
+                const dz = player.position[2] - cpu.position[2];
+                const len = Math.hypot(dx, dz) || 1;
+                vx += (dx / len) * push;
+                vz += (dz / len) * push;
+              }
+            }
+            fighting.updatePlayerVelocity(vx, vy, vz);
+            fighting.setPlayerDirection(hit.knockbackVector[0] < 0 ? -1 : 1);
+            this.cpuHitRegistry.add(`${this.cpuMoveInstanceId ?? 0}:${hit.hitboxId}`);
+            pushEvent({
+              type: "hit",
+              attacker: "cpu",
+              defender: "player",
+              moveId: hit.moveId,
+              moveInstanceId: this.cpuMoveInstanceId,
+              hitboxId: hit.hitboxId,
+              blocked: blocking,
+              damage: blocking
+                ? Math.max(MIN_CHIP_DAMAGE, Math.round(baseDamage * CHIP_DAMAGE_RATIO))
+                : baseDamage,
+              impact: Math.min(1.5, baseDamage / 8),
+            });
+            recordTelemetry({
+              type: "hit",
+              source: opponentSource,
+              slot: opponentSlot,
+              hit,
+              timestamp: performance.now(),
+              comboCount: cpu.comboCount,
+            });
+            this.playerHitLag = Math.max(this.playerHitLag, computeHitLagSeconds(hit.hitLag));
+            this.cpuHitLag = Math.max(this.cpuHitLag, computeHitLagSeconds(hit.hitLag));
+          });
+          const intensity = Math.min(1.5, maxDamage / 8);
+          audio.playHit(intensity);
+          this.deps.onImpact?.(intensity);
+        }
       }
     } else {
       this.cpuHitRegistry.clear();
@@ -851,6 +1257,8 @@ export class MatchRuntime {
       audio,
       cpuTechPressed,
       useCircularBounds,
+      fighting,
+      pushEvent,
     );
     this.updatePlayerMovement(
       {
@@ -874,9 +1282,10 @@ export class MatchRuntime {
       playerInHitLag,
       audio,
       useCircularBounds,
+      fighting,
+      pushEvent,
     );
 
-    fighting.updateRoundTime(delta);
     fighting.updatePlayerCooldowns(delta);
     fighting.updateCPUCooldowns(delta);
     fighting.updatePlayerMeters({
@@ -888,6 +1297,58 @@ export class MatchRuntime {
       guard: this.cpuCombatState.guardMeter,
       stamina: this.cpuCombatState.staminaMeter,
       special: this.cpuCombatState.specialMeter,
+    });
+    const playerJustLanded = previousPlayer.isJumping && !player.isJumping;
+    const cpuJustLanded = previousCpu.isJumping && !cpu.isJumping;
+    if (playerJustLanded) {
+      pushEvent({
+        type: "land",
+        slot: "player",
+        intensity: Math.min(1, Math.abs(previousPlayer.velocity[1]) + Math.hypot(previousPlayer.velocity[0], previousPlayer.velocity[2]) * 0.3),
+      });
+    }
+    if (cpuJustLanded) {
+      pushEvent({
+        type: "land",
+        slot: "cpu",
+        intensity: Math.min(1, Math.abs(previousCpu.velocity[1]) + Math.hypot(previousCpu.velocity[0], previousCpu.velocity[2]) * 0.3),
+      });
+    }
+    if (playerGuardBreakThisFrame) {
+      pushEvent({ type: "guardBreak", slot: "player" });
+    }
+    if (cpuGuardBreakThisFrame) {
+      pushEvent({ type: "guardBreak", slot: "cpu" });
+    }
+    this.playerCombatState.comboCounter = player.comboCount;
+    this.cpuCombatState.comboCounter = cpu.comboCount;
+    this.playerState = player;
+    this.cpuState = cpu;
+    this.deps.fighting.updateRoundTime(delta);
+    this.deps.fighting.applyCombatEvents(events);
+    this.deps.fighting.applyRuntimeFrame({
+      player: this.createPresentationSnapshot("player", player, this.playerCombatState, {
+        hitLag: this.playerHitLag,
+        timers: this.playerTimers,
+        moveInstanceId: this.playerMoveInstanceId,
+        lastConfirmedMoveId: this.playerLastConfirmedMoveId,
+        justStartedMove: Boolean(events.find((event) => event.type === "moveStart" && event.slot === "player")),
+        justLanded: playerJustLanded,
+        justHit: Boolean(events.find((event) => event.type === "hit" && event.attacker === "player" && !event.blocked)),
+        justBlocked: Boolean(events.find((event) => event.type === "hit" && event.attacker === "cpu" && event.blocked)),
+        justGuardBroke: playerGuardBreakThisFrame,
+      }),
+      cpu: this.createPresentationSnapshot("cpu", cpu, this.cpuCombatState, {
+        hitLag: this.cpuHitLag,
+        timers: this.cpuTimers,
+        moveInstanceId: this.cpuMoveInstanceId,
+        lastConfirmedMoveId: this.cpuLastConfirmedMoveId,
+        justStartedMove: Boolean(events.find((event) => event.type === "moveStart" && event.slot === "cpu")),
+        justLanded: cpuJustLanded,
+        justHit: Boolean(events.find((event) => event.type === "hit" && event.attacker === "cpu" && !event.blocked)),
+        justBlocked: Boolean(events.find((event) => event.type === "hit" && event.attacker === "player" && event.blocked)),
+        justGuardBroke: cpuGuardBreakThisFrame,
+      }),
     });
     this.previousInputs.player1 = { ...playerControls };
     this.previousInputs.player2 = { ...opponentControls };
@@ -902,8 +1363,9 @@ export class MatchRuntime {
     audio: AudioActions,
     techPressed: boolean,
     useCircularBounds: boolean,
+    fighting: FrameMutationActions,
+    pushEvent: (event: any) => void,
   ) {
-    const { fighting } = this.deps;
     const cpuStunned =
       this.cpuTimers.guardBreak > 0 || this.cpuTimers.landingLag > 0;
     const cpuCanAct =
@@ -1088,13 +1550,14 @@ export class MatchRuntime {
     );
     let [boundedX, boundedY, boundedZ] = cpuBounds.position;
     let [boundedVX, boundedVY, boundedVZ] = cpuBounds.velocity;
+    boundedZ = constrainToCombatPlane(boundedZ, delta);
+    boundedVZ = boundPlaneVelocity(boundedVZ, boundedZ);
     const cpuGrounded = boundedY <= getPlatformHeight(boundedX, boundedZ) + 0.02;
     if (cpuGrounded || this.cpuTimers.techPending) {
       const techOutcome = this.resolveTechLandingOutcome(
         "cpu",
         {
           grounded: cpuGrounded,
-          landedThisFrame: cpuLandedThisFrame,
           techPressed,
           leftward: controlState.leftward,
           rightward: controlState.rightward,
@@ -1105,6 +1568,9 @@ export class MatchRuntime {
       );
       [boundedX, boundedY, boundedZ] = techOutcome.position;
       [boundedVX, boundedVY, boundedVZ] = techOutcome.velocity;
+      if (techOutcome.result) {
+        pushEvent({ type: "tech", slot: "cpu", result: techOutcome.result });
+      }
     }
 
     fighting.moveCPU(boundedX, boundedY, boundedZ);
@@ -1134,8 +1600,10 @@ export class MatchRuntime {
     playerInHitLag: boolean,
     audio: AudioActions,
     useCircularBounds: boolean,
+    fighting: FrameMutationActions,
+    pushEvent: (event: any) => void,
   ) {
-    const { fighting, getDebugMode } = this.deps;
+    const { getDebugMode } = this.deps;
     const playerStunned =
       this.playerTimers.guardBreak > 0 || this.playerTimers.landingLag > 0;
     const canAct =
@@ -1378,6 +1846,8 @@ export class MatchRuntime {
     const bounds = resolveCapsuleBounds([proposedX, newY, proposedZ], [newVX, newVY, newVZ], undefined, useCircularBounds);
     let [boundedX, boundedY, boundedZ] = bounds.position;
     let [boundedVX, boundedVY, boundedVZ] = bounds.velocity;
+    boundedZ = constrainToCombatPlane(boundedZ, delta);
+    boundedVZ = boundPlaneVelocity(boundedVZ, boundedZ);
     const groundedAfterMove =
       boundedY <= getPlatformHeight(boundedX, boundedZ) + 0.02;
     if (groundedAfterMove || this.playerTimers.techPending) {
@@ -1385,7 +1855,6 @@ export class MatchRuntime {
         "player",
         {
           grounded: groundedAfterMove,
-          landedThisFrame,
           techPressed: input.techPressed,
           leftward: input.leftward,
           rightward: input.rightward,
@@ -1396,11 +1865,90 @@ export class MatchRuntime {
       );
       [boundedX, boundedY, boundedZ] = techOutcome.position;
       [boundedVX, boundedVY, boundedVZ] = techOutcome.velocity;
+      if (techOutcome.result) {
+        pushEvent({ type: "tech", slot: "player", result: techOutcome.result });
+      }
     }
 
     fighting.movePlayer(boundedX, boundedY, boundedZ);
     fighting.updatePlayerVelocity(boundedVX, boundedVY, boundedVZ);
     fighting.setPlayerDirection(newDirection);
+  }
+
+  private createPresentationSnapshot(
+    slot: FighterRuntimeSlot,
+    state: CharacterState,
+    combatState: FighterCombatState,
+    meta: {
+      hitLag: number;
+      timers: ActionTimers;
+      moveInstanceId?: number;
+      lastConfirmedMoveId?: string;
+      justStartedMove: boolean;
+      justLanded: boolean;
+      justHit: boolean;
+      justBlocked: boolean;
+      justGuardBroke: boolean;
+    },
+  ): FighterPresentationSnapshot {
+    const move = combatState.moveId ? coreMoves[combatState.moveId] : undefined;
+    const grounded = state.position[1] <= getPlatformHeight(state.position[0], state.position[2]) + 0.02;
+    const inAir = !grounded || state.isJumping;
+    const moveFrame = combatState.moveFrame ?? 0;
+    const hitLagFrames = Math.max(0, Math.round(meta.hitLag * 60));
+    const invulnerable = isCombatInvulnerable(combatState, move, meta.timers);
+    const armored = isCombatArmored(combatState, move);
+    const hardLocked =
+      meta.timers.guardBreak > 0 ||
+      meta.timers.landingLag > 0 ||
+      combatState.hitstunFrames > 0 ||
+      combatState.blockstunFrames > 0 ||
+      hitLagFrames > 0;
+
+    return {
+      slot,
+      fighterId: state.fighterId,
+      health: state.health,
+      position: state.position,
+      velocity: state.velocity,
+      facing: state.direction,
+      grounded,
+      inAir,
+      action: combatState.action,
+      moveId: combatState.moveId,
+      moveInstanceId: meta.moveInstanceId,
+      moveFrame,
+      movePhase: derivePresentationMovePhase(move, moveFrame),
+      hitLagFrames,
+      hitstunFrames: Math.max(0, Math.ceil(combatState.hitstunFrames)),
+      blockstunFrames: Math.max(0, Math.ceil(combatState.blockstunFrames)),
+      invulnerable,
+      armored,
+      canAct: !hardLocked && !state.isGrabbing && !state.isTaunting,
+      guardMeter: combatState.guardMeter,
+      staminaMeter: combatState.staminaMeter,
+      specialMeter: combatState.specialMeter,
+      comboCounter: state.comboCount,
+      comboTimer: state.comboTimer,
+      attackCooldown: state.attackCooldown,
+      dodgeCooldown: state.dodgeCooldown,
+      grabCooldown: state.grabCooldown,
+      moveCooldown: state.moveCooldown,
+      isBlocking: state.isBlocking,
+      isDodging: state.isDodging,
+      isGrabbing: state.isGrabbing,
+      isTaunting: state.isTaunting,
+      isAirAttacking: state.isAirAttacking,
+      airJumpsLeft: state.airJumpsLeft,
+      lastStartedMoveId: state.lastStartedMoveId ?? combatState.moveId,
+      lastConfirmedMoveId: meta.lastConfirmedMoveId,
+      justStartedMove: meta.justStartedMove,
+      justLanded: meta.justLanded,
+      justHit: meta.justHit,
+      justBlocked: meta.justBlocked,
+      justParried: meta.justBlocked && state.lastStartedMoveId === "parry",
+      justGuardBroke: meta.justGuardBroke,
+    };
   }
 
   private flushTelemetry() {
@@ -1411,8 +1959,13 @@ export class MatchRuntime {
     }
   }
 
-  private advancePlayerTimers(delta: number, player: CharacterState, cpu: CharacterState) {
-    const { fighting, audio } = this.deps;
+  private advancePlayerTimers(
+    delta: number,
+    player: CharacterState,
+    cpu: CharacterState,
+    fighting: FrameMutationActions,
+  ) {
+    const { audio } = this.deps;
 
     const wasTraveling = this.playerTimers.dodgeTravelPhase > 0;
     if (this.playerTimers.dodgeInvuln > 0) {
@@ -1503,8 +2056,13 @@ export class MatchRuntime {
     }
   }
 
-  private advanceCpuTimers(delta: number, player: CharacterState, cpu: CharacterState) {
-    const { fighting, audio } = this.deps;
+  private advanceCpuTimers(
+    delta: number,
+    player: CharacterState,
+    cpu: CharacterState,
+    fighting: FrameMutationActions,
+  ) {
+    const { audio } = this.deps;
 
     const cpuWasTraveling = this.cpuTimers.dodgeTravelPhase > 0;
     if (this.cpuTimers.dodgeInvuln > 0) {
@@ -1623,8 +2181,13 @@ export class MatchRuntime {
     position: [number, number, number],
     velocity: [number, number, number],
     useCircularBounds: boolean,
-  ): { position: [number, number, number]; velocity: [number, number, number] } {
+  ): {
+    position: [number, number, number];
+    velocity: [number, number, number];
+    result?: "success" | "fail";
+  } {
     const timers = target === "player" ? this.playerTimers : this.cpuTimers;
+    const combatState = target === "player" ? this.playerCombatState : this.cpuCombatState;
     if (!timers.techPending || !context.grounded) {
       return { position, velocity };
     }
@@ -1648,14 +2211,19 @@ export class MatchRuntime {
       timers.techWindow = 0;
       timers.landingLag = 0;
       timers.techInvuln = TECH_SUCCESS_IFRAMES;
+      combatState.action = "tech";
+      combatState.moveId = undefined;
+      combatState.moveFrame = 0;
       this.recordTechTelemetry(target, "success", 0);
-      return adjusted;
+      return { ...adjusted, result: "success" };
     }
     if (timers.techWindow <= 0) {
       timers.techPending = false;
       timers.techWindow = 0;
       timers.landingLag = Math.max(timers.landingLag, HARD_KNOCKDOWN_LAG);
+      combatState.action = "hitstun";
       this.recordTechTelemetry(target, "fail", timers.landingLag);
+      return { position, velocity, result: "fail" };
     }
     return { position, velocity };
   }
@@ -1732,25 +2300,107 @@ export class MatchRuntime {
   ) {
     if (!this.deps.getDebugMode()) return;
     const defendModes = summarizeDefendModes(defend);
+    const attackStrength = frame?.attack ? pressToStrength(frame.attack.press) : undefined;
+    const attackAltitude = frame?.attack ? (frame.attack.airborne ? "air" : "ground") : undefined;
+    const specialSlot = frame?.special ? toSpecialSlot(frame.special.dir) : undefined;
+    const specialAltitude = frame?.special ? (frame.special.airborne ? "air" : "ground") : undefined;
+    const timestamp = performance.now();
+    const signature = [
+      frame?.direction ?? "neutral",
+      attackStrength ?? "none",
+      attackAltitude ?? "none",
+      specialSlot ?? "none",
+      specialAltitude ?? "none",
+      defendModes.join(",") || "none",
+      moveId ?? "none",
+      grounded ? "ground" : "air",
+    ].join("|");
+    const previous = this.inputTelemetryState[slot];
+    if (signature === previous.signature) {
+      return;
+    }
+    if (timestamp - previous.timestamp < INPUT_TELEMETRY_MIN_INTERVAL_MS) {
+      return;
+    }
+    this.inputTelemetryState[slot] = { signature, timestamp };
     recordTelemetry({
       type: "input",
       source,
       slot,
       direction: frame?.direction ?? "neutral",
-      attackStrength: frame?.attack ? pressToStrength(frame.attack.press) : undefined,
-      attackAltitude: frame?.attack ? (frame.attack.airborne ? "air" : "ground") : undefined,
-      specialSlot: frame?.special ? toSpecialSlot(frame.special.dir) : undefined,
-      specialAltitude: frame?.special ? (frame.special.airborne ? "air" : "ground") : undefined,
+      attackStrength,
+      attackAltitude,
+      specialSlot,
+      specialAltitude,
       defendModes,
       moveId,
       grounded,
-      timestamp: performance.now(),
+      timestamp,
     });
   }
 
 }
 
 type InfluenceSnapshot = Partial<Record<"leftward" | "rightward" | "jump" | "backward", boolean>>;
+
+function derivePresentationMovePhase(
+  move: MoveDefinition | undefined,
+  frame: number,
+): FighterPresentationSnapshot["movePhase"] {
+  if (!move) return "none";
+  if (frame >= move.windows.startup.start && frame <= move.windows.startup.end) {
+    return "startup";
+  }
+  if (frame >= move.windows.active.start && frame <= move.windows.active.end) {
+    return "active";
+  }
+  if (frame >= move.windows.recovery.start && frame <= move.windows.recovery.end) {
+    return "recovery";
+  }
+  return "none";
+}
+
+function frameWithinWindow(frame: number | undefined, window?: { start: number; end: number }) {
+  if (frame === undefined || !window) return false;
+  return frame >= window.start && frame <= window.end;
+}
+
+function isCombatInvulnerable(
+  state: FighterCombatState,
+  move: MoveDefinition | undefined,
+  timers: ActionTimers,
+) {
+  if (timers.dodgeInvuln > 0 || timers.techInvuln > 0) return true;
+  return Boolean(move?.invulnerableFrames?.some((window) => frameWithinWindow(state.moveFrame, window)));
+}
+
+function isCombatArmored(state: FighterCombatState, move: MoveDefinition | undefined) {
+  return Boolean(move?.armorFrames?.some((window) => frameWithinWindow(state.moveFrame, window)));
+}
+
+function computeHitstunFrames(hit: { damage: number; knockbackVector: [number, number, number] }) {
+  return Math.round(
+    HITSTUN_BASE_FRAMES +
+      hit.damage * 1.35 +
+      Math.hypot(...hit.knockbackVector) * 12,
+  );
+}
+
+function computeBlockstunFrames(hit: { guardDamage: number; hitLag: number }) {
+  return Math.round(BLOCKSTUN_BASE_FRAMES + hit.guardDamage * 0.35 + hit.hitLag * 0.5);
+}
+
+function constrainToCombatPlane(z: number, delta: number) {
+  const towardPlane = moveTowards(z, COMBAT_PLANE_Z, COMBAT_PLANE_SPRING * delta);
+  return Math.max(-COMBAT_PLANE_BAND, Math.min(COMBAT_PLANE_BAND, towardPlane));
+}
+
+function boundPlaneVelocity(vz: number, z: number) {
+  if (Math.abs(z) >= COMBAT_PLANE_BAND) {
+    return 0;
+  }
+  return vz * 0.35;
+}
 
 function snapshotToControlFrame(
   snapshot?: ControlSnapshot,

@@ -18,6 +18,10 @@ const envSchema = z.object({
     .string()
     .transform((val) => val === "true")
     .default("false"),
+  PORT: z
+    .string()
+    .transform((val) => parseInt(val, 10))
+    .default("3000"),
   ONLINE_WS_PORT: z
     .string()
     .transform((val) => parseInt(val, 10))
@@ -29,6 +33,7 @@ const parsed = envSchema.safeParse({
   NODE_ENV: process.env.NODE_ENV ?? "development",
   SESSION_SECRET: process.env.SESSION_SECRET,
   ENABLE_ONLINE_MULTIPLAYER: process.env.ENABLE_ONLINE_MULTIPLAYER ?? "false",
+  PORT: process.env.PORT ?? "3000",
   ONLINE_WS_PORT: process.env.ONLINE_WS_PORT ?? "5001",
 });
 

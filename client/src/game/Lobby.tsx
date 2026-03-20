@@ -130,7 +130,7 @@ const Lobby = () => {
   return (
     <div className="w-full h-full bg-gradient-to-br from-slate-950 via-slate-900 to-indigo-950 text-white flex flex-col items-center justify-center px-6 py-10 gap-10">
       <div className="text-center space-y-2">
-        <p className="tracking-[0.3em] text-sm text-indigo-300 uppercase">Local Co-op</p>
+        <p className="tracking-[0.3em] text-sm text-indigo-300 uppercase">Local Versus</p>
         <h1 className="text-4xl md:text-5xl font-extrabold">Battle Lobby</h1>
         <p className="text-gray-300 text-sm max-w-xl">
           Claim your slot, ready up, and sync your controllers before stepping into the arena.

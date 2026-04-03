@@ -29,7 +29,7 @@ const Menu = () => {
   useEffect(() => {
     const refreshPads = () => {
       const pads = navigator.getGamepads ? navigator.getGamepads() : [];
-      setControllerConnected(pads.some((pad) => pad && pad.connected));
+      setControllerConnected(Array.from(pads).some((pad) => !!pad?.connected));
     };
     window.addEventListener("gamepadconnected", refreshPads);
     window.addEventListener("gamepaddisconnected", refreshPads);

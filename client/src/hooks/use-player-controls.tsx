@@ -1,5 +1,6 @@
 import { useCallback, useEffect } from "react";
 import { Controls } from "../lib/stores/useControls";
+import { useFighting } from "../lib/stores/useFighting";
 import { KEYBOARD_BINDING_CODES } from "../input/controlGuide";
 
 export type PlayerSlot = "player1" | "player2";
@@ -111,24 +112,39 @@ const keyUpHandler = createHandler(false);
 const gamepadAssignments = new Map<number, PlayerSlot>();
 let gamepadLoopId: number | null = null;
 
-const assignGamepadToSlot = (index: number) => {
-  if (gamepadAssignments.has(index)) return;
-  const preferredOrder: PlayerSlot[] = ["player2", "player1"];
-  const assignedSlots = Array.from(gamepadAssignments.values());
-  for (const slot of preferredOrder) {
-    if (!assignedSlots.includes(slot)) {
-      gamepadAssignments.set(index, slot);
+const getPreferredGamepadOrder = (): PlayerSlot[] =>
+  useFighting.getState().matchMode === "local" ? ["player2", "player1"] : ["player1", "player2"];
+
+const findAssignedIndex = (assignments: Map<number, PlayerSlot>, slot: PlayerSlot) =>
+  Array.from(assignments.entries()).find(([, assignedSlot]) => assignedSlot === slot)?.[0];
+
+const syncGamepadAssignments = (connectedIndices: readonly number[]) => {
+  const nextAssignments = new Map<number, PlayerSlot>();
+  const preferredOrder = getPreferredGamepadOrder();
+
+  connectedIndices.slice(0, preferredOrder.length).forEach((index, orderIndex) => {
+    nextAssignments.set(index, preferredOrder[orderIndex]);
+  });
+
+  (["player1", "player2"] as const).forEach((slot) => {
+    if (findAssignedIndex(gamepadAssignments, slot) !== findAssignedIndex(nextAssignments, slot)) {
       clearSource(slot, "gamepad");
-      return;
     }
-  }
+  });
+
+  gamepadAssignments.clear();
+  nextAssignments.forEach((slot, index) => {
+    gamepadAssignments.set(index, slot);
+  });
 };
 
-const releaseGamepad = (index: number) => {
-  const slot = gamepadAssignments.get(index);
-  if (!slot) return;
-  gamepadAssignments.delete(index);
-  clearSource(slot, "gamepad");
+const getConnectedGamepadIndices = () => {
+  if (typeof navigator === "undefined" || typeof navigator.getGamepads !== "function") {
+    return [] as number[];
+  }
+
+  const pads = navigator.getGamepads() || [];
+  return Array.from(pads).flatMap((pad, index) => (pad && pad.connected ? [index] : []));
 };
 
 const gamepadThreshold = 0.35;
@@ -163,13 +179,11 @@ const updateGamepadStates = () => {
     return;
   }
   const pads = navigator.getGamepads() || [];
+  syncGamepadAssignments(getConnectedGamepadIndices());
   const activeSlots = new Set<PlayerSlot>();
   for (let index = 0; index < pads.length; index++) {
     const pad = pads[index];
     if (!pad || !pad.connected) continue;
-    if (!gamepadAssignments.has(index)) {
-      assignGamepadToSlot(index);
-    }
     const slot = gamepadAssignments.get(index);
     if (!slot) continue;
     activeSlots.add(slot);
@@ -207,11 +221,12 @@ const stopGamepadLoop = () => {
 };
 
 const handleGamepadConnected = (event: GamepadEvent) => {
-  assignGamepadToSlot(event.gamepad.index);
+  syncGamepadAssignments(getConnectedGamepadIndices());
 };
 
 const handleGamepadDisconnected = (event: GamepadEvent) => {
-  releaseGamepad(event.gamepad.index);
+  const connectedIndices = getConnectedGamepadIndices().filter((index) => index !== event.gamepad.index);
+  syncGamepadAssignments(connectedIndices);
 };
 
 const attachListeners = () => {

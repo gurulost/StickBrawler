@@ -1,4 +1,5 @@
 import { Controls } from "./controls";
+import type { MatchMode } from "../lib/stores/useFighting";
 
 export type ControlGuideSlot = "player1" | "player2";
 
@@ -106,7 +107,7 @@ export const PLAYER_KEYBOARD_HINTS: Record<ControlGuideSlot, string> = {
 
 export const CONTROLLER_CONTROL_CARD: ControlCardData = {
   title: "Controller",
-  subtitle: "Gamepad uses the same verbs as the keyboard layouts.",
+  subtitle: "Solo maps the first controller to Player 1. Local Versus maps the first controller to Player 2.",
   bindings: [
     { control: Controls.forward, codes: [], keys: ["Left Stick", "D-Pad"], description: "Move" },
     { control: Controls.jump, codes: [], keys: ["A / Cross"], description: "Jump" },
@@ -118,6 +119,29 @@ export const CONTROLLER_CONTROL_CARD: ControlCardData = {
 
 export const CONTROLLER_READY_HINT =
   "Gamepad ready: Left Stick or D-Pad moves, A jumps, X attacks, B special, LB or RB defends.";
+
+const isSoloMode = (matchMode: MatchMode) => matchMode === "single";
+
+export const getControllerStatusLabel = (matchMode: MatchMode, controllerConnected: boolean) => {
+  if (!controllerConnected) return "Keyboard active";
+  return isSoloMode(matchMode) ? "Controller ready for Player 1" : "Controller ready for Player 2";
+};
+
+export const getControllerStatusDetail = (matchMode: MatchMode, controllerConnected: boolean) => {
+  if (!controllerConnected) {
+    return "Arrow keys + Right Shift + J / K / L are active by default.";
+  }
+  return isSoloMode(matchMode)
+    ? "In Solo, the first controller drives Player 1."
+    : "In Local Versus, the first controller joins Player 2.";
+};
+
+export const getControllerPrompt = (matchMode: MatchMode, controllerConnected: boolean) => {
+  if (!controllerConnected) return null;
+  return isSoloMode(matchMode)
+    ? "Controller mapped to Player 1 for Solo."
+    : "First controller will join Player 2 in Local Versus.";
+};
 
 export const INTENT_GUIDE: readonly IntentLesson[] = [
   {
@@ -196,7 +220,18 @@ export const getCombatHudLegendLine = (slot: ControlGuideSlot): CombatHudLegendL
   };
 };
 
-export const getLobbyControlHint = (slot: ControlGuideSlot, controllerConnected = false) =>
-  slot === "player2" && controllerConnected
-    ? `${CONTROLLER_READY_HINT} ${PLAYER_KEYBOARD_HINTS.player2}`
-    : PLAYER_KEYBOARD_HINTS[slot];
+export const getLobbyControlHint = (
+  slot: ControlGuideSlot,
+  matchMode: MatchMode,
+  controllerConnected = false,
+) => {
+  if (slot === "player1" && controllerConnected && isSoloMode(matchMode)) {
+    return `${CONTROLLER_READY_HINT} This controller drives Player 1 in Solo.`;
+  }
+
+  if (slot === "player2" && controllerConnected && !isSoloMode(matchMode)) {
+    return `Controller joins Player 2 in Local Versus. ${PLAYER_KEYBOARD_HINTS.player2}`;
+  }
+
+  return PLAYER_KEYBOARD_HINTS[slot];
+};

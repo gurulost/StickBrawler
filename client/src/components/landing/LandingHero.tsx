@@ -3,6 +3,11 @@ import { CharacterPreview } from "../preview/CharacterPreview";
 import { heroBadges } from "../../data/landingContent";
 import { MatchMode } from "../../lib/stores/useFighting";
 import { motion } from "framer-motion";
+import {
+  getControllerPrompt,
+  getControllerStatusDetail,
+  getControllerStatusLabel,
+} from "../../input/controlGuide";
 
 interface LandingHeroProps {
   onPlay: () => void;
@@ -42,8 +47,10 @@ export function LandingHero({
   const sectionRef = useRef<HTMLElement | null>(null);
   const [heroInView, setHeroInView] = useState(false);
   const [secondPreviewReady, setSecondPreviewReady] = useState(false);
-  const [showControllerPrompt, setShowControllerPrompt] = useState(false);
   const selectedArena = arenaOptions.find((arena) => arena.id === arenaId);
+  const controllerStatusLabel = getControllerStatusLabel(matchMode, controllerConnected);
+  const controllerStatusDetail = getControllerStatusDetail(matchMode, controllerConnected);
+  const controllerPrompt = getControllerPrompt(matchMode, controllerConnected);
 
   useEffect(() => {
     const observer = new IntersectionObserver(
@@ -66,11 +73,6 @@ export function LandingHero({
       }
     };
   }, []);
-
-  useEffect(() => {
-    setShowControllerPrompt(controllerConnected);
-  }, [controllerConnected]);
-
   return (
     <section
       ref={sectionRef}
@@ -227,9 +229,12 @@ export function LandingHero({
             border: '1px solid rgba(255, 255, 255, 0.04)',
             clipPath: 'polygon(0 0, calc(100% - 10px) 0, 100% 10px, 100% 100%, 10px 100%, 0 calc(100% - 10px))',
           }}>
-            <div className="flex items-center gap-2 text-xs font-tech text-white/55">
+            <div className="flex items-start gap-2 text-xs font-tech text-white/55">
               <span className="text-sm">{controllerConnected ? "🕹️" : "⌨️"}</span>
-              {controllerConnected ? "Gamepad ready" : "Keyboard active"}
+              <div className="space-y-1">
+                <p>{controllerStatusLabel}</p>
+                <p className="text-[10px] text-white/40">{controllerStatusDetail}</p>
+              </div>
             </div>
             <div className="flex items-center gap-2 text-xs font-tech text-white/55">
               <button
@@ -288,9 +293,9 @@ export function LandingHero({
             </p>
           </div>
 
-          {showControllerPrompt && (
+          {controllerPrompt && (
             <div className="clip-angular-sm border border-[#39ff14]/20 bg-[#39ff14]/5 px-3 py-2 text-[10px] font-tech font-bold uppercase tracking-wider text-[#39ff14]/80">
-              Press any button on your controller to add Player 2
+              {controllerPrompt}
             </div>
           )}
         </div>

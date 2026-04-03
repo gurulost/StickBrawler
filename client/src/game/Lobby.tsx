@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useFighting, type PlayerSlot } from "../lib/stores/useFighting";
+import { useFighting, type MatchMode, type PlayerSlot } from "../lib/stores/useFighting";
 import type { FighterId } from "../combat/moveTable";
 import { getLobbyControlHint } from "../input/controlGuide";
 
@@ -10,6 +10,7 @@ const fighterOptions: Array<{ value: FighterId; label: string }> = [
 
 const SlotCard = ({
   slot,
+  matchMode,
   label,
   type,
   ready,
@@ -22,6 +23,7 @@ const SlotCard = ({
   glowColor,
 }: {
   slot: PlayerSlot;
+  matchMode: MatchMode;
   label: string;
   type: "human" | "cpu";
   ready: boolean;
@@ -36,7 +38,7 @@ const SlotCard = ({
   const isPlayerTwo = slot === "player2";
   const isHuman = type === "human";
   const hint = isHuman
-    ? getLobbyControlHint(slot, isPlayerTwo && controllerConnected)
+    ? getLobbyControlHint(slot, matchMode, controllerConnected)
     : "CPU will use the adaptive AI brain.";
 
   return (
@@ -137,14 +139,14 @@ const SlotCard = ({
 };
 
 const Lobby = () => {
-  const { slots, setSlotType, setSlotReady, setSlotFighter, beginMatch, returnToMenu } = useFighting();
+  const { matchMode, slots, setSlotType, setSlotReady, setSlotFighter, beginMatch, returnToMenu } = useFighting();
   const [controllerConnected, setControllerConnected] = useState(false);
 
   useEffect(() => {
     if (typeof window === "undefined" || typeof navigator === "undefined") return;
     const detectControllers = () => {
       const pads = navigator.getGamepads ? navigator.getGamepads() : [];
-      setControllerConnected(pads.some((pad) => pad && pad.connected));
+      setControllerConnected(Array.from(pads).some((pad) => !!pad?.connected));
     };
     window.addEventListener("gamepadconnected", detectControllers);
     window.addEventListener("gamepaddisconnected", detectControllers);
@@ -161,8 +163,8 @@ const Lobby = () => {
   const canStart = playerOneReady && playerTwoReady;
   const lobbyModeLabel = playerTwoHuman ? "Local Versus" : "Solo vs CPU";
   const lobbyDescription = playerTwoHuman
-    ? "Claim both local slots, check the bindings, and ready up before the first round."
-    : "Lock in your fighter, check the bindings, and ready up for a CPU sparring round.";
+    ? "Player 1 stays on the arrow-key layout, and the first controller joins Player 2 for Local Versus."
+    : "Player 1 can use the arrow-key layout or the first connected controller before the CPU sparring round.";
 
   return (
     <div
@@ -191,10 +193,11 @@ const Lobby = () => {
         <div className="grid grid-cols-1 md:grid-cols-[1fr_auto_1fr] gap-6 items-center">
           <SlotCard
             slot="player1"
+            matchMode={matchMode}
             label={slots.player1.label}
             type="human"
             ready={slots.player1.ready}
-            controllerConnected={false}
+            controllerConnected={controllerConnected}
             onToggleReady={() => setSlotReady("player1", !slots.player1.ready)}
             fighterId={slots.player1.fighterId}
             onSelectFighter={(fighter) => setSlotFighter("player1", fighter)}
@@ -223,6 +226,7 @@ const Lobby = () => {
 
           <SlotCard
             slot="player2"
+            matchMode={matchMode}
             label={slots.player2.label}
             type={slots.player2.type}
             ready={slots.player2.ready}

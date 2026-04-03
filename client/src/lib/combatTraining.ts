@@ -1,8 +1,9 @@
+import type { FighterId } from "../combat/moveTable";
 import type { DualInputSnapshot, PlayerInputSnapshot, PlayerSlot } from "../hooks/use-player-controls";
 import { CONTROL_ACTIONS, Controls } from "../input/controls";
 import type { DualPlayerIntentFrame, PlayerIntentFrame } from "../input/intentTypes";
 
-export type CombatTrainingFighter = "any" | "hero" | "villain";
+export type CombatTrainingFighter = "any" | FighterId;
 export type CombatTrainingPresetId =
   | "run_forward"
   | "jump_arc"
@@ -13,7 +14,15 @@ export type CombatTrainingPresetId =
   | "hero_tilt_side"
   | "hero_launcher"
   | "hero_air_forward"
-  | "vill_guard_break_big";
+  | "vill_guard_break_big"
+  | "kite_feather_jab"
+  | "kite_sky_hook"
+  | "kite_air_flick"
+  | "kite_updraft_rise"
+  | "anvil_club_jab"
+  | "anvil_headbutt_lift"
+  | "anvil_air_lariat"
+  | "anvil_rising_crash";
 
 export interface CombatTrainingStep {
   frames: number;
@@ -125,6 +134,29 @@ const attackIntent = (
   };
 };
 
+const specialIntent = (
+  dir: NonNullable<PlayerIntentFrame["special"]>["dir"],
+  options: {
+    airborne?: boolean;
+    direction?: PlayerIntentFrame["direction"];
+  } = {},
+): PlayerIntentFrame => ({
+  ...baseIntent(options.direction ?? "neutral"),
+  special: {
+    kind: "special",
+    dir,
+    airborne: options.airborne ?? false,
+    press: {
+      heldMs: 120,
+      tapped: true,
+      heavy: false,
+      charged: false,
+      flickedDir: undefined,
+      justPressed: true,
+    },
+  },
+});
+
 const defendIntent = (
   mode: "guard" | "roll" | "parry",
   options: { dir?: PlayerIntentFrame["direction"]; direction?: PlayerIntentFrame["direction"] } = {},
@@ -225,7 +257,7 @@ export const COMBAT_TRAINING_PRESETS: Record<CombatTrainingPresetId, CombatTrain
     id: "hero_jab_1",
     label: "Hero Jab",
     description: "Neutral light attack through the live intent analyzer.",
-    fighter: "hero",
+    fighter: "stick_hero",
     steps: [
       step(2, "jab input", { [Controls.attack]: true }, attackIntent("neutral")),
       step(22, "recover"),
@@ -235,7 +267,7 @@ export const COMBAT_TRAINING_PRESETS: Record<CombatTrainingPresetId, CombatTrain
     id: "hero_tilt_side",
     label: "Hero Side Tilt",
     description: "Forward-leaning tilt through the real movement and attack path.",
-    fighter: "hero",
+    fighter: "stick_hero",
     steps: [
       step(
         2,
@@ -250,7 +282,7 @@ export const COMBAT_TRAINING_PRESETS: Record<CombatTrainingPresetId, CombatTrain
     id: "hero_launcher",
     label: "Hero Launcher",
     description: "Up-directed launcher via the fixed action-direction route.",
-    fighter: "hero",
+    fighter: "stick_hero",
     steps: [
       step(
         2,
@@ -265,7 +297,7 @@ export const COMBAT_TRAINING_PRESETS: Record<CombatTrainingPresetId, CombatTrain
     id: "hero_air_forward",
     label: "Hero Air Forward",
     description: "Jump first, then fire the forward aerial on a fixed airborne frame.",
-    fighter: "hero",
+    fighter: "stick_hero",
     steps: [
       step(2, "jump start", { [Controls.jump]: true }),
       step(6, "rise"),
@@ -282,7 +314,7 @@ export const COMBAT_TRAINING_PRESETS: Record<CombatTrainingPresetId, CombatTrain
     id: "vill_guard_break_big",
     label: "Vill Guard Break",
     description: "Held heavy forward strike to force the big guard-break startup.",
-    fighter: "villain",
+    fighter: "stick_villain",
     steps: [
       step(
         16,
@@ -291,6 +323,120 @@ export const COMBAT_TRAINING_PRESETS: Record<CombatTrainingPresetId, CombatTrain
         attackIntent("forward", { heavy: true, direction: "right" }),
       ),
       step(38, "recover"),
+    ],
+  },
+  kite_feather_jab: {
+    id: "kite_feather_jab",
+    label: "Kite Feather Jab",
+    description: "Fast neutral poke for checking aerial fighter startup.",
+    fighter: "stick_kite",
+    steps: [
+      step(2, "jab input", { [Controls.attack]: true }, attackIntent("neutral")),
+      step(22, "recover"),
+    ],
+  },
+  kite_sky_hook: {
+    id: "kite_sky_hook",
+    label: "Kite Sky Hook",
+    description: "Launcher route that starts the juggle-heavy Kite gameplan.",
+    fighter: "stick_kite",
+    steps: [
+      step(
+        2,
+        "sky hook input",
+        { [Controls.forward]: true, [Controls.attack]: true },
+        attackIntent("up", { direction: "forward" }),
+      ),
+      step(34, "recover"),
+    ],
+  },
+  kite_air_flick: {
+    id: "kite_air_flick",
+    label: "Kite Air Flick",
+    description: "Forward aerial check from an intentional jump arc.",
+    fighter: "stick_kite",
+    steps: [
+      step(2, "jump start", { [Controls.jump]: true }),
+      step(6, "rise"),
+      step(
+        2,
+        "air flick",
+        { [Controls.rightward]: true, [Controls.attack]: true },
+        attackIntent("forward", { airborne: true, direction: "right" }),
+      ),
+      step(26, "fall / land"),
+    ],
+  },
+  kite_updraft_rise: {
+    id: "kite_updraft_rise",
+    label: "Kite Updraft Rise",
+    description: "Rising recovery special for confirming the up-special route.",
+    fighter: "stick_kite",
+    steps: [
+      step(
+        2,
+        "rise input",
+        { [Controls.forward]: true, [Controls.special]: true },
+        specialIntent("up", { direction: "forward" }),
+      ),
+      step(38, "recover"),
+    ],
+  },
+  anvil_club_jab: {
+    id: "anvil_club_jab",
+    label: "Anvil Club Jab",
+    description: "Heavyweight neutral check through the same live intent analyzer.",
+    fighter: "stick_anvil",
+    steps: [
+      step(2, "jab input", { [Controls.attack]: true }, attackIntent("neutral")),
+      step(24, "recover"),
+    ],
+  },
+  anvil_headbutt_lift: {
+    id: "anvil_headbutt_lift",
+    label: "Anvil Headbutt Lift",
+    description: "Up-directed launcher that proves the bruiser still has a deliberate juggle starter.",
+    fighter: "stick_anvil",
+    steps: [
+      step(
+        2,
+        "lift input",
+        { [Controls.forward]: true, [Controls.attack]: true },
+        attackIntent("up", { direction: "forward" }),
+      ),
+      step(36, "recover"),
+    ],
+  },
+  anvil_air_lariat: {
+    id: "anvil_air_lariat",
+    label: "Anvil Air Lariat",
+    description: "Jump first, then drive the forward aerial through the live airborne route.",
+    fighter: "stick_anvil",
+    steps: [
+      step(2, "jump start", { [Controls.jump]: true }),
+      step(6, "rise"),
+      step(
+        2,
+        "air lariat",
+        { [Controls.rightward]: true, [Controls.attack]: true },
+        attackIntent("forward", { airborne: true, direction: "right" }),
+      ),
+      step(28, "fall / land"),
+    ],
+  },
+  anvil_rising_crash: {
+    id: "anvil_rising_crash",
+    label: "Anvil Rising Crash",
+    description: "Rising recovery special for the heavy bruiser route set.",
+    fighter: "stick_anvil",
+    steps: [
+      step(
+        2,
+        "rise input",
+        { [Controls.forward]: true, [Controls.special]: true },
+        specialIntent("up", { direction: "forward" }),
+      ),
+      step(40, "recover"),
     ],
   },
 };
@@ -306,6 +452,14 @@ export const COMBAT_TRAINING_PRESET_ORDER = [
   "hero_launcher",
   "hero_air_forward",
   "vill_guard_break_big",
+  "kite_feather_jab",
+  "kite_sky_hook",
+  "kite_air_flick",
+  "kite_updraft_rise",
+  "anvil_club_jab",
+  "anvil_headbutt_lift",
+  "anvil_air_lariat",
+  "anvil_rising_crash",
 ] as const satisfies readonly CombatTrainingPresetId[];
 
 export const createCombatTrainingRunFromPreset = (
@@ -435,9 +589,8 @@ export const describeCombatTrainingRun = (run: CombatTrainingRun | null) => {
 
 export const matchesCombatTrainingFighter = (
   fighter: CombatTrainingFighter,
-  fighterId: string,
+  fighterId: FighterId,
 ) => {
   if (fighter === "any") return true;
-  if (fighter === "hero") return fighterId === "stick_hero";
-  return fighterId === "stick_villain";
+  return fighterId === fighter;
 };

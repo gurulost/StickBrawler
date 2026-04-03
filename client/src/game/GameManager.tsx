@@ -3,7 +3,11 @@ import { useEffect, useMemo, useRef, useCallback } from "react";
 import Arena from "./Arena";
 import CombatDebugOverlay from "./CombatDebugOverlay";
 import StickFigure from "./StickFigure";
-import { useFighting, type GamePhase } from "../lib/stores/useFighting";
+import {
+  isLiveCombatPhase,
+  useFighting,
+  type GamePhase,
+} from "../lib/stores/useFighting";
 import { useAudio } from "../lib/stores/useAudio";
 import { usePlayerControls } from "../hooks/use-player-controls";
 import { usePlayerIntents } from "../hooks/use-player-intents";
@@ -16,6 +20,7 @@ import type { CharacterState } from "../lib/stores/useFighting";
 import type { IntentContext } from "../input/intentTypes";
 import { resolveCombatDebugReviewRecord, useCombatDebug } from "../lib/stores/useCombatDebug";
 import {
+  type CombatTrainingFighter,
   describeCombatTrainingRun,
   injectCombatTrainingFrame,
   injectCombatTrainingIntentFrame,
@@ -151,7 +156,7 @@ const GameManager = () => {
   const buildRuntimeFrame = useCallback(
     (delta: number) => {
       const latest = useFighting.getState();
-      if (latest.gamePhase !== "fighting" || latest.paused) return null;
+      if (!isLiveCombatPhase(latest.gamePhase) || latest.paused) return null;
       const controlsState = useControls.getState();
       const injectedTrainingFrame = controlsState.consumeCombatTrainingFrame();
       const inputs = injectCombatTrainingFrame(getInputState(), injectedTrainingFrame);
@@ -203,6 +208,8 @@ const GameManager = () => {
         getDebugMode: () => useControls.getState().debugMode,
         getMatchMode: () => useFighting.getState().matchMode,
         getArenaStyle: () => arenaStyleRef.current,
+        getArenaId: () => useFighting.getState().arenaId,
+        getCpuConfig: () => useFighting.getState().slots.player2.cpuConfig,
         onImpact: handleImpact,
         sendTelemetry,
       },
@@ -227,17 +234,19 @@ const GameManager = () => {
 
   useEffect(() => {
     if (!runtimeRef.current) return;
-    const enteredFighting = fighting.gamePhase === "fighting" && prevPhaseRef.current !== "fighting";
+    const enteredLiveCombat =
+      isLiveCombatPhase(fighting.gamePhase) &&
+      !isLiveCombatPhase(prevPhaseRef.current);
     const requestedRuntimeReset =
-      fighting.gamePhase === "fighting" &&
+      isLiveCombatPhase(fighting.gamePhase) &&
       fighting.runtimeResetNonce !== prevRuntimeResetNonceRef.current;
-    if (enteredFighting || requestedRuntimeReset) {
+    if (enteredLiveCombat || requestedRuntimeReset) {
       runtimeRef.current.reset({
         player: playerSnapshotRef.current,
         cpu: cpuSnapshotRef.current,
       });
     }
-    if (fighting.gamePhase !== "fighting" && prevPhaseRef.current === "fighting") {
+    if (!isLiveCombatPhase(fighting.gamePhase) && isLiveCombatPhase(prevPhaseRef.current)) {
       resetCombatPlayback();
       clearCombatTraining();
     }
@@ -247,7 +256,7 @@ const GameManager = () => {
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.code === "Escape" && fighting.gamePhase === "fighting") {
+      if (event.code === "Escape" && isLiveCombatPhase(fighting.gamePhase)) {
         fighting.togglePause();
       }
     };
@@ -264,7 +273,7 @@ const GameManager = () => {
         label: string;
         description?: string;
         slot?: "player1" | "player2";
-        fighter?: "any" | "hero" | "villain";
+        fighter?: CombatTrainingFighter;
         presetId?: string;
         steps: CombatTrainingStep[];
       }) => void;
@@ -333,7 +342,7 @@ const GameManager = () => {
 
   useFrame((state, delta) => {
     if (!runtimeRef.current) return;
-    const activeCombat = fighting.gamePhase === "fighting" && !fighting.paused;
+    const activeCombat = isLiveCombatPhase(fighting.gamePhase) && !fighting.paused;
     const queuedStepFrames = activeCombat
       ? useControls.getState().consumeCombatFrameSteps()
       : 0;
@@ -344,6 +353,7 @@ const GameManager = () => {
           : delta * combatPlaybackRate
         : 0;
     const presentationActive =
+      fighting.gamePhase === "training" ||
       fighting.gamePhase === "fighting" ||
       fighting.gamePhase === "round_end" ||
       fighting.gamePhase === "match_end";

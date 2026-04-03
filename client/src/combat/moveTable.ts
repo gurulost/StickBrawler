@@ -1,6 +1,6 @@
 import type { Direction, PressStyle } from "../input/intentTypes";
 
-export type FighterId = "stick_hero" | "stick_villain";
+export type FighterId = "stick_hero" | "stick_villain" | "stick_kite" | "stick_anvil";
 
 export type AttackStrength = "light" | "medium" | "heavy" | "power";
 export type Altitude = "ground" | "air";
@@ -92,9 +92,81 @@ export const villainMoveTable: FighterMoveTable = {
   ["defend:roll" as MoveKey]: "dodge",
 };
 
+export const kiteMoveTable: FighterMoveTable = {
+  [mapAttack("neutral", "light", "ground")]: "kite_feather_jab",
+  [mapAttack("forward", "light", "ground")]: "kite_wing_slice",
+  [mapAttack("back", "light", "ground")]: "kite_wing_slice",
+  [mapAttack("up", "light", "ground")]: "kite_sky_hook",
+  [mapAttack("down", "light", "ground")]: "kite_slide_kick",
+
+  [mapAttack("forward", "heavy", "ground")]: "kite_tail_whip",
+  [mapAttack("back", "heavy", "ground")]: "kite_tail_whip",
+  [mapAttack("down", "heavy", "ground")]: "kite_sky_hook",
+  [mapAttack("forward", "power", "ground")]: "kite_tail_whip",
+  [mapAttack("back", "power", "ground")]: "kite_tail_whip",
+
+  [mapAttack("neutral", "light", "air")]: "kite_air_swirl",
+  [mapAttack("forward", "light", "air")]: "kite_air_flick",
+  [mapAttack("back", "light", "air")]: "kite_air_swirl",
+  [mapAttack("down", "light", "air")]: "kite_dive_screw",
+  [mapAttack("up", "light", "air")]: "kite_air_swirl",
+
+  [mapSpecial("neutral", "ground")]: "kite_gale_pulse",
+  [mapSpecial("forward", "ground")]: "kite_drift_break",
+  [mapSpecial("back", "ground")]: "kite_crosswind_feint",
+  [mapSpecial("up", "ground")]: "kite_updraft_rise",
+  [mapSpecial("down", "ground")]: "kite_crosswind_feint",
+
+  [mapSpecial("neutral", "air")]: "kite_gale_pulse",
+  [mapSpecial("forward", "air")]: "kite_drift_break",
+  [mapSpecial("back", "air")]: "kite_air_swirl",
+  [mapSpecial("up", "air")]: "kite_updraft_rise",
+  [mapSpecial("down", "air")]: "kite_dive_screw",
+
+  ["defend:parry" as MoveKey]: "parry",
+  ["defend:roll" as MoveKey]: "dodge",
+};
+
+export const anvilMoveTable: FighterMoveTable = {
+  [mapAttack("neutral", "light", "ground")]: "anvil_club_jab",
+  [mapAttack("forward", "light", "ground")]: "anvil_shoulder_check",
+  [mapAttack("back", "light", "ground")]: "anvil_shoulder_check",
+  [mapAttack("up", "light", "ground")]: "anvil_headbutt_lift",
+  [mapAttack("down", "light", "ground")]: "anvil_ankle_stamp",
+
+  [mapAttack("forward", "heavy", "ground")]: "anvil_hammer_fall",
+  [mapAttack("back", "heavy", "ground")]: "anvil_hammer_fall",
+  [mapAttack("down", "heavy", "ground")]: "anvil_headbutt_lift",
+  [mapAttack("forward", "power", "ground")]: "anvil_hammer_fall",
+  [mapAttack("back", "power", "ground")]: "anvil_hammer_fall",
+
+  [mapAttack("neutral", "light", "air")]: "anvil_body_press",
+  [mapAttack("forward", "light", "air")]: "anvil_air_lariat",
+  [mapAttack("back", "light", "air")]: "anvil_body_press",
+  [mapAttack("down", "light", "air")]: "anvil_elbow_drop",
+  [mapAttack("up", "light", "air")]: "anvil_body_press",
+
+  [mapSpecial("neutral", "ground")]: "anvil_iron_bellow",
+  [mapSpecial("forward", "ground")]: "anvil_bulldoze",
+  [mapSpecial("back", "ground")]: "anvil_brace_counter",
+  [mapSpecial("up", "ground")]: "anvil_rising_crash",
+  [mapSpecial("down", "ground")]: "anvil_quake_slam",
+
+  [mapSpecial("neutral", "air")]: "anvil_body_press",
+  [mapSpecial("forward", "air")]: "anvil_air_lariat",
+  [mapSpecial("back", "air")]: "anvil_brace_counter",
+  [mapSpecial("up", "air")]: "anvil_rising_crash",
+  [mapSpecial("down", "air")]: "anvil_elbow_drop",
+
+  ["defend:parry" as MoveKey]: "parry",
+  ["defend:roll" as MoveKey]: "dodge",
+};
+
 const fighterMoveTables: Record<FighterId, FighterMoveTable> = {
   stick_hero: heroMoveTable,
   stick_villain: villainMoveTable,
+  stick_kite: kiteMoveTable,
+  stick_anvil: anvilMoveTable,
 };
 
 export function getMoveTableFor(fighterId: FighterId) {

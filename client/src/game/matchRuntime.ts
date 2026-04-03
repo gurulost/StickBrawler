@@ -1,7 +1,14 @@
 import { GameEngine, createInitialState, type GameCommand, type SystemContext } from "../../../engine/index";
-import { CpuBrain, CpuStyle, type CpuControlFrame } from "./cpuBrain";
+import {
+  CpuBrain,
+  DEFAULT_CPU_CONFIG,
+  type CpuConfig,
+  type CpuControlFrame,
+} from "./cpuBrain";
 import {
   applyGravity,
+  CAPSULE_RADIUS,
+  type Platform,
   PLAYER_SPEED,
   JUMP_FORCE,
   applyHorizontalFriction,
@@ -10,6 +17,7 @@ import {
   applyHitLagTimer,
   ATTACK_RANGE,
   getPlatformHeight,
+  getPlatformsForLayout,
   CPU_SPEED,
   GROUND_ACCELERATION,
   AIR_ACCELERATION,
@@ -28,6 +36,7 @@ import {
   AIR_TURN_LOCK_PENALTY,
   AIR_STRAFE_IMPULSE,
   COMBO_WINDOW,
+  PLATFORMS,
 } from "./Physics";
 import {
   CombatStateMachine,
@@ -83,6 +92,7 @@ import {
   resolveCombatPlanePush,
   scaleCombatPlaneDepthSpeed,
 } from "./combatReadability";
+import { getArenaTheme } from "./arenas";
 
 interface FightingActions {
   applyRuntimeFrame: (frame: RuntimeFrameSnapshot) => void;
@@ -109,6 +119,8 @@ interface MatchRuntimeDeps {
   getDebugMode: () => boolean;
   getMatchMode: () => MatchMode;
   getArenaStyle: () => 'open' | 'contained';
+  getArenaId?: () => string;
+  getCpuConfig?: () => CpuConfig;
   sendTelemetry?: (entries: CombatTelemetryEvent[]) => void;
   onImpact?: (intensity: number) => void;
 }
@@ -137,6 +149,23 @@ const hasActiveControlSnapshot = (snapshot: ControlSnapshot) =>
 export const createEmptyInputs = (): DualInputState => ({
   player1: createControlSnapshot(),
   player2: createControlSnapshot(),
+});
+
+const createEmptyCpuControlFrame = (): CpuControlFrame => ({
+  jump: false,
+  forward: false,
+  backward: false,
+  leftward: false,
+  rightward: false,
+  dropThrough: false,
+  shield: false,
+  parry: false,
+  attack1: false,
+  attack2: false,
+  special: false,
+  airAttack: false,
+  dodge: false,
+  grab: false,
 });
 
 interface FramePayload {
@@ -249,6 +278,19 @@ const createConfirmFlags = (): ConfirmFlags => ({
   whiff: false,
 });
 
+const frameInWindow = (frame: number | undefined, window: { start: number; end: number }) =>
+  frame != null && frame >= window.start && frame <= window.end;
+
+const isCounterGuardingMove = (
+  move: MoveDefinition | undefined,
+  moveFrame: number | undefined,
+) => Boolean(move?.counterGuardFrames?.some((window) => frameInWindow(moveFrame, window)));
+
+const isReactiveBlockMove = (
+  move: MoveDefinition | undefined,
+  moveFrame: number | undefined,
+) => move?.id === "parry" || isCounterGuardingMove(move, moveFrame);
+
 type DefendResolution = {
   guard: boolean;
   parry: boolean;
@@ -360,9 +402,10 @@ export class MatchRuntime {
   private cpuHitLag = 0;
   private roundTimeRemaining = DEFAULT_ROUND_TIME;
   private maxRoundTime = DEFAULT_ROUND_TIME;
-  private readonly cpuBrain = new CpuBrain({ style: CpuStyle.BALANCED });
+  private readonly cpuBrain: CpuBrain;
   private playerTimers: ActionTimers = createActionTimers();
   private cpuTimers: ActionTimers = createActionTimers();
+  private currentPlatforms: Platform[] = PLATFORMS;
   private previousInputs: DualInputState = createEmptyInputs();
   private inputTelemetryState: Record<
     TelemetrySlot,
@@ -386,6 +429,11 @@ export class MatchRuntime {
     // Create deterministic seed from match start positions
     const seed = this.createMatchSeed(snapshot);
     this.rng = new DeterministicRandom(seed);
+    this.cpuBrain = new CpuBrain({
+      ...this.getCpuConfig(),
+      rng: () => this.rng.next(),
+    });
+    this.refreshArenaPlatforms();
     
     // Initialize engine with deterministic seed
     this.engine = new GameEngine(createInitialState(seed));
@@ -414,8 +462,21 @@ export class MatchRuntime {
     return hash & hash; // Convert to 32-bit integer
   }
 
+  private getCpuConfig(): CpuConfig {
+    return this.deps.getCpuConfig?.() ?? DEFAULT_CPU_CONFIG;
+  }
+
+  private refreshArenaPlatforms() {
+    const arenaTheme = getArenaTheme(this.deps.getArenaId?.());
+    this.currentPlatforms = getPlatformsForLayout(arenaTheme.platformLayout);
+  }
+
+  private getPlatformHeightAt(x: number, z: number) {
+    return getPlatformHeight(x, z, this.currentPlatforms);
+  }
+
   update(payload: FramePayload) {
-    if (payload.gamePhase !== "fighting") return;
+    if (payload.gamePhase !== "fighting" && payload.gamePhase !== "training") return;
     const command: GameCommand<FramePayload> = {
       type: "match/frame",
       payload,
@@ -462,6 +523,8 @@ export class MatchRuntime {
     // Reset RNG with new deterministic seed for match consistency
     const seed = this.createMatchSeed(snapshot);
     this.rng.reset(seed);
+    this.refreshArenaPlatforms();
+    this.cpuBrain.setConfig(this.getCpuConfig());
   }
 
   private setPosition(target: CharacterState, x: number, y: number, z: number) {
@@ -537,6 +600,7 @@ export class MatchRuntime {
   private processFrame(payload: FramePayload) {
     const { audio, getMatchMode } = this.deps;
     const { delta, inputs } = payload;
+    const isTrainingMode = payload.gamePhase === "training";
     const previousPlayer = this.playerState;
     const previousCpu = this.cpuState;
     const player = structuredClone(previousPlayer);
@@ -548,6 +612,7 @@ export class MatchRuntime {
     const playerIntentFrame = intentFrame?.player1;
     const rawOpponentIntentFrame = intentFrame?.player2;
     const matchMode = getMatchMode();
+    this.refreshArenaPlatforms();
     const isLocalMultiplayer = matchMode === "local";
     const useCircularBounds = this.deps.getArenaStyle() === "contained";
     const opponentSlot = isLocalMultiplayer ? "player2" : "cpu";
@@ -560,6 +625,7 @@ export class MatchRuntime {
       !isLocalMultiplayer &&
       payload.trainingOverrideSlots?.includes("player2") === true &&
       hasActiveControlSnapshot(opponentControls);
+    this.cpuBrain.setConfig(this.getCpuConfig());
     const playerMoveTable = getMoveTableFor(player.fighterId);
     const cpuMoveTable = getMoveTableFor(cpu.fighterId);
 
@@ -593,7 +659,9 @@ export class MatchRuntime {
       intentTech ||
       (!!playerControls.attack && !prevPlayerControls.attack);
 
-    const cpuControlState = isLocalMultiplayer || cpuManualOverride
+    const cpuControlState = isTrainingMode && !isLocalMultiplayer && !cpuManualOverride
+      ? createEmptyCpuControlFrame()
+      : isLocalMultiplayer || cpuManualOverride
       ? snapshotToControlFrame(opponentControls, rawOpponentIntentFrame, localOpponentDefendState)
       : this.cpuBrain.tick(
           {
@@ -652,7 +720,9 @@ export class MatchRuntime {
         target.comboCount = 0;
       }
     };
-    this.roundTimeRemaining = Math.max(0, this.roundTimeRemaining - delta);
+    if (!isTrainingMode) {
+      this.roundTimeRemaining = Math.max(0, this.roundTimeRemaining - delta);
+    }
 
     const applyGuardDamageToPlayer = (amount: number) => {
       if (amount <= 0) return;
@@ -826,6 +896,11 @@ export class MatchRuntime {
     this.setAttackingState(player, playerAction === "attack");
     this.setDodgingState(player, playerAction === "dodge");
     this.setAirAttackingState(player, updatedCombatState.inAir && playerAction === "attack");
+    const playerCounterGuarding = isCounterGuardingMove(
+      updatedCombatState.moveId ? coreMoves[updatedCombatState.moveId] : undefined,
+      updatedCombatState.moveFrame,
+    );
+    this.setBlockingState(player, player.isBlocking || playerCounterGuarding);
 
     if (updatedCombatState.moveId) {
       const moveDef = coreMoves[updatedCombatState.moveId];
@@ -855,28 +930,37 @@ export class MatchRuntime {
               return;
             }
             const defenderArmored = isCombatArmored(this.cpuCombatState, defenderMove);
-            const blocking = cpu.isBlocking;
+            const defenderReactiveBlock = isReactiveBlockMove(
+              defenderMove,
+              this.cpuCombatState.moveFrame,
+            );
+            const blocking =
+              cpu.isBlocking ||
+              defenderReactiveBlock;
             const baseDamage = Math.round(hit.damage);
             maxDamage = Math.max(maxDamage, baseDamage);
             this.playerMoveHadConfirm = true;
             this.playerLastConfirmedMoveId = hit.moveId;
             if (blocking) {
-              const chip = Math.max(
-                MIN_CHIP_DAMAGE,
-                Math.round(baseDamage * CHIP_DAMAGE_RATIO),
-              );
-              applyResolvedDamage(cpu, player, chip);
-              applyGuardDamageToCpu(hit.guardDamage);
-              this.cpuTimers.guardRegenDelay = GUARD_REGEN_DELAY;
               audio.playBlock();
               this.playerConfirmFlags.block = true;
-              this.cpuCombatState.blockstunFrames = Math.max(
-                this.cpuCombatState.blockstunFrames,
-                computeBlockstunFrames(hit),
-              );
-              this.cpuCombatState.action = "blockstun";
-              this.cpuCombatState.moveId = undefined;
-              this.cpuCombatState.moveFrame = 0;
+              this.cpuConfirmFlags.block = true;
+              if (!defenderReactiveBlock) {
+                const chip = Math.max(
+                  MIN_CHIP_DAMAGE,
+                  Math.round(baseDamage * CHIP_DAMAGE_RATIO),
+                );
+                applyResolvedDamage(cpu, player, chip);
+                applyGuardDamageToCpu(hit.guardDamage);
+                this.cpuTimers.guardRegenDelay = GUARD_REGEN_DELAY;
+                this.cpuCombatState.blockstunFrames = Math.max(
+                  this.cpuCombatState.blockstunFrames,
+                  computeBlockstunFrames(hit),
+                );
+                this.cpuCombatState.action = "blockstun";
+                this.cpuCombatState.moveId = undefined;
+                this.cpuCombatState.moveFrame = 0;
+              }
             } else {
               applyResolvedDamage(cpu, player, baseDamage);
               if (hit.causesTrip) {
@@ -1031,12 +1115,17 @@ export class MatchRuntime {
     this.setAttackingState(cpu, cpuAction === "attack");
     this.setDodgingState(cpu, cpuAction === "dodge");
     this.setAirAttackingState(cpu, cpuUpdatedState.inAir && cpuAction === "attack");
-    const cpuBlocking = cpuControlState.shield && this.cpuCombatState.guardMeter > 0;
+    const cpuCounterGuarding = isCounterGuardingMove(
+      cpuUpdatedState.moveId ? coreMoves[cpuUpdatedState.moveId] : undefined,
+      cpuUpdatedState.moveFrame,
+    );
+    const cpuBlocking =
+      (cpuControlState.shield && this.cpuCombatState.guardMeter > 0) || cpuCounterGuarding;
     this.setBlockingState(cpu, cpuBlocking);
     if (cpuBlocking) {
       this.cpuCombatState.guardMeter = Math.max(
         0,
-        this.cpuCombatState.guardMeter - GUARD_HOLD_DRAIN * delta,
+        this.cpuCombatState.guardMeter - (cpuControlState.shield ? GUARD_HOLD_DRAIN * delta : 0),
       );
       this.cpuTimers.guardRegenDelay = GUARD_REGEN_DELAY;
     }
@@ -1068,28 +1157,37 @@ export class MatchRuntime {
               return;
             }
             const defenderArmored = isCombatArmored(this.playerCombatState, defenderMove);
-            const blocking = player.isBlocking;
+            const defenderReactiveBlock = isReactiveBlockMove(
+              defenderMove,
+              this.playerCombatState.moveFrame,
+            );
+            const blocking =
+              player.isBlocking ||
+              defenderReactiveBlock;
             const baseDamage = Math.round(hit.damage);
             maxDamage = Math.max(maxDamage, baseDamage);
             this.cpuMoveHadConfirm = true;
             this.cpuLastConfirmedMoveId = hit.moveId;
             if (blocking) {
-              const chip = Math.max(
-                MIN_CHIP_DAMAGE,
-                Math.round(baseDamage * CHIP_DAMAGE_RATIO),
-              );
-              applyResolvedDamage(player, cpu, chip);
-              applyGuardDamageToPlayer(hit.guardDamage);
-              this.playerTimers.guardRegenDelay = GUARD_REGEN_DELAY;
               audio.playBlock();
               this.cpuConfirmFlags.block = true;
-              this.playerCombatState.blockstunFrames = Math.max(
-                this.playerCombatState.blockstunFrames,
-                computeBlockstunFrames(hit),
-              );
-              this.playerCombatState.action = "blockstun";
-              this.playerCombatState.moveId = undefined;
-              this.playerCombatState.moveFrame = 0;
+              this.playerConfirmFlags.block = true;
+              if (!defenderReactiveBlock) {
+                const chip = Math.max(
+                  MIN_CHIP_DAMAGE,
+                  Math.round(baseDamage * CHIP_DAMAGE_RATIO),
+                );
+                applyResolvedDamage(player, cpu, chip);
+                applyGuardDamageToPlayer(hit.guardDamage);
+                this.playerTimers.guardRegenDelay = GUARD_REGEN_DELAY;
+                this.playerCombatState.blockstunFrames = Math.max(
+                  this.playerCombatState.blockstunFrames,
+                  computeBlockstunFrames(hit),
+                );
+                this.playerCombatState.action = "blockstun";
+                this.playerCombatState.moveId = undefined;
+                this.playerCombatState.moveFrame = 0;
+              }
             } else {
               applyResolvedDamage(player, cpu, baseDamage);
               if (hit.causesTrip) {
@@ -1297,7 +1395,7 @@ export class MatchRuntime {
     let cpuDirection = cpu.direction;
     this.cpuTimers.dashCooldown = Math.max(0, this.cpuTimers.dashCooldown - delta);
     this.cpuTimers.turnLock = Math.max(0, this.cpuTimers.turnLock - delta);
-    const cpuPlatformHeight = getPlatformHeight(cpu.position[0], cpu.position[2]);
+    const cpuPlatformHeight = this.getPlatformHeightAt(cpu.position[0], cpu.position[2]);
     const cpuHorizontalIntent =
       controlState.leftward ||
       controlState.rightward ||
@@ -1440,9 +1538,11 @@ export class MatchRuntime {
       cpuDrop,
       cpuFastFall,
       delta,
+      CAPSULE_RADIUS,
+      this.currentPlatforms,
     );
 
-    const cpuOnGround = cpuNewY <= getPlatformHeight(cpu.position[0], cpu.position[2]) + 0.01;
+    const cpuOnGround = cpuNewY <= this.getPlatformHeightAt(cpu.position[0], cpu.position[2]) + 0.01;
     const cpuLandedThisFrame = cpuOnGround && cpu.isJumping;
     if (cpuLandedThisFrame) {
       this.setJumpingState(cpu, false);
@@ -1465,7 +1565,7 @@ export class MatchRuntime {
     let [boundedVX, boundedVY, boundedVZ] = cpuBounds.velocity;
     boundedZ = constrainToCombatPlane(boundedZ, delta);
     boundedVZ = boundPlaneVelocity(boundedVZ, boundedZ);
-    const cpuGrounded = boundedY <= getPlatformHeight(boundedX, boundedZ) + 0.02;
+    const cpuGrounded = boundedY <= this.getPlatformHeightAt(boundedX, boundedZ) + 0.02;
     if (cpuGrounded || this.cpuTimers.techPending) {
       const techOutcome = this.resolveTechLandingOutcome(
         "cpu",
@@ -1532,7 +1632,7 @@ export class MatchRuntime {
     let newVY = player.velocity[1];
     let newVZ = player.velocity[2];
     let newDirection = player.direction;
-    const platformHeight = getPlatformHeight(playerX, playerZ);
+    const platformHeight = this.getPlatformHeightAt(playerX, playerZ);
     const groundedNow = playerY <= platformHeight + 0.02;
     const horizontalIntent =
       input.leftward || input.rightward || input.forward || input.backward;
@@ -1666,6 +1766,8 @@ export class MatchRuntime {
       dropThrough,
       fastFallActive,
       delta,
+      CAPSULE_RADIUS,
+      this.currentPlatforms,
     );
     newVY = gravityVY;
 
@@ -1761,7 +1863,7 @@ export class MatchRuntime {
     boundedZ = constrainToCombatPlane(boundedZ, delta);
     boundedVZ = boundPlaneVelocity(boundedVZ, boundedZ);
     const groundedAfterMove =
-      boundedY <= getPlatformHeight(boundedX, boundedZ) + 0.02;
+      boundedY <= this.getPlatformHeightAt(boundedX, boundedZ) + 0.02;
     if (groundedAfterMove || this.playerTimers.techPending) {
       const techOutcome = this.resolveTechLandingOutcome(
         "player",
@@ -1804,12 +1906,13 @@ export class MatchRuntime {
     },
   ): FighterPresentationSnapshot {
     const move = combatState.moveId ? coreMoves[combatState.moveId] : undefined;
-    const grounded = state.position[1] <= getPlatformHeight(state.position[0], state.position[2]) + 0.02;
+    const grounded = state.position[1] <= this.getPlatformHeightAt(state.position[0], state.position[2]) + 0.02;
     const inAir = !grounded || state.isJumping;
     const moveFrame = combatState.moveFrame ?? 0;
     const hitLagFrames = Math.max(0, Math.round(meta.hitLag * 60));
     const invulnerable = isCombatInvulnerable(combatState, move, meta.timers);
     const armored = isCombatArmored(combatState, move);
+    const blocking = state.isBlocking || isCounterGuardingMove(move, moveFrame);
     const hardLocked =
       meta.timers.guardBreak > 0 ||
       meta.timers.landingLag > 0 ||
@@ -1848,7 +1951,7 @@ export class MatchRuntime {
       dodgeCooldown: state.dodgeCooldown,
       grabCooldown: state.grabCooldown,
       moveCooldown: state.moveCooldown,
-      isBlocking: state.isBlocking,
+      isBlocking: blocking,
       isDodging: state.isDodging,
       isGrabbing: state.isGrabbing,
       isTaunting: state.isTaunting,
@@ -2333,6 +2436,7 @@ function snapshotToControlFrame(
     dodge: false,
     grab: false,
     shield: false,
+    parry: false,
   };
   if (!snapshot) return base;
   base.jump = !!snapshot.jump;
@@ -2354,6 +2458,7 @@ function snapshotToControlFrame(
   base.dodge = defend?.roll ?? false;
   base.grab = defend?.grab ?? false;
   base.shield = defend?.guard || defend?.parry || false;
+  base.parry = defend?.parry ?? false;
   base.dropThrough = !!snapshot.backward && !!snapshot.jump;
   return base;
 }
@@ -2412,6 +2517,14 @@ function buildCpuIntentFrame(
 ): PlayerIntentFrame {
   const direction: Direction = resolveMovementIntentDirection(controlState);
   const actionDirection: Direction = resolveActionIntentDirection(controlState, facing);
+  const defendPress: PressStyle = {
+    heldMs: controlState.parry ? 60 : 120,
+    tapped: !!controlState.parry,
+    heavy: false,
+    charged: false,
+    flickedDir: undefined,
+    justPressed: true,
+  };
   const attackPress: PressStyle = {
     heldMs: controlState.attack2 ? 320 : 90,
     tapped: !controlState.attack2,
@@ -2443,10 +2556,33 @@ function buildCpuIntentFrame(
         } as PressStyle,
       }
     : undefined;
+  const defendIntents: DefendIntent[] = [];
+  if (controlState.parry) {
+    defendIntents.push({ kind: "defend", mode: "parry", press: defendPress });
+  } else if (controlState.shield) {
+    defendIntents.push({ kind: "defend", mode: "guard", press: defendPress });
+  }
+  if (controlState.dodge) {
+    defendIntents.push({
+      kind: "defend",
+      mode: "roll",
+      dir: controlState.leftward
+        ? "left"
+        : controlState.rightward
+          ? "right"
+          : controlState.backward
+            ? "back"
+            : "neutral",
+      press: defendPress,
+    });
+  }
+  if (controlState.grab) {
+    defendIntents.push({ kind: "defend", mode: "grab", press: defendPress });
+  }
   return {
     attack: attackIntent,
     special: specialIntent,
-    defend: [],
+    defend: defendIntents,
     jump: controlState.jump
       ? { kind: "jump", shortHopCandidate: false, justPressed: true }
       : undefined,
@@ -2461,8 +2597,8 @@ function deriveCpuDefendState(controlState: CpuControlFrame): DefendResolution {
   else if (controlState.rightward) rollDir = "right";
   else if (controlState.backward) rollDir = "back";
   return {
-    guard: !!controlState.shield,
-    parry: false,
+    guard: !!controlState.shield || !!controlState.parry,
+    parry: !!controlState.parry,
     roll: !!controlState.dodge,
     rollDir: controlState.dodge ? rollDir : undefined,
     grab: !!controlState.grab,

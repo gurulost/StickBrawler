@@ -4,6 +4,7 @@ import {
   consumeCombatTrainingRunFrame,
   createCombatTrainingRunFromPreset,
   createCombatTrainingRunFromSequence,
+  type CombatTrainingFighter,
   type CombatTrainingFrameSample,
   type CombatTrainingPresetId,
   type CombatTrainingRun,
@@ -65,7 +66,7 @@ type ControlsState = {
     label: string;
     description?: string;
     slot?: PlayerSlot;
-    fighter?: "any" | "hero" | "villain";
+    fighter?: CombatTrainingFighter;
     presetId?: string;
     steps: CombatTrainingStep[];
   }) => void;

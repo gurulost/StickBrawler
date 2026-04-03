@@ -59,6 +59,21 @@ export interface Platform {
   y: number;   // Height of platform
 }
 
+export type ArenaPlatformLayoutId =
+  | "classic"
+  | "skybridge"
+  | "scramble"
+  | "runway"
+  | "contained";
+
+const mirrorAcrossCenterX = (platform: Platform): Platform => ({
+  x1: -platform.x2,
+  x2: -platform.x1,
+  z1: platform.z1,
+  z2: platform.z2,
+  y: platform.y,
+});
+
 // Define platforms in the arena (coordinates are in world space)
 // Spread more evenly throughout the larger 3D space
 /**
@@ -99,20 +114,78 @@ export function generateDefaultPlatforms(): Platform[] {
   return platforms;
 }
 
+export function generateSkybridgePlatforms(): Platform[] {
+  return [
+    { x1: -9.5, x2: -4.5, z1: -1.8, z2: 1.8, y: 2.6 },
+    { x1: 4.5, x2: 9.5, z1: -1.8, z2: 1.8, y: 2.6 },
+    { x1: -3.8, x2: 3.8, z1: -1.3, z2: 1.3, y: 5.6 },
+    { x1: -13, x2: -10.2, z1: -1.2, z2: 1.2, y: 4.1 },
+    { x1: 10.2, x2: 13, z1: -1.2, z2: 1.2, y: 4.1 },
+  ];
+}
+
+export function generateScramblePlatforms(): Platform[] {
+  return [
+    { x1: -7.4, x2: -3.3, z1: -1.7, z2: 1.7, y: 2.1 },
+    { x1: 3.3, x2: 7.4, z1: -1.7, z2: 1.7, y: 2.1 },
+    { x1: -2.8, x2: 2.8, z1: -1.9, z2: 1.9, y: 3.3 },
+    { x1: -1.4, x2: 1.4, z1: -1.1, z2: 1.1, y: 4.9 },
+  ];
+}
+
+export function generateRunwayPlatforms(): Platform[] {
+  return [
+    { x1: -12.2, x2: -8.4, z1: -1.3, z2: 1.3, y: 2.4 },
+    { x1: 8.4, x2: 12.2, z1: -1.3, z2: 1.3, y: 2.4 },
+    { x1: -2.4, x2: 2.4, z1: -0.9, z2: 0.9, y: 5.1 },
+  ];
+}
+
+export function generateContainmentPlatforms(): Platform[] {
+  const sideStep: Platform = { x1: -4.6, x2: -1.2, z1: -1.5, z2: 1.5, y: 2.3 };
+  return [
+    sideStep,
+    mirrorAcrossCenterX(sideStep),
+    { x1: -2.1, x2: 2.1, z1: -1.4, z2: 1.4, y: 4.6 },
+  ];
+}
+
+const PLATFORM_LAYOUTS: Record<ArenaPlatformLayoutId, Platform[]> = {
+  classic: generateDefaultPlatforms(),
+  skybridge: generateSkybridgePlatforms(),
+  scramble: generateScramblePlatforms(),
+  runway: generateRunwayPlatforms(),
+  contained: generateContainmentPlatforms(),
+};
+
+export const DEFAULT_PLATFORM_LAYOUT: ArenaPlatformLayoutId = "classic";
+
 // Define platforms in the arena using the generator
-export const PLATFORMS: Platform[] = generateDefaultPlatforms();
+export const PLATFORMS: Platform[] = PLATFORM_LAYOUTS[DEFAULT_PLATFORM_LAYOUT];
+
+export function getPlatformsForLayout(
+  layoutId: ArenaPlatformLayoutId = DEFAULT_PLATFORM_LAYOUT,
+): Platform[] {
+  return PLATFORM_LAYOUTS[layoutId] ?? PLATFORMS;
+}
 
 /**
  * Check if a point is on a platform
  */
-export function isOnPlatform(x: number, y: number, z: number, platformY: number = 0): boolean {
+export function isOnPlatform(
+  x: number,
+  y: number,
+  z: number,
+  platformY: number = 0,
+  platforms: Platform[] = PLATFORMS,
+): boolean {
   // First check the main floor (implicit platform at y=0)
   if (Math.abs(y - FLOOR_Y) < 0.1 && y >= 0) {
     return true;
   }
   
   // Then check all other platforms
-  for (const platform of PLATFORMS) {
+  for (const platform of platforms) {
     // Check if within the platform boundaries (with a small margin)
     const onPlatformX = x >= platform.x1 && x <= platform.x2;
     const onPlatformZ = z >= platform.z1 && z <= platform.z2;
@@ -131,10 +204,14 @@ export function isOnPlatform(x: number, y: number, z: number, platformY: number 
  * Returns the height of the highest platform at this position
  * or FLOOR_Y if no platform exists there
  */
-export function getPlatformHeight(x: number, z: number): number {
+export function getPlatformHeight(
+  x: number,
+  z: number,
+  platforms: Platform[] = PLATFORMS,
+): number {
   let highestY = FLOOR_Y;
   
-  for (const platform of PLATFORMS) {
+  for (const platform of platforms) {
     if (x >= platform.x1 && x <= platform.x2 && 
         z >= platform.z1 && z <= platform.z2 && 
         platform.y > highestY) {
@@ -158,6 +235,7 @@ export function applyGravity(
   fastFall: boolean = false,
   delta: number = 1,
   capsuleRadius: number = CAPSULE_RADIUS,
+  platforms: Platform[] = PLATFORMS,
 ): [number, number] {
   // Apply gravity to the velocity scaled by delta
   let newVelocityY = velocityY - GRAVITY * delta;
@@ -170,7 +248,7 @@ export function applyGravity(
   const newY = y + newVelocityY * delta;
   
   // Find the height of the platform at the current x,z position
-  const platformHeight = getPlatformHeight(x, z);
+  const platformHeight = getPlatformHeight(x, z, platforms);
   
   // If the player is pressing down (dropThrough = true), let them drop through platforms
   if (dropThrough && y === platformHeight && platformHeight > FLOOR_Y) {

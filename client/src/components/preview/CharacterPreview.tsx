@@ -1,6 +1,10 @@
 import { Suspense, useEffect, useMemo, useState } from "react";
 import { Canvas } from "@react-three/fiber";
 import { OrbitControls, Environment } from "@react-three/drei";
+import {
+  DEFAULT_CPU_FIGHTER_ID,
+  DEFAULT_PLAYER_FIGHTER_ID,
+} from "../../combat/fighterRoster";
 import StickFigure from "../../game/StickFigure";
 import { useCustomization } from "../../lib/stores/useCustomization";
 import { ParticleEffect, AuraEffect } from "../ui/particle-effects";
@@ -10,7 +14,7 @@ const basePreviewState = {
   health: 100,
   position: [0, 0, 0] as [number, number, number],
   direction: 1 as 1 | -1,
-  fighterId: "stick_hero" as const,
+  fighterId: DEFAULT_PLAYER_FIGHTER_ID,
   isJumping: false,
   isAttacking: false,
   isBlocking: false,
@@ -36,6 +40,7 @@ interface CharacterPreviewProps {
   isPlayer: boolean;
   className?: string;
   animate?: boolean;
+  fighterId?: FighterId;
 }
 
 function PreviewStage({ accentColor, glowColor }: { accentColor: string; glowColor: string }) {
@@ -77,7 +82,12 @@ function PreviewStage({ accentColor, glowColor }: { accentColor: string; glowCol
   );
 }
 
-export function CharacterPreview({ isPlayer, className = "", animate = false }: CharacterPreviewProps) {
+export function CharacterPreview({
+  isPlayer,
+  className = "",
+  animate = false,
+  fighterId: forcedFighterId,
+}: CharacterPreviewProps) {
   const {
     getPlayerColors,
     getPlayerStyle,
@@ -90,7 +100,8 @@ export function CharacterPreview({ isPlayer, className = "", animate = false }: 
   const style = isPlayer ? getPlayerStyle() : getCPUStyle();
   const loadout = isPlayer ? getPlayerLoadout() : getCPULoadout();
   const [pose, setPose] = useState(() => ({ ...basePreviewState }));
-  const fighterId: FighterId = isPlayer ? "stick_hero" : "stick_villain";
+  const fighterId: FighterId =
+    forcedFighterId ?? (isPlayer ? DEFAULT_PLAYER_FIGHTER_ID : DEFAULT_CPU_FIGHTER_ID);
   const previewRenderKey = useMemo(
     () =>
       [

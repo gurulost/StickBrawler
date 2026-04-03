@@ -1,5 +1,6 @@
 import type { FC } from "react";
 import { useMemo } from "react";
+import { getFighterDefinition } from "../combat/fighterRoster";
 import type { GamePhase } from "../lib/stores/useFighting";
 import type { CharacterState } from "../lib/stores/useFighting";
 import { useControls } from "../lib/stores/useControls";
@@ -114,8 +115,15 @@ const CombatDebugPanel: FC<CombatDebugPanelProps> = ({
   );
   const trainingTargetLabel = combatTrainingTargetSlot === "player1" ? playerLabel : cpuLabel;
   const trainingTargetFighterId = combatTrainingTargetSlot === "player1" ? player.fighterId : cpu.fighterId;
-  const canReview =
-    history.length > 1 && (gamePhase === "fighting" || gamePhase === "round_end" || gamePhase === "match_end");
+  const trainingTargetFighterLabel = getFighterDefinition(trainingTargetFighterId).label;
+  const describeTrainingPresetFighter = (fighter: typeof COMBAT_TRAINING_PRESETS[keyof typeof COMBAT_TRAINING_PRESETS]["fighter"]) =>
+    fighter === "any" ? "any fighter" : getFighterDefinition(fighter).label;
+  const canReviewTraining =
+    history.length > 1 &&
+    (gamePhase === "training" ||
+      gamePhase === "fighting" ||
+      gamePhase === "round_end" ||
+      gamePhase === "match_end");
 
   return (
     <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex max-w-[min(1100px,92vw)] flex-col gap-3 pointer-events-auto">
@@ -183,7 +191,7 @@ const CombatDebugPanel: FC<CombatDebugPanelProps> = ({
                   }
                   stepReviewFrame(-1);
                 }}
-                disabled={!canReview}
+                disabled={!canReviewTraining}
                 className={buttonClass(false)}
               >
                 -1f
@@ -194,7 +202,7 @@ const CombatDebugPanel: FC<CombatDebugPanelProps> = ({
                   setCombatPlaybackPaused(true);
                   stepReviewFrame(1);
                 }}
-                disabled={!canReview || reviewFrameId === null}
+                disabled={!canReviewTraining || reviewFrameId === null}
                 className={buttonClass(false)}
               >
                 +1f
@@ -209,7 +217,7 @@ const CombatDebugPanel: FC<CombatDebugPanelProps> = ({
               max={Math.max(0, history.length - 1)}
               step={1}
               value={Math.max(0, reviewIndex)}
-              disabled={!canReview}
+              disabled={!canReviewTraining}
               onChange={(event) => {
                 const nextIndex = Number(event.target.value);
                 setCombatPlaybackPaused(true);
@@ -280,7 +288,11 @@ const CombatDebugPanel: FC<CombatDebugPanelProps> = ({
                   key={preset.id}
                   type="button"
                   disabled={!allowed}
-                  title={allowed ? preset.description : `${preset.label} only applies to the current ${preset.fighter} slice.`}
+                  title={
+                    allowed
+                      ? preset.description
+                      : `${preset.label} only applies to ${describeTrainingPresetFighter(preset.fighter)}. Current target: ${trainingTargetFighterLabel}.`
+                  }
                   onClick={() => {
                     clearReviewFrame();
                     queueCombatTrainingPreset(preset.id, combatTrainingTargetSlot);

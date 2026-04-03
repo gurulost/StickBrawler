@@ -8,7 +8,7 @@ import Menu from "./game/Menu";
 import Lobby from "./game/Lobby";
 import UI from "./game/UI";
 import { InputOverlay } from "./game/InputOverlay";
-import { useFighting } from "./lib/stores/useFighting";
+import { isCombatScenePhase, useFighting } from "./lib/stores/useFighting";
 import { useEconomySync } from "./hooks/use-economy-sync";
 import { useAutoStartMusic } from "./hooks/use-auto-start-music";
 
@@ -105,12 +105,14 @@ function App() {
 
   // Music context switching based on game phase
   useEffect(() => {
-    if (gamePhase === 'fighting') {
+    if (gamePhase === 'fighting' || gamePhase === 'training') {
       switchMusicContext('fighting');
     } else if (gamePhase === 'menu' || gamePhase === 'lobby') {
       switchMusicContext('menu');
     }
   }, [gamePhase, switchMusicContext]);
+
+  const showCombatScene = isCombatScenePhase(gamePhase);
 
   return (
     <div style={{ width: '100vw', height: '100vh', position: 'relative', overflow: 'hidden' }}>
@@ -119,7 +121,7 @@ function App() {
           {gamePhase === 'menu' && <Menu />}
           {gamePhase === 'lobby' && <Lobby />}
 
-          {(gamePhase === 'fighting' || gamePhase === 'round_end' || gamePhase === 'match_end') && (
+          {showCombatScene && (
             <>
               <Canvas
                 shadows

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef } from "react";
 import { useFrame, useThree } from "@react-three/fiber";
-import { ARENA_WIDTH, FLOOR_Y, PLATFORMS, ARENA_DEPTH } from "./Physics";
+import { ARENA_WIDTH, FLOOR_Y, ARENA_DEPTH, getPlatformsForLayout } from "./Physics";
 import {
   getArenaTheme,
   ARENA_THEMES,
@@ -136,6 +136,10 @@ const OpenArena = ({
   skylineTexture: THREE.CanvasTexture | null;
 }) => {
   const tuning = theme.openPresentation ?? DEFAULT_OPEN_PRESENTATION_TUNING;
+  const platforms = useMemo(
+    () => getPlatformsForLayout(theme.platformLayout),
+    [theme.platformLayout],
+  );
   const wallHeight = ARENA_WIDTH / 3;
   const decorationCount = tuning.decorationCount;
   const decorationDepthOffsets = Array.from({ length: decorationCount }).map((_, index) => {
@@ -220,7 +224,7 @@ const OpenArena = ({
       </mesh>
 
       {/* Platforms for multi-level combat */}
-      {PLATFORMS.map((platform, index) => (
+      {platforms.map((platform, index) => (
         <ReadableOpenArenaPlatform
           key={`platform-${index}`}
           platform={platform}
@@ -548,6 +552,10 @@ const ContainmentArena = ({
   skylineTexture: THREE.CanvasTexture | null;
 }) => {
   const tuning = theme.containedPresentation ?? DEFAULT_CONTAINED_PRESENTATION_TUNING;
+  const platforms = useMemo(
+    () => getPlatformsForLayout(theme.platformLayout),
+    [theme.platformLayout],
+  );
   const baseSize = Math.min(ARENA_WIDTH, ARENA_DEPTH);
   const ringRadius = baseSize * 0.34;
   const wallRadius = baseSize * 0.47;
@@ -759,8 +767,8 @@ const ContainmentArena = ({
         </mesh>
       ))}
 
-      {/* Platforms from PLATFORMS (no occluding posts) */}
-      {PLATFORMS.map((p, i) => {
+      {/* Platforms from the active layout (no occluding posts) */}
+      {platforms.map((p, i) => {
         const w = p.x2 - p.x1;
         const d = p.z2 - p.z1;
         const cx = (p.x1 + p.x2) / 2;

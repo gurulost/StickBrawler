@@ -2,6 +2,10 @@ import { create } from 'zustand';
 import { useCustomization } from './useCustomization';
 import type { CoinAwardPayload } from './useCustomization';
 import { DEFAULT_ARENA_ID, ARENA_THEMES } from '../../game/arenas';
+import {
+  DEFAULT_CPU_FIGHTER_ID,
+  DEFAULT_PLAYER_FIGHTER_ID,
+} from "../../combat/fighterRoster";
 import type { FighterId } from "../../combat/moveTable";
 import type { FighterActionState } from "../../combat/types";
 import { ONLINE_MULTIPLAYER_ENABLED } from "@shared/productFlags";
@@ -12,10 +16,27 @@ import type {
   RuntimeFrameSnapshot,
 } from "../../game/combatPresentation";
 import { useCombatDebug } from "./useCombatDebug";
+import { useControls } from "./useControls";
+import { useTrainingMode } from "./useTrainingMode";
+import {
+  DEFAULT_CPU_CONFIG,
+  type CpuConfig,
+  type CpuDifficulty,
+  type CpuStyle,
+} from "../../game/cpuBrain";
+import {
+  calculateArcadeMatchScore,
+  createArcadeRun,
+  getArcadeEncounter,
+  getNextArcadeEncounter,
+  type ArcadeEncounter,
+  type ArcadeRunState,
+} from "../../game/arcadeRun";
 
-export type GamePhase = 'menu' | 'lobby' | 'fighting' | 'round_end' | 'match_end';
+export type GamePhase = 'menu' | 'lobby' | 'training' | 'fighting' | 'round_end' | 'match_end';
 export type MatchMode = "single" | "local" | "online";
-export type Character = 'stick_hero' | 'stick_villain';
+export type SessionMode = "versus" | "training" | "arcade";
+export type Character = FighterId;
 export type PlayerSlot = "player1" | "player2";
 export interface CharacterState {
   health: number;
@@ -77,6 +98,7 @@ export type SlotAssignment = {
   ready: boolean;
   label: string;
   fighterId: FighterId;
+  cpuConfig: CpuConfig;
 };
 
 type SlotState = Record<PlayerSlot, SlotAssignment>;
@@ -84,7 +106,9 @@ type SlotState = Record<PlayerSlot, SlotAssignment>;
 interface FightingState {
   gamePhase: GamePhase;
   matchMode: MatchMode;
+  sessionMode: SessionMode;
   slots: SlotState;
+  arcadeRun?: ArcadeRunState;
   paused: boolean;
   player: CharacterState;
   cpu: CharacterState;
@@ -108,7 +132,10 @@ interface FightingState {
 
   // Actions
   startGame: (mode?: MatchMode) => void;
+  startTraining: () => void;
+  startArcade: () => void;
   beginMatch: () => void;
+  continueArcade: () => void;
   resetRound: () => void;
   restartMatch: () => void;
   returnToMenu: () => void;
@@ -117,6 +144,8 @@ interface FightingState {
   setArenaId: (arenaId: string) => void;
   setSlotType: (slot: PlayerSlot, type: "human" | "cpu") => void;
   setSlotFighter: (slot: PlayerSlot, fighter: FighterId) => void;
+  setSlotCpuStyle: (slot: PlayerSlot, style: CpuStyle) => void;
+  setSlotCpuDifficulty: (slot: PlayerSlot, difficulty: CpuDifficulty) => void;
   setSlotReady: (slot: PlayerSlot, ready: boolean) => void;
   pauseGame: () => void;
   resumeGame: () => void;
@@ -130,24 +159,64 @@ const DEFAULT_STAMINA = 100;
 const DEFAULT_SPECIAL = 0;
 const DEFAULT_POSITION_PLAYER: [number, number, number] = [-2, 0, 0];
 const DEFAULT_POSITION_CPU: [number, number, number] = [2, 0, 0];
+const TRAINING_POSITION_PLAYER: [number, number, number] = [-1.35, 0, 0];
+const TRAINING_POSITION_CPU: [number, number, number] = [1.35, 0, 0];
 const DEFAULT_ROUND_TIME = 60; // 60 seconds per round
 const ROUNDS_TO_WIN = 2;
+
+export const isLiveCombatPhase = (phase: GamePhase) =>
+  phase === "fighting" || phase === "training";
+
+export const isCombatScenePhase = (phase: GamePhase) =>
+  isLiveCombatPhase(phase) || phase === "round_end" || phase === "match_end";
 
 const normalizeMatchMode = (mode: MatchMode): MatchMode =>
   !ONLINE_MULTIPLAYER_ENABLED && mode === "online" ? "local" : mode;
 
+const cloneCpuConfig = (config: Partial<CpuConfig> = {}): CpuConfig => ({
+  ...DEFAULT_CPU_CONFIG,
+  ...config,
+});
+
 const createDefaultSlots = (mode: MatchMode): SlotState => {
   const normalizedMode = normalizeMatchMode(mode);
   return ({
-  player1: { type: "human", ready: false, label: "Player 1", fighterId: "stick_hero" },
+  player1: {
+    type: "human",
+    ready: false,
+    label: "Player 1",
+    fighterId: DEFAULT_PLAYER_FIGHTER_ID,
+    cpuConfig: cloneCpuConfig(),
+  },
   player2: {
     type: normalizedMode === "single" ? "cpu" : "human",
     ready: normalizedMode === "single",
     label: normalizedMode === "single" ? "CPU" : "Player 2",
-    fighterId: normalizedMode === "single" ? "stick_villain" : "stick_hero",
+    fighterId: normalizedMode === "single" ? DEFAULT_CPU_FIGHTER_ID : DEFAULT_PLAYER_FIGHTER_ID,
+    cpuConfig: cloneCpuConfig(),
   },
 });
 };
+
+const createArcadeSlots = (
+  playerFighter: FighterId,
+  encounter: ArcadeEncounter,
+): SlotState => ({
+  player1: {
+    type: "human",
+    ready: false,
+    label: "Player 1",
+    fighterId: playerFighter,
+    cpuConfig: cloneCpuConfig(),
+  },
+  player2: {
+    type: "cpu",
+    ready: true,
+    label: encounter.label,
+    fighterId: encounter.fighterId,
+    cpuConfig: cloneCpuConfig(encounter.cpuConfig),
+  },
+});
 
 const roundToHundredth = (value: number) => Math.round(value * 100) / 100;
 
@@ -164,6 +233,18 @@ const resolveTimeoutWinner = (
 };
 
 const getCoinStore = () => useCustomization.getState();
+
+const resetTrainingSessionState = () => {
+  useTrainingMode.getState().resetSession();
+  useControls.getState().clearCombatTraining();
+  useControls.getState().resetCombatPlayback();
+};
+
+const startTrainingSessionState = (fighterId: FighterId) => {
+  useTrainingMode.getState().startSession(fighterId);
+  useControls.getState().clearCombatTraining();
+  useControls.getState().resetCombatPlayback();
+};
 
 const awardCoinsSafe = (payload: CoinAwardPayload) => {
   const store = getCoinStore();
@@ -246,10 +327,29 @@ const awardDamageCoins = ({
   });
 };
 
+const awardArcadeClearCoins = (
+  encounter: ArcadeEncounter,
+  flawless: boolean,
+  finalClear: boolean,
+) => {
+  const amount = encounter.clearCoins + (flawless ? 20 : 0) + (finalClear ? 120 : 0);
+  awardCoinsSafe({
+    amount,
+    reason: finalClear ? "arcade_run_clear" : "arcade_fight_clear",
+    metadata: {
+      encounterId: encounter.id,
+      encounterLabel: encounter.label,
+      flawless,
+      finalClear,
+      amount,
+    },
+  });
+};
+
 const createDefaultCharacterState = (
   position: [number, number, number],
   direction: 1 | -1,
-  fighterId: FighterId = "stick_hero",
+  fighterId: FighterId = DEFAULT_PLAYER_FIGHTER_ID,
 ): CharacterState => ({
   health: DEFAULT_HEALTH,
   position,
@@ -303,6 +403,23 @@ const createDefaultCharacterState = (
   
   velocity: [0, 0, 0],
 });
+
+type EncounterLayout = "versus" | "training";
+
+const createEncounterCharacters = (
+  playerFighter: FighterId,
+  cpuFighter: FighterId,
+  layout: EncounterLayout = "versus",
+) => {
+  const playerPosition =
+    layout === "training" ? TRAINING_POSITION_PLAYER : DEFAULT_POSITION_PLAYER;
+  const cpuPosition =
+    layout === "training" ? TRAINING_POSITION_CPU : DEFAULT_POSITION_CPU;
+  return {
+    player: createDefaultCharacterState(playerPosition, 1, playerFighter),
+    cpu: createDefaultCharacterState(cpuPosition, -1, cpuFighter),
+  };
+};
 
 const toCharacterState = (
   snapshot: FighterPresentationSnapshot,
@@ -369,13 +486,67 @@ const filterSlotEvents = (events: CombatEvent[], slot: "player" | "cpu") =>
     return event.attacker === slot || event.defender === slot;
   });
 
+const resolveArcadeMatchState = (
+  state: FightingState,
+  nextPlayer: CharacterState,
+  nextRoundTime: number,
+  playerRoundsWon: number,
+  cpuRoundsWon: number,
+) => {
+  if (state.sessionMode !== "arcade" || !state.arcadeRun) return {};
+  const encounter = getArcadeEncounter(state.arcadeRun);
+  if (!encounter) return {};
+
+  const playerWon = playerRoundsWon > cpuRoundsWon;
+  if (!playerWon) {
+    return {
+      arcadeRun: {
+        ...state.arcadeRun,
+        status: "lost" as const,
+        lastResult: "lost" as const,
+        lastMatchScore: 0,
+      },
+    };
+  }
+
+  const alreadyCleared = state.arcadeRun.clearedEncounterIds.includes(encounter.id);
+  const clearedEncounterIds = alreadyCleared
+    ? state.arcadeRun.clearedEncounterIds
+    : [...state.arcadeRun.clearedEncounterIds, encounter.id];
+  const finalClear = clearedEncounterIds.length >= state.arcadeRun.encounters.length;
+  const matchScore =
+    calculateArcadeMatchScore({
+      encounter,
+      encounterIndex: state.arcadeRun.currentEncounterIndex,
+      cpuRoundsWon,
+      playerHealth: nextPlayer.health,
+      roundTimeRemaining: nextRoundTime,
+    }) + (finalClear ? 1500 : 0);
+  const flawless = cpuRoundsWon === 0;
+  awardArcadeClearCoins(encounter, flawless, finalClear);
+
+  return {
+    currentGameScore: state.currentGameScore + matchScore,
+    arcadeRun: {
+      ...state.arcadeRun,
+      status: finalClear ? ("won" as const) : ("between_fights" as const),
+      clearedEncounterIds,
+      flawlessMatches: state.arcadeRun.flawlessMatches + (flawless ? 1 : 0),
+      lastMatchScore: matchScore,
+      lastResult: "won" as const,
+    },
+  };
+};
+
 export const useFighting = create<FightingState>((set, get) => ({
   gamePhase: 'menu',
   matchMode: "single",
+  sessionMode: "versus",
   slots: createDefaultSlots("single"),
+  arcadeRun: undefined,
   paused: false,
-  player: createDefaultCharacterState(DEFAULT_POSITION_PLAYER, 1, "stick_hero"),
-  cpu: createDefaultCharacterState(DEFAULT_POSITION_CPU, -1, "stick_villain"),
+  player: createEncounterCharacters(DEFAULT_PLAYER_FIGHTER_ID, DEFAULT_CPU_FIGHTER_ID, "versus").player,
+  cpu: createEncounterCharacters(DEFAULT_PLAYER_FIGHTER_ID, DEFAULT_CPU_FIGHTER_ID, "versus").cpu,
   playerEvents: [],
   cpuEvents: [],
   playerScore: 0,
@@ -437,6 +608,19 @@ export const useFighting = create<FightingState>((set, get) => ({
       }
     }
 
+    if (state.gamePhase === "fighting" && nextState.gamePhase === "match_end") {
+      Object.assign(
+        nextState,
+        resolveArcadeMatchState(
+          state,
+          nextPlayer,
+          nextRoundTime,
+          nextState.playerScore ?? state.playerScore,
+          nextState.cpuScore ?? state.cpuScore,
+        ),
+      );
+    }
+
     useCombatDebug.getState().recordFrame({
       player: nextPlayer,
       cpu: nextCPU,
@@ -473,11 +657,19 @@ export const useFighting = create<FightingState>((set, get) => ({
   
   startGame: (mode) => set((state) => {
     useCombatDebug.getState().clearHistory();
+    resetTrainingSessionState();
     const targetMode = normalizeMatchMode(mode ?? state.matchMode);
     const slots = createDefaultSlots(targetMode);
+    const encounter = createEncounterCharacters(
+      slots.player1.fighterId,
+      slots.player2.fighterId,
+      "versus",
+    );
     return {
       gamePhase: 'lobby',
       matchMode: targetMode,
+      sessionMode: "versus",
+      arcadeRun: undefined,
       paused: false,
       playerScore: 0,
       cpuScore: 0,
@@ -485,9 +677,86 @@ export const useFighting = create<FightingState>((set, get) => ({
       cpuEvents: [],
       playerStatus: undefined,
       cpuStatus: undefined,
-      player: createDefaultCharacterState(DEFAULT_POSITION_PLAYER, 1, slots.player1.fighterId),
-      cpu: createDefaultCharacterState(DEFAULT_POSITION_CPU, -1, slots.player2.fighterId),
+      player: encounter.player,
+      cpu: encounter.cpu,
       roundTime: DEFAULT_ROUND_TIME,
+      currentGameScore: 0,
+      slots,
+    };
+  }),
+
+  startTraining: () => set((state) => {
+    useCombatDebug.getState().clearHistory();
+    const playerFighter = state.slots.player1.fighterId;
+    const cpuFighter = state.slots.player2.fighterId ?? DEFAULT_CPU_FIGHTER_ID;
+    startTrainingSessionState(playerFighter);
+    const encounter = createEncounterCharacters(
+      playerFighter,
+      cpuFighter,
+      "training",
+    );
+    return {
+      gamePhase: "training",
+      matchMode: "single",
+      sessionMode: "training",
+      arcadeRun: undefined,
+      paused: false,
+      playerScore: 0,
+      cpuScore: 0,
+      playerEvents: [],
+      cpuEvents: [],
+      playerStatus: undefined,
+      cpuStatus: undefined,
+      runtimeResetNonce: state.runtimeResetNonce + 1,
+      slots: {
+        player1: {
+          type: "human",
+          ready: true,
+          label: "Player 1",
+          fighterId: playerFighter,
+          cpuConfig: cloneCpuConfig(state.slots.player1.cpuConfig),
+        },
+        player2: {
+          type: "cpu",
+          ready: true,
+          label: "Training Dummy",
+          fighterId: cpuFighter,
+          cpuConfig: cloneCpuConfig(state.slots.player2.cpuConfig),
+        },
+      },
+      player: encounter.player,
+      cpu: encounter.cpu,
+      roundTime: DEFAULT_ROUND_TIME,
+      currentGameScore: 0,
+    };
+  }),
+
+  startArcade: () => set((state) => {
+    useCombatDebug.getState().clearHistory();
+    resetTrainingSessionState();
+    const playerFighter = state.slots.player1.fighterId;
+    const arcadeRun = createArcadeRun(playerFighter);
+    const encounter = getArcadeEncounter(arcadeRun);
+    if (!encounter) return state;
+    const slots = createArcadeSlots(playerFighter, encounter);
+    const fight = createEncounterCharacters(playerFighter, encounter.fighterId, "versus");
+    return {
+      gamePhase: "lobby",
+      matchMode: "single",
+      sessionMode: "arcade",
+      arcadeRun,
+      paused: false,
+      playerScore: 0,
+      cpuScore: 0,
+      playerEvents: [],
+      cpuEvents: [],
+      playerStatus: undefined,
+      cpuStatus: undefined,
+      player: fight.player,
+      cpu: fight.cpu,
+      roundTime: DEFAULT_ROUND_TIME,
+      currentGameScore: 0,
+      arenaId: encounter.arenaId,
       slots,
     };
   }),
@@ -498,8 +767,27 @@ export const useFighting = create<FightingState>((set, get) => ({
     const opponentReady = state.slots.player2.type === "cpu" ? true : state.slots.player2.ready;
     if (!playerReady || !opponentReady) return state;
     useCombatDebug.getState().clearHistory();
+    resetTrainingSessionState();
     const playerFighter = state.slots.player1.fighterId;
-    const opponentFighter = state.slots.player2.fighterId;
+    const arcadeEncounter =
+      state.sessionMode === "arcade" ? getArcadeEncounter(state.arcadeRun) : undefined;
+    const opponentFighter = arcadeEncounter?.fighterId ?? state.slots.player2.fighterId;
+    const encounter = createEncounterCharacters(
+      playerFighter,
+      opponentFighter,
+      "versus",
+    );
+    const nextSlots =
+      state.sessionMode === "arcade" && arcadeEncounter
+        ? createArcadeSlots(playerFighter, arcadeEncounter)
+        : {
+            player1: { ...state.slots.player1, ready: false },
+            player2: {
+              ...state.slots.player2,
+              ready: state.slots.player2.type === "cpu",
+              label: state.slots.player2.type === "human" ? "Player 2" : "CPU",
+            },
+          };
     return {
       gamePhase: 'fighting',
       paused: false,
@@ -508,40 +796,122 @@ export const useFighting = create<FightingState>((set, get) => ({
       playerStatus: undefined,
       cpuStatus: undefined,
       runtimeResetNonce: state.runtimeResetNonce + 1,
-      player: createDefaultCharacterState(DEFAULT_POSITION_PLAYER, 1, playerFighter),
-      cpu: createDefaultCharacterState(DEFAULT_POSITION_CPU, -1, opponentFighter),
+      player: encounter.player,
+      cpu: encounter.cpu,
       roundTime: DEFAULT_ROUND_TIME,
-      slots: {
-        player1: { ...state.slots.player1, ready: false },
-        player2: {
-          ...state.slots.player2,
-          ready: state.slots.player2.type === "cpu",
-          label: state.slots.player2.type === "human" ? "Player 2" : "CPU",
-        },
-      },
+      arenaId: arcadeEncounter?.arenaId ?? state.arenaId,
+      arcadeRun:
+        state.sessionMode === "arcade" && state.arcadeRun
+          ? {
+              ...state.arcadeRun,
+              selectedFighterId: playerFighter,
+              status: "in_progress",
+              lastResult: undefined,
+              lastMatchScore: 0,
+            }
+          : state.arcadeRun,
+      slots: nextSlots,
+    };
+  }),
+
+  continueArcade: () => set((state) => {
+    if (state.sessionMode !== "arcade" || !state.arcadeRun) return state;
+    if (state.gamePhase !== "match_end" || state.arcadeRun.status !== "between_fights") {
+      return state;
+    }
+    const nextEncounter = getNextArcadeEncounter(state.arcadeRun);
+    if (!nextEncounter) return state;
+    const nextArcadeRun = {
+      ...state.arcadeRun,
+      currentEncounterIndex: state.arcadeRun.currentEncounterIndex + 1,
+      status: "in_progress" as const,
+      lastResult: undefined,
+      lastMatchScore: 0,
+    };
+    const playerFighter = state.slots.player1.fighterId;
+    const fight = createEncounterCharacters(playerFighter, nextEncounter.fighterId, "versus");
+    return {
+      gamePhase: "fighting",
+      paused: false,
+      playerScore: 0,
+      cpuScore: 0,
+      playerEvents: [],
+      cpuEvents: [],
+      playerStatus: undefined,
+      cpuStatus: undefined,
+      runtimeResetNonce: state.runtimeResetNonce + 1,
+      player: fight.player,
+      cpu: fight.cpu,
+      roundTime: DEFAULT_ROUND_TIME,
+      arenaId: nextEncounter.arenaId,
+      arcadeRun: nextArcadeRun,
+      slots: createArcadeSlots(playerFighter, nextEncounter),
     };
   }),
   
   resetRound: () => set((state) => {
     useCombatDebug.getState().clearHistory();
+    const layout = state.gamePhase === "training" ? "training" : "versus";
+    const encounter = createEncounterCharacters(
+      state.slots.player1.fighterId,
+      state.slots.player2.fighterId,
+      layout,
+    );
     return {
-      gamePhase: 'fighting',
+      gamePhase: state.gamePhase === "training" ? "training" : "fighting",
       paused: false,
       playerEvents: [],
       cpuEvents: [],
       playerStatus: undefined,
       cpuStatus: undefined,
       runtimeResetNonce: state.runtimeResetNonce + 1,
-      player: createDefaultCharacterState(DEFAULT_POSITION_PLAYER, 1, state.slots.player1.fighterId),
-      cpu: createDefaultCharacterState(DEFAULT_POSITION_CPU, -1, state.slots.player2.fighterId),
+      player: encounter.player,
+      cpu: encounter.cpu,
       roundTime: DEFAULT_ROUND_TIME,
     };
   }),
 
   restartMatch: () => set((state) => {
     useCombatDebug.getState().clearHistory();
+    if (state.sessionMode === "arcade") {
+      resetTrainingSessionState();
+      const playerFighter = state.slots.player1.fighterId;
+      const arcadeRun = createArcadeRun(playerFighter);
+      const encounter = getArcadeEncounter(arcadeRun);
+      if (!encounter) return state;
+      const fight = createEncounterCharacters(playerFighter, encounter.fighterId, "versus");
+      return {
+        gamePhase: "fighting",
+        matchMode: "single",
+        sessionMode: "arcade",
+        arcadeRun: {
+          ...arcadeRun,
+          status: "in_progress",
+        },
+        paused: false,
+        playerScore: 0,
+        cpuScore: 0,
+        playerEvents: [],
+        cpuEvents: [],
+        playerStatus: undefined,
+        cpuStatus: undefined,
+        runtimeResetNonce: state.runtimeResetNonce + 1,
+        player: fight.player,
+        cpu: fight.cpu,
+        roundTime: DEFAULT_ROUND_TIME,
+        currentGameScore: 0,
+        arenaId: encounter.arenaId,
+        slots: createArcadeSlots(playerFighter, encounter),
+      };
+    }
+    const layout = state.gamePhase === "training" ? "training" : "versus";
+    const encounter = createEncounterCharacters(
+      state.slots.player1.fighterId,
+      state.slots.player2.fighterId,
+      layout,
+    );
     return {
-      gamePhase: 'fighting',
+      gamePhase: state.gamePhase === "training" ? "training" : "fighting",
       paused: false,
       playerScore: 0,
       cpuScore: 0,
@@ -550,16 +920,19 @@ export const useFighting = create<FightingState>((set, get) => ({
       playerStatus: undefined,
       cpuStatus: undefined,
       runtimeResetNonce: state.runtimeResetNonce + 1,
-      player: createDefaultCharacterState(DEFAULT_POSITION_PLAYER, 1, state.slots.player1.fighterId),
-      cpu: createDefaultCharacterState(DEFAULT_POSITION_CPU, -1, state.slots.player2.fighterId),
+      player: encounter.player,
+      cpu: encounter.cpu,
       roundTime: DEFAULT_ROUND_TIME,
     };
   }),
   
   returnToMenu: () => set((state) => {
     useCombatDebug.getState().clearHistory();
+    resetTrainingSessionState();
     return {
       gamePhase: 'menu',
+      sessionMode: 'versus',
+      arcadeRun: undefined,
       paused: false,
       playerScore: 0,
       cpuScore: 0,
@@ -567,6 +940,7 @@ export const useFighting = create<FightingState>((set, get) => ({
       cpuEvents: [],
       playerStatus: undefined,
       cpuStatus: undefined,
+      currentGameScore: 0,
       matchMode: normalizeMatchMode(state.matchMode),
       slots: createDefaultSlots(state.matchMode),
     };
@@ -583,6 +957,9 @@ export const useFighting = create<FightingState>((set, get) => ({
       arenaId: ARENA_THEMES[arenaId] ? arenaId : DEFAULT_ARENA_ID,
     })),
   setSlotType: (slot, type) => set((state) => {
+    if (state.sessionMode === "arcade" && slot === "player2") {
+      return state;
+    }
     if (slot === "player1") {
       return {
         slots: {
@@ -602,18 +979,52 @@ export const useFighting = create<FightingState>((set, get) => ({
           type,
           ready: type === "cpu",
           label: type === "human" ? "Player 2" : "CPU",
-          fighterId: type === "cpu" ? "stick_villain" : state.slots.player2.fighterId,
+          fighterId: state.slots.player2.fighterId,
+          cpuConfig: cloneCpuConfig(state.slots.player2.cpuConfig),
         },
       },
     };
   }),
   setSlotFighter: (slot, fighter) =>
     set((state) => ({
+      arcadeRun:
+        state.sessionMode === "arcade" && state.arcadeRun && slot === "player1"
+          ? {
+              ...state.arcadeRun,
+              selectedFighterId: fighter,
+            }
+          : state.arcadeRun,
       slots: {
         ...state.slots,
         [slot]: {
           ...state.slots[slot],
           fighterId: fighter,
+        },
+      },
+    })),
+  setSlotCpuStyle: (slot, style) =>
+    set((state) => ({
+      slots: {
+        ...state.slots,
+        [slot]: {
+          ...state.slots[slot],
+          cpuConfig: cloneCpuConfig({
+            ...state.slots[slot].cpuConfig,
+            style,
+          }),
+        },
+      },
+    })),
+  setSlotCpuDifficulty: (slot, difficulty) =>
+    set((state) => ({
+      slots: {
+        ...state.slots,
+        [slot]: {
+          ...state.slots[slot],
+          cpuConfig: cloneCpuConfig({
+            ...state.slots[slot].cpuConfig,
+            difficulty,
+          }),
         },
       },
     })),
@@ -633,12 +1044,12 @@ export const useFighting = create<FightingState>((set, get) => ({
     };
   }),
   pauseGame: () =>
-    set((state) => (state.gamePhase === 'fighting' ? { paused: true } : state)),
+    set((state) => (isLiveCombatPhase(state.gamePhase) ? { paused: true } : state)),
   resumeGame: () =>
     set((state) => (state.paused ? { paused: false } : state)),
   togglePause: () =>
     set((state) =>
-      state.gamePhase === 'fighting'
+      isLiveCombatPhase(state.gamePhase)
         ? {
             paused: !state.paused,
           }
@@ -649,6 +1060,9 @@ export const useFighting = create<FightingState>((set, get) => ({
   // Score calculation and submission
   calculateFinalScore: () => {
     const state = get();
+    if (state.sessionMode === "arcade") {
+      return Math.max(0, state.currentGameScore);
+    }
     let score = 0;
     
     // Base score from rounds won

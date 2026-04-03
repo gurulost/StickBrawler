@@ -1,3 +1,5 @@
+  import type { ArenaPlatformLayoutId } from "../Physics";
+
   export type OpenArenaPresentationTuning = {
     laneWidth: number;
     laneOpacity: number;
@@ -33,6 +35,7 @@
     name: string;
     description: string;
     style: 'open' | 'contained'; // Kept from HEAD
+    platformLayout: ArenaPlatformLayoutId;
 
     // --- New flat properties (from incoming) ---
     floorGradient: [string, string];
@@ -92,6 +95,7 @@
       description:
         "Pastel floor, ink gradients, and glowing arches inspired by dusk skies.",
       style: "open",
+      platformLayout: "classic",
       // New props
       floorGradient: ["#fef6fb", "#f0f7ff"],
       skyGradient: ["#d2efff", "#fef6ff"],
@@ -157,6 +161,7 @@
       description:
         "Cool cyan floor with crystalline pylons under a night-sky gradient.",
       style: "open",
+      platformLayout: "skybridge",
       // New props
       floorGradient: ["#edf8ff", "#c3e1ff"],
       skyGradient: ["#1e3a8a", "#0f172a"],
@@ -216,11 +221,140 @@
       },
     },
 
+    crosswindVault: {
+      id: "crosswindVault",
+      name: "Crosswind Vault",
+      description:
+        "Stacked scramble platforms reward scrappy resets, fast climbs, and aerial reroutes.",
+      style: "open",
+      platformLayout: "scramble",
+      floorGradient: ["#fff3db", "#ffddd2"],
+      skyGradient: ["#ffd7ba", "#ff8fab"],
+      platformColor: "#ffe3c2",
+      pillarColor: "#f59e0b",
+      accentLeft: "#fb7185",
+      accentRight: "#f97316",
+      ambientColor: "#fff1e6",
+      fillLight: { color: "#fb7185", intensity: 0.7, position: [-11, 8, 5] },
+      rimLight: { color: "#fdba74", intensity: 0.5, position: [9, 9, -4] },
+      openPresentation: {
+        laneWidth: 2.36,
+        laneOpacity: 0.18,
+        gridOpacity: 0.065,
+        backdropOpacity: 0.045,
+        focusBackdropOpacity: 0.06,
+        decorationCount: 3,
+        decorationScale: 0.7,
+        decorationOpacity: 0.11,
+        pillarOpacity: 0.22,
+        pillarWidthScale: 0.68,
+        pillarDepthScale: 0.58,
+        platformGlowOpacity: 0.09,
+        undersideGlowOpacity: 0.12,
+        supportOpacity: 0.22,
+        supportOccludedOpacity: 0.03,
+        topOpacity: 0.52,
+        topOccludedOpacity: 0.09,
+      },
+      colors: {
+        skyTop: "#ffd7ba",
+        skyBottom: "#ff8fab",
+        floorTop: "#fff3db",
+        floorBottom: "#ffddd2",
+        floorBase: "#fff7ed",
+        platform: "#ffe3c2",
+        platformSupport: "#f59e0b",
+        wallLeft: "#fb7185",
+        wallRight: "#f97316",
+        decorEmissive1: "#fb7185",
+        decorEmissive2: "#fdba74",
+        decorBase1: "#ffedd5",
+        decorBase2: "#fff1f2",
+        gridColor1: "#fb7185",
+        gridColor2: "#fdba74",
+      },
+      lighting: {
+        hemisphereTop: "#fff1e6",
+        hemisphereBottom: "#fff7ed",
+        hemisphereIntensity: 0.82,
+        directionalIntensity: 0.78,
+        pointLight1Color: "#fb7185",
+        pointLight1Intensity: 0.7,
+        pointLight2Color: "#fdba74",
+        pointLight2Intensity: 0.52,
+      },
+    },
+
+    longwatch: {
+      id: "longwatch",
+      name: "Longwatch",
+      description:
+        "Long side lanes and a narrow center perch make spacing and recoveries feel expensive.",
+      style: "open",
+      platformLayout: "runway",
+      floorGradient: ["#e6fbff", "#dbeafe"],
+      skyGradient: ["#164e63", "#0f172a"],
+      platformColor: "#d7f9ff",
+      pillarColor: "#22d3ee",
+      accentLeft: "#67e8f9",
+      accentRight: "#38bdf8",
+      ambientColor: "#cffafe",
+      fillLight: { color: "#67e8f9", intensity: 0.68, position: [-11, 7, 5] },
+      rimLight: { color: "#93c5fd", intensity: 0.48, position: [9, 10, -6] },
+      openPresentation: {
+        laneWidth: 1.92,
+        laneOpacity: 0.22,
+        gridOpacity: 0.07,
+        backdropOpacity: 0.038,
+        focusBackdropOpacity: 0.052,
+        decorationCount: 2,
+        decorationScale: 0.82,
+        decorationOpacity: 0.13,
+        pillarOpacity: 0.28,
+        pillarWidthScale: 0.62,
+        pillarDepthScale: 0.56,
+        platformGlowOpacity: 0.075,
+        undersideGlowOpacity: 0.11,
+        supportOpacity: 0.17,
+        supportOccludedOpacity: 0.02,
+        topOpacity: 0.47,
+        topOccludedOpacity: 0.075,
+      },
+      colors: {
+        skyTop: "#164e63",
+        skyBottom: "#0f172a",
+        floorTop: "#e6fbff",
+        floorBottom: "#dbeafe",
+        floorBase: "#ecfeff",
+        platform: "#d7f9ff",
+        platformSupport: "#22d3ee",
+        wallLeft: "#67e8f9",
+        wallRight: "#38bdf8",
+        decorEmissive1: "#67e8f9",
+        decorEmissive2: "#93c5fd",
+        decorBase1: "#cffafe",
+        decorBase2: "#dbeafe",
+        gridColor1: "#67e8f9",
+        gridColor2: "#93c5fd",
+      },
+      lighting: {
+        hemisphereTop: "#cffafe",
+        hemisphereBottom: "#e0f2fe",
+        hemisphereIntensity: 0.84,
+        directionalIntensity: 0.8,
+        pointLight1Color: "#67e8f9",
+        pointLight1Intensity: 0.68,
+        pointLight2Color: "#93c5fd",
+        pointLight2Intensity: 0.48,
+      },
+    },
+
     containment: {
       id: "containment",
       name: "Containment Arena",
       description: "Energy-shielded battleground with no fall KOs",
       style: "contained",
+      platformLayout: "contained",
       // New props (Translated from old)
       floorGradient: ["#fcfcff", "#f2f6fb"],
       skyGradient: ["#eaf2ff", "#f8fbff"],

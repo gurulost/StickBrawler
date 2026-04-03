@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
+import { CpuDifficulty, CpuStyle } from "../../client/src/game/cpuBrain";
 import { useFighting } from "../../client/src/lib/stores/useFighting";
 import type { RuntimeFrameSnapshot } from "../../client/src/game/combatPresentation";
 
@@ -134,6 +135,43 @@ test("online match requests normalize to local play when the feature is disabled
   store.getState().setMatchMode("single");
 });
 
+test("single-player defaults expose a configurable CPU profile and difficulty", () => {
+  const store = useFighting;
+  store.getState().returnToMenu();
+  store.getState().startGame("single");
+
+  const cpuSlot = store.getState().slots.player2;
+  assert.equal(cpuSlot.type, "cpu");
+  assert.equal(cpuSlot.cpuConfig.style, CpuStyle.BEGINNER);
+  assert.equal(cpuSlot.cpuConfig.difficulty, CpuDifficulty.NORMAL);
+
+  store.getState().returnToMenu();
+});
+
+test("cpu profile settings persist while toggling player two between local and cpu", () => {
+  const store = useFighting;
+  store.getState().returnToMenu();
+  store.getState().startGame("single");
+
+  store.getState().setSlotCpuStyle("player2", CpuStyle.TRICKSTER);
+  store.getState().setSlotCpuDifficulty("player2", CpuDifficulty.HARD);
+  store.getState().setSlotType("player2", "human");
+
+  let slot = store.getState().slots.player2;
+  assert.equal(slot.type, "human");
+  assert.equal(slot.cpuConfig.style, CpuStyle.TRICKSTER);
+  assert.equal(slot.cpuConfig.difficulty, CpuDifficulty.HARD);
+
+  store.getState().setSlotType("player2", "cpu");
+  slot = store.getState().slots.player2;
+  assert.equal(slot.type, "cpu");
+  assert.equal(slot.ready, true);
+  assert.equal(slot.cpuConfig.style, CpuStyle.TRICKSTER);
+  assert.equal(slot.cpuConfig.difficulty, CpuDifficulty.HARD);
+
+  store.getState().returnToMenu();
+});
+
 test("resetRound increments the runtime reset nonce while keeping the match active", () => {
   const store = useFighting;
   store.getState().returnToMenu();
@@ -261,6 +299,39 @@ test("timeout round resolution is driven by runtime snapshot time, not store-sid
   assert.equal(store.getState().roundTime, 0);
   assert.equal(store.getState().gamePhase, "round_end");
   assert.equal(store.getState().playerScore, 1);
+
+  store.getState().returnToMenu();
+});
+
+test("training mode stays on the live combat phase without competitive round resolution", () => {
+  const store = useFighting;
+  store.getState().returnToMenu();
+  store.getState().startTraining();
+
+  let state = store.getState();
+  assert.equal(state.gamePhase, "training");
+  assert.equal(state.matchMode, "single");
+  assert.equal(state.slots.player2.label, "Training Dummy");
+  assert.deepEqual(state.player.position, [-1.35, 0, 0]);
+  assert.deepEqual(state.cpu.position, [1.35, 0, 0]);
+
+  const koFrame = createRuntimeFrame();
+  koFrame.player.position = [-1.35, 0, 0];
+  koFrame.cpu.position = [1.35, 0, 0];
+  koFrame.cpu.health = 0;
+  koFrame.roundTimeRemaining = 0;
+  store.getState().applyRuntimeFrame(koFrame);
+
+  state = store.getState();
+  assert.equal(state.gamePhase, "training");
+  assert.equal(state.playerScore, 0);
+  assert.equal(state.cpuScore, 0);
+
+  store.getState().resetRound();
+  state = store.getState();
+  assert.equal(state.gamePhase, "training");
+  assert.deepEqual(state.player.position, [-1.35, 0, 0]);
+  assert.deepEqual(state.cpu.position, [1.35, 0, 0]);
 
   store.getState().returnToMenu();
 });

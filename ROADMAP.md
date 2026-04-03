@@ -3,6 +3,24 @@
 ## Vision
 Build a polished, replayable stick-figure arena fighter that keeps HP bars but borrows the depth, responsiveness, and spectacle of Smash-style games. The experience should support deterministic simulation, rich audio/visual polish, multiple modes, persistent progression, and a secure backend.
 
+## 2026-04 Vertical Slice Filter
+The project is past the point where another foundational rewrite is the highest-leverage move. The current priority is to turn the combat slice into a game with accessible mastery, meaningful solo variety, and a sticky session loop.
+
+Use [`docs/elegance-replayability-rubric.md`](docs/elegance-replayability-rubric.md) as the implementation filter for upcoming work.
+
+Default priority order for the next block:
+- Training Mode
+- CPU personality and difficulty
+- Arcade / Gauntlet
+- Then new fighters, new stages, and a selective combat juice pass
+
+Default defer list for this block:
+- Online multiplayer
+- Auth and leaderboard polish
+- Cosmetics-first work
+- Menu-art-first work
+- More developer-only debug tooling
+
 ## Guiding Pillars
 - **Combat Fidelity:** Startup/active/recovery frames, hit-stun, DI-like knockback, combos, and guard mechanics make every exchange intentional.
 - **Deterministic Engine:** A fixed-step simulation, ECS-style state, and command/event bus keep gameplay authoritative, testable, and multiplayer-ready.

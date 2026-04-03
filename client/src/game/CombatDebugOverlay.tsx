@@ -3,7 +3,9 @@ import type { FC } from "react";
 import { useMemo } from "react";
 import { coreMoves, sampleCombatSpatialFrame } from "../combat";
 import type { CharacterState } from "../lib/stores/useFighting";
+import { useFighting } from "../lib/stores/useFighting";
 import { useControls } from "../lib/stores/useControls";
+import { useTrainingMode } from "../lib/stores/useTrainingMode";
 import { toCombatState } from "./combatBridge";
 import { resolveCombatDebugData } from "./combatDebug";
 
@@ -19,6 +21,8 @@ const CombatDebugOverlay: FC<CombatDebugOverlayProps> = ({
   accent,
 }) => {
   const debugMode = useControls((state) => state.debugMode);
+  const trainingAdvancedMode = useTrainingMode((state) => state.advancedMode);
+  const gamePhase = useFighting((state) => state.gamePhase);
   const showHurtboxes = useControls((state) => state.combatDebugShowHurtboxes);
   const showHitboxes = useControls((state) => state.combatDebugShowHitboxes);
   const showSockets = useControls((state) => state.combatDebugShowSockets);
@@ -54,8 +58,9 @@ const CombatDebugOverlay: FC<CombatDebugOverlayProps> = ({
   const labelOffset = characterState.direction >= 0 ? -0.7 : 0.7;
   const showHeaderLabel =
     showFrameData || showPhaseData || showInstanceData || showActiveHitbox;
+  const showInspector = debugMode || (trainingAdvancedMode && gamePhase === "training");
 
-  if (!debugMode) return null;
+  if (!showInspector) return null;
   if (!showHurtboxes && !showHitboxes && !showSockets && !showHeaderLabel) return null;
 
   return (

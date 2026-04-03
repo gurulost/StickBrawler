@@ -26,6 +26,31 @@ const BESPOKE_MOVE_IDS = [
   "vill_poison_orb",
   "vill_teleport_recover",
   "vill_trap",
+  "kite_feather_jab",
+  "kite_wing_slice",
+  "kite_slide_kick",
+  "kite_sky_hook",
+  "kite_tail_whip",
+  "kite_air_swirl",
+  "kite_air_flick",
+  "kite_dive_screw",
+  "kite_gale_pulse",
+  "kite_drift_break",
+  "kite_updraft_rise",
+  "kite_crosswind_feint",
+  "anvil_club_jab",
+  "anvil_shoulder_check",
+  "anvil_headbutt_lift",
+  "anvil_ankle_stamp",
+  "anvil_hammer_fall",
+  "anvil_body_press",
+  "anvil_air_lariat",
+  "anvil_elbow_drop",
+  "anvil_iron_bellow",
+  "anvil_bulldoze",
+  "anvil_brace_counter",
+  "anvil_rising_crash",
+  "anvil_quake_slam",
 ] as const;
 
 const createDebugCharacterState = (moveId?: string, moveFrame = 0): CharacterState => ({
@@ -158,6 +183,17 @@ test("vertical slice states resolve to explicit presentation profiles", () => {
     resolveSlicePresentationId(
       {
         velocity: [0, 0, 0],
+        moveId: "anvil_hammer_fall",
+      },
+      coreMoves.anvil_hammer_fall,
+      false,
+    ),
+    "anvil_hammer_fall",
+  );
+  assert.equal(
+    resolveSlicePresentationId(
+      {
+        velocity: [0, 0, 0],
         isBlocking: true,
       },
       undefined,
@@ -182,10 +218,30 @@ test("vertical slice states resolve to explicit presentation profiles", () => {
     undefined,
     false,
   );
+  const kiteRiseProfile = resolveSlicePresentationProfile(
+    {
+      velocity: [0, 0, 0],
+      moveId: "kite_updraft_rise",
+    },
+    coreMoves.kite_updraft_rise,
+    false,
+  );
+  const anvilRiseProfile = resolveSlicePresentationProfile(
+    {
+      velocity: [0, 0, 0],
+      moveId: "anvil_rising_crash",
+    },
+    coreMoves.anvil_rising_crash,
+    false,
+  );
 
   assert.deepEqual(jabProfile.trailSockets, ["torso", "rightHand"]);
   assert.equal(jabProfile.hurtSocket, "torso");
   assert.deepEqual(landProfile.landingSockets, ["leftFoot", "rightFoot"]);
+  assert.deepEqual(kiteRiseProfile.trailSockets, ["torso", "leftHand", "rightHand"]);
+  assert.equal(kiteRiseProfile.hurtSocket, "head");
+  assert.deepEqual(anvilRiseProfile.trailSockets, ["torso", "head", "rightHand"]);
+  assert.equal(anvilRiseProfile.hurtSocket, "head");
 });
 
 test("landing and blockstun now sample authored reaction poses instead of generic idle", () => {
@@ -323,23 +379,33 @@ test("debug timeline data exposes active hitboxes for the tuned slice", () => {
 test("arena themes carry distinct stage-specific readability tuning", () => {
   const sunset = ARENA_THEMES.sunsetBloom.openPresentation;
   const aurora = ARENA_THEMES.auroraFlux.openPresentation;
+  const crosswind = ARENA_THEMES.crosswindVault.openPresentation;
+  const longwatch = ARENA_THEMES.longwatch.openPresentation;
   const containment = ARENA_THEMES.containment.containedPresentation;
 
   assert.ok(sunset, "sunsetBloom should expose open-arena tuning");
   assert.ok(aurora, "auroraFlux should expose open-arena tuning");
+  assert.ok(crosswind, "crosswindVault should expose open-arena tuning");
+  assert.ok(longwatch, "longwatch should expose open-arena tuning");
   assert.ok(containment, "containment should expose contained-arena tuning");
 
   assert.equal(sunset?.laneWidth, 2.22);
   assert.equal(aurora?.laneWidth, 2.08);
+  assert.equal(crosswind?.decorationCount, 3);
+  assert.equal(longwatch?.laneWidth, 1.92);
   assert.equal(sunset?.decorationCount, 2);
   assert.equal(aurora?.decorationCount, 2);
   assert.equal(containment?.wallTransmission, 0.86);
   assert.equal(containment?.spawnPadGlow, 0.16);
+  assert.equal(ARENA_THEMES.crosswindVault.platformLayout, "scramble");
+  assert.equal(ARENA_THEMES.longwatch.platformLayout, "runway");
 
   assert.notEqual(sunset?.laneWidth, aurora?.laneWidth);
+  assert.notEqual(crosswind?.laneWidth, longwatch?.laneWidth);
   assert.notEqual(sunset?.decorationOpacity, aurora?.decorationOpacity);
   assert.ok((sunset?.laneOpacity ?? 0) > (sunset?.gridOpacity ?? 0));
   assert.ok((aurora?.laneOpacity ?? 0) > (aurora?.gridOpacity ?? 0));
+  assert.ok((crosswind?.supportOpacity ?? 0) > (longwatch?.supportOpacity ?? 0));
   assert.ok((containment?.wallOpacity ?? 1) < 0.3);
 });
 

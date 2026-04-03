@@ -11,6 +11,8 @@ import {
 
 interface LandingHeroProps {
   onPlay: () => void;
+  onArcade: () => void;
+  onTraining: () => void;
   onCustomize: () => void;
   onLeaderboard: () => void;
   onControls: () => void;
@@ -29,6 +31,8 @@ interface LandingHeroProps {
 
 export function LandingHero({
   onPlay,
+  onArcade,
+  onTraining,
   onCustomize,
   onLeaderboard,
   onControls,
@@ -202,6 +206,18 @@ export function LandingHero({
               }}
             >
               Enter Arena ({matchMode === "single" ? "Solo" : "Local 2P"})
+            </button>
+            <button
+              onClick={onArcade}
+              className="clip-angular border border-[#ffe600]/30 bg-[#ffe600]/8 px-6 py-3 text-sm font-tech font-bold uppercase tracking-wider text-[#ffe600]/90 backdrop-blur hover:text-[#ffe600] hover:bg-[#ffe600]/14"
+            >
+              Arcade Gauntlet
+            </button>
+            <button
+              onClick={onTraining}
+              className="clip-angular border border-[#39ff14]/30 bg-[#39ff14]/6 px-6 py-3 text-sm font-tech font-bold uppercase tracking-wider text-[#39ff14]/88 backdrop-blur hover:text-[#39ff14] hover:bg-[#39ff14]/12"
+            >
+              Training Mode
             </button>
             <button
               onClick={onCustomize}

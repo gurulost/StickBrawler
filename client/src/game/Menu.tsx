@@ -18,7 +18,7 @@ import {
 type Panel = "main" | "customization" | "leaderboard" | "controls";
 
 const Menu = () => {
-  const { startGame, matchMode, setMatchMode, arenaId, setArenaId } = useFighting();
+  const { startGame, startTraining, startArcade, matchMode, setMatchMode, arenaId, setArenaId } = useFighting();
   const { toggleMute, isMuted, setMasterVolume, masterVolume } = useAudio();
   const { user, status, logout } = useAuth();
   const [activePanel, setActivePanel] = useState<Panel>("main");
@@ -42,6 +42,14 @@ const Menu = () => {
 
   const handleStartGame = () => {
     startGame(matchMode);
+  };
+
+  const handleStartTraining = () => {
+    startTraining();
+  };
+
+  const handleStartArcade = () => {
+    startArcade();
   };
 
   const handleOpenCustomization = () => {
@@ -71,6 +79,8 @@ const Menu = () => {
         <div className={activePanel === "main" ? "" : "hidden"} aria-hidden={activePanel !== "main"}>
           <LandingHero
             onPlay={handleStartGame}
+            onArcade={handleStartArcade}
+            onTraining={handleStartTraining}
             onCustomize={handleOpenCustomization}
             onLeaderboard={() => setActivePanel("leaderboard")}
             onControls={() => setActivePanel("controls")}

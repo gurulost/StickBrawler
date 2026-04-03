@@ -1,4 +1,10 @@
 import { MatchRuntime, createEmptyInputs, type DualInputState } from "../client/src/game/matchRuntime";
+import { DEFAULT_CPU_CONFIG } from "../client/src/game/cpuBrain";
+import {
+  DEFAULT_CPU_FIGHTER_ID,
+  DEFAULT_PLAYER_FIGHTER_ID,
+} from "../client/src/combat/fighterRoster";
+import type { FighterId } from "../client/src/combat/moveTable";
 import type { CharacterState, GamePhase } from "../client/src/lib/stores/useFighting";
 import type { CombatTelemetryEvent } from "../client/src/game/combatTelemetry";
 import type { FighterPresentationSnapshot } from "../client/src/game/combatPresentation";
@@ -15,7 +21,7 @@ const DEFAULT_POSITION_CPU: [number, number, number] = [2, 0, 0];
 function createDefaultCharacterState(
   position: [number, number, number],
   direction: 1 | -1,
-  fighterId: "stick_hero" | "stick_villain" = "stick_hero",
+  fighterId: FighterId = DEFAULT_PLAYER_FIGHTER_ID,
 ): CharacterState {
   return {
     health: DEFAULT_HEALTH,
@@ -119,8 +125,8 @@ const noopAudio = {
 
 export class ServerMatchRuntime {
   private readonly runtime: MatchRuntime;
-  private player: CharacterState = createDefaultCharacterState(DEFAULT_POSITION_PLAYER, 1, "stick_hero");
-  private cpu: CharacterState = createDefaultCharacterState(DEFAULT_POSITION_CPU, -1, "stick_villain");
+  private player: CharacterState = createDefaultCharacterState(DEFAULT_POSITION_PLAYER, 1, DEFAULT_PLAYER_FIGHTER_ID);
+  private cpu: CharacterState = createDefaultCharacterState(DEFAULT_POSITION_CPU, -1, DEFAULT_CPU_FIGHTER_ID);
   private gamePhase: GamePhase = "fighting";
   private roundTimeRemaining = 60;
   private maxRoundTime = 60;
@@ -135,6 +141,8 @@ export class ServerMatchRuntime {
         getDebugMode: () => false,
         getMatchMode: () => "single",
         getArenaStyle: () => "open",
+        getArenaId: () => "sunsetBloom",
+        getCpuConfig: () => DEFAULT_CPU_CONFIG,
         sendTelemetry: (entries) => {
           this.telemetryBuffer.push(...entries);
         },
@@ -162,8 +170,8 @@ export class ServerMatchRuntime {
   }
 
   reset() {
-    this.player = createDefaultCharacterState(DEFAULT_POSITION_PLAYER, 1, "stick_hero");
-    this.cpu = createDefaultCharacterState(DEFAULT_POSITION_CPU, -1, "stick_villain");
+    this.player = createDefaultCharacterState(DEFAULT_POSITION_PLAYER, 1, DEFAULT_PLAYER_FIGHTER_ID);
+    this.cpu = createDefaultCharacterState(DEFAULT_POSITION_CPU, -1, DEFAULT_CPU_FIGHTER_ID);
     this.roundTimeRemaining = 60;
     this.maxRoundTime = 60;
     this.runtime.reset({ player: this.player, cpu: this.cpu });

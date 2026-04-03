@@ -107,6 +107,35 @@ test("combat training presets emit deterministic frame scripts and slot-only inp
   assert.equal(injectedIntent.player2.attack?.press.heavy, true);
 });
 
+test("kite training presets can drive authored special routes through the live intent path", () => {
+  const run = createCombatTrainingRunFromPreset("kite_updraft_rise", "player1", 11);
+  const first = consumeCombatTrainingRunFrame(run);
+
+  assert.equal(first.sample.slot, "player1");
+  assert.equal(first.sample.label, "Kite Updraft Rise");
+  assert.equal(first.sample.inputs[Controls.forward], true);
+  assert.equal(first.sample.inputs[Controls.special], true);
+  assert.equal(first.sample.intent?.special?.dir, "up");
+});
+
+test("anvil training presets cover bruiser launcher and recovery routes", () => {
+  const liftRun = createCombatTrainingRunFromPreset("anvil_headbutt_lift", "player1", 12);
+  const liftFirst = consumeCombatTrainingRunFrame(liftRun);
+
+  assert.equal(liftFirst.sample.label, "Anvil Headbutt Lift");
+  assert.equal(liftFirst.sample.inputs[Controls.forward], true);
+  assert.equal(liftFirst.sample.inputs[Controls.attack], true);
+  assert.equal(liftFirst.sample.intent?.attack?.dir, "up");
+
+  const riseRun = createCombatTrainingRunFromPreset("anvil_rising_crash", "player2", 13);
+  const riseFirst = consumeCombatTrainingRunFrame(riseRun);
+
+  assert.equal(riseFirst.sample.slot, "player2");
+  assert.equal(riseFirst.sample.inputs[Controls.forward], true);
+  assert.equal(riseFirst.sample.inputs[Controls.special], true);
+  assert.equal(riseFirst.sample.intent?.special?.dir, "up");
+});
+
 test("combat training store queues presets through the selected slot", () => {
   const store = useControls.getState();
   store.setCombatTrainingTargetSlot("player2");

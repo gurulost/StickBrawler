@@ -78,6 +78,7 @@ export interface MoveDefinition {
   meterGain?: ResourceCost;
   armorFrames?: FrameWindow[];
   invulnerableFrames?: FrameWindow[];
+  counterGuardFrames?: FrameWindow[];
   aerialOnly?: boolean;
   groundedOnly?: boolean;
   autoTurn?: boolean;

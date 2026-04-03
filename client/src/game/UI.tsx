@@ -8,6 +8,12 @@ import { useEffects } from "../lib/stores/useEffects";
 import { MusicToggle } from "../components/ui/music-toggle";
 import CombatDebugPanel from "./CombatDebugPanel";
 import { useCombatDebug } from "../lib/stores/useCombatDebug";
+import TrainingHud from "./TrainingHud";
+import {
+  getArcadeEncounter,
+  getNextArcadeEncounter,
+  resolveArcadeGrade,
+} from "./arcadeRun";
 import {
   COMBAT_HUD_GRAMMAR_HINT,
   COMBAT_PRIMER_STEPS,
@@ -18,6 +24,9 @@ import {
   INTENT_GUIDE,
   KEYBOARD_CONTROL_CARDS,
 } from "../input/controlGuide";
+import { TRAINING_DRILLS } from "./trainingDrills";
+import { useTrainingMode } from "../lib/stores/useTrainingMode";
+import { isLiveCombatPhase } from "../lib/stores/useFighting";
 
 type TelemetryDigest = Partial<
     Record<
@@ -51,12 +60,16 @@ const UI = () => {
     gamePhase,
     resetRound,
     restartMatch,
+    continueArcade,
     returnToMenu,
     calculateFinalScore,
     submitScore,
     playerStatus,
     cpuStatus,
     slots,
+    sessionMode,
+    arcadeRun,
+    currentGameScore,
     paused,
     togglePause,
     runtimeResetNonce,
@@ -82,15 +95,37 @@ const UI = () => {
     dismissCombatPrimer,
   } = useControls();
   const clearReviewFrame = useCombatDebug((state) => state.clearReviewFrame);
+  const trainingAdvancedMode = useTrainingMode((state) => state.advancedMode);
+  const trainingCurrentDrillIndex = useTrainingMode((state) => state.currentDrillIndex);
+  const trainingCompletedDrillIds = useTrainingMode((state) => state.completedDrillIds);
   const { coins, lastCoinEvent } = useCustomization();
   const landingBurst = useEffects((state) => state.landingBurst);
   const impactFlash = useEffects((state) => state.impactFlash);
+  const isTrainingMode = gamePhase === "training";
+  const isActiveCombat = isLiveCombatPhase(gamePhase);
+  const showCombatInspector = debugMode || (isTrainingMode && trainingAdvancedMode);
   const isLocalMultiplayer = slots.player2.type === "human";
+  const isArcadeMode = sessionMode === "arcade";
+  const currentArcadeEncounter = getArcadeEncounter(arcadeRun);
+  const nextArcadeEncounter = getNextArcadeEncounter(arcadeRun);
+  const arcadeClearedCount = arcadeRun?.clearedEncounterIds.length ?? 0;
+  const arcadeTotalEncounters = arcadeRun?.encounters.length ?? 0;
+  const arcadeGrade = resolveArcadeGrade(
+    currentGameScore,
+    arcadeClearedCount,
+    arcadeTotalEncounters,
+  );
   const playerOneLabel = slots.player1.label;
   const opponentLabel = slots.player2.label;
   const playerOneBadge = slots.player1.type === "human" ? "Human" : "CPU";
   const opponentBadge = slots.player2.type === "human" ? "Human" : "CPU";
-  const timerSubtitle = isLocalMultiplayer ? "Local Versus" : "Solo vs CPU";
+  const timerSubtitle = isTrainingMode
+    ? `Training Dojo · ${trainingCompletedDrillIds.length}/${TRAINING_DRILLS.length} Clear`
+    : isArcadeMode && currentArcadeEncounter
+      ? `Arcade · Fight ${arcadeRun!.currentEncounterIndex + 1}/${arcadeRun!.encounters.length} · ${currentArcadeEncounter.title}`
+    : isLocalMultiplayer
+      ? "Local Versus"
+      : "Solo vs CPU";
   const playerSpecialReady = player.specialMeter >= 100;
   const cpuSpecialReady = cpu.specialMeter >= 100;
   const playerGuardCritical = player.guardMeter > 0 && player.guardMeter <= 20;
@@ -120,6 +155,16 @@ const UI = () => {
     return `${mins}:${secs.toString().padStart(2, '0')}`;
   };
 
+  const timerValue = isTrainingMode
+    ? `${trainingCurrentDrillIndex + 1}/${TRAINING_DRILLS.length}`
+    : formatTime(roundTime);
+  const shouldSubmitScore =
+    gamePhase === "match_end" &&
+    !scoreSubmitted &&
+    (!isArcadeMode ||
+      arcadeRun?.status === "won" ||
+      arcadeRun?.status === "lost");
+
   const resolveBindingLabel = (
     card: (typeof KEYBOARD_CONTROL_CARDS)[number],
     description: string,
@@ -136,29 +181,50 @@ const UI = () => {
 
   const winnerMessage = determineWinner();
   const playerWon = winnerMessage.includes(playerOneLabel);
+  const arcadeCanAdvance =
+    isArcadeMode && gamePhase === "match_end" && arcadeRun?.status === "between_fights";
+  const arcadeRunResolved =
+    isArcadeMode &&
+    gamePhase === "match_end" &&
+    (arcadeRun?.status === "won" || arcadeRun?.status === "lost");
+  const matchOverlayLabel = isArcadeMode
+    ? arcadeRun?.status === "between_fights"
+      ? "Fight Cleared"
+      : arcadeRun?.status === "won"
+        ? "Gauntlet Cleared"
+        : arcadeRun?.status === "lost"
+          ? "Run Over"
+          : "Match Complete"
+    : "Match Complete";
 
   // Play win sound effect and submit score
   useEffect(() => {
-    if (gamePhase === 'match_end' && !scoreSubmitted) {
+    if (shouldSubmitScore) {
       if (player.health > cpu.health) {
         playSuccess();
       }
 
-      // Submit score to leaderboard
       const finalScore = calculateFinalScore();
       if (finalScore > 0) {
         submitScore(finalScore);
         setScoreSubmitted(true);
       }
     }
-  }, [gamePhase, player.health, cpu.health, playSuccess, scoreSubmitted, calculateFinalScore, submitScore]);
+  }, [
+    shouldSubmitScore,
+    player.health,
+    cpu.health,
+    playSuccess,
+    calculateFinalScore,
+    submitScore,
+  ]);
 
   // Reset score submission flag when starting new game
   useEffect(() => {
-    if (gamePhase === 'fighting') {
+    if (isActiveCombat) {
       setScoreSubmitted(false);
     }
-  }, [gamePhase]);
+  }, [isActiveCombat]);
 
   useEffect(() => {
     if (!lastCoinEvent || lastCoinEvent.direction !== "credit") return;
@@ -167,7 +233,7 @@ const UI = () => {
     return () => clearTimeout(timeout);
   }, [lastCoinEvent]);
   useEffect(() => {
-    if (!debugMode) return;
+    if (!showCombatInspector) return;
     let cancelled = false;
     const fetchSummary = () => {
       fetch("/api/telemetry/summary")
@@ -188,19 +254,19 @@ const UI = () => {
       cancelled = true;
       clearInterval(id);
     };
-  }, [debugMode]);
+  }, [showCombatInspector]);
 
   useEffect(() => {
-    if (debugMode) return;
+    if (showCombatInspector) return;
     clearReviewFrame();
-  }, [clearReviewFrame, debugMode]);
+  }, [clearReviewFrame, showCombatInspector]);
 
   useEffect(() => {
     setPrimerProgress(createPrimerProgress());
   }, [gamePhase, runtimeResetNonce]);
 
   useEffect(() => {
-    if (gamePhase !== "fighting") return;
+    if (!isActiveCombat) return;
     setPrimerProgress((current) => ({
       move:
         current.move ||
@@ -227,6 +293,7 @@ const UI = () => {
     player.justParried,
     player.justStartedMove,
     player.velocity,
+    isActiveCombat,
   ]);
 
   useEffect(() => {
@@ -404,7 +471,7 @@ const UI = () => {
           boxShadow: "0 10px 30px rgba(0, 0, 0, 0.28)",
         }}
       >
-        {gamePhase === 'fighting' && (
+        {isActiveCombat && (
           <button
             onClick={() => togglePause()}
             className={`px-3 py-1.5 text-[10px] font-tech font-bold uppercase tracking-wider transition ${
@@ -455,42 +522,42 @@ const UI = () => {
             >
               {lowGraphicsMode ? "Low Gfx" : "Full Gfx"}
             </button>
-            {debugMode && gamePhase === 'fighting' && (
-              <>
-                <button
-                  onClick={() => {
-                    if (combatPlaybackPaused) {
-                      clearReviewFrame();
-                      setCombatPlaybackPaused(false);
-                      return;
-                    }
-                    toggleCombatPlaybackPaused();
-                  }}
-                  className={`px-2.5 py-1.5 text-[10px] font-tech font-bold uppercase tracking-wider transition ${topHudButtonInteractive}`}
-                >
-                  {combatPlaybackPaused ? "Sim Play" : "Sim Pause"}
-                </button>
-                <button
-                  onClick={() => setCombatPlaybackRate(combatPlaybackRate === 1 ? 0.25 : 1)}
-                  className={`px-2.5 py-1.5 text-[10px] font-tech font-bold uppercase tracking-wider transition ${topHudButtonInteractive}`}
-                >
-                  {combatPlaybackRate === 1 ? "1x" : "0.25x"}
-                </button>
-                <button
-                  onClick={() => {
-                    setCombatPlaybackPaused(true);
-                    clearReviewFrame();
-                    queueCombatFrameStep();
-                  }}
-                  className={`px-2.5 py-1.5 text-[10px] font-tech font-bold uppercase tracking-wider transition ${topHudButtonInteractive}`}
-                >
-                  Step
-                </button>
-              </>
-            )}
           </>
         )}
-        {gamePhase === "fighting" && (
+        {showCombatInspector && isActiveCombat && (
+          <>
+            <button
+              onClick={() => {
+                if (combatPlaybackPaused) {
+                  clearReviewFrame();
+                  setCombatPlaybackPaused(false);
+                  return;
+                }
+                toggleCombatPlaybackPaused();
+              }}
+              className={`px-2.5 py-1.5 text-[10px] font-tech font-bold uppercase tracking-wider transition ${topHudButtonInteractive}`}
+            >
+              {combatPlaybackPaused ? "Sim Play" : "Sim Pause"}
+            </button>
+            <button
+              onClick={() => setCombatPlaybackRate(combatPlaybackRate === 1 ? 0.25 : 1)}
+              className={`px-2.5 py-1.5 text-[10px] font-tech font-bold uppercase tracking-wider transition ${topHudButtonInteractive}`}
+            >
+              {combatPlaybackRate === 1 ? "1x" : "0.25x"}
+            </button>
+            <button
+              onClick={() => {
+                setCombatPlaybackPaused(true);
+                clearReviewFrame();
+                queueCombatFrameStep();
+              }}
+              className={`px-2.5 py-1.5 text-[10px] font-tech font-bold uppercase tracking-wider transition ${topHudButtonInteractive}`}
+            >
+              Step
+            </button>
+          </>
+        )}
+        {isActiveCombat && (
           <>
             {combatHudLegendLines.map((line) => (
               <div
@@ -562,7 +629,7 @@ const UI = () => {
           })}
         </div>
       )}
-      {debugMode && (
+      {showCombatInspector && (
         <CombatDebugPanel
           player={player}
           cpu={cpu}
@@ -571,6 +638,7 @@ const UI = () => {
           gamePhase={gamePhase}
         />
       )}
+      {isTrainingMode && <TrainingHud />}
 
       {/* ═══════════════════════════════════════════
           ─── HEALTH BARS & STATUS PANELS ───
@@ -654,8 +722,13 @@ const UI = () => {
           }}
         >
           <div className="absolute top-0 left-3 right-3 h-[1px] bg-gradient-to-r from-transparent via-white/20 to-transparent" />
-          <span className="font-tech text-xl font-bold text-white tracking-wider tabular-nums">{formatTime(roundTime)}</span>
+          <span className="font-tech text-xl font-bold text-white tracking-wider tabular-nums">{timerValue}</span>
           <span className="text-[9px] font-tech tracking-[0.3em] text-white/80 uppercase drop-shadow-[0_1px_3px_rgba(0,0,0,0.65)]">{timerSubtitle}</span>
+          {isArcadeMode && currentGameScore > 0 && (
+            <span className="mt-0.5 text-[9px] font-tech tracking-[0.25em] text-[#ffe600]/85 uppercase">
+              Score {currentGameScore.toLocaleString()}
+            </span>
+          )}
         </div>
 
         {/* Player 2 / CPU Health Panel */}
@@ -726,20 +799,22 @@ const UI = () => {
       </div>
 
       {/* ─── Score Display ─── */}
-      <div className="absolute top-[102px] left-0 w-full text-center">
-        <div
-          className="inline-flex items-center gap-2.5 px-5 py-1"
-          style={{
-            background: 'linear-gradient(90deg, transparent, rgba(10, 10, 15, 0.8), transparent)',
-          }}
-        >
-          <span className="text-[10px] font-tech uppercase tracking-widest text-white/80 drop-shadow-[0_1px_3px_rgba(0,0,0,0.65)]">{playerOneLabel}</span>
-          <span className={`font-tech text-lg font-bold ${playerScore > cpuScore ? 'text-[#00f0ff] neon-text-cyan' : 'text-white/60'}`}>{playerScore}</span>
-          <span className="text-white/15 font-tech">|</span>
-          <span className={`font-tech text-lg font-bold ${cpuScore > playerScore ? 'text-[#ff2d7b] neon-text-magenta' : 'text-white/60'}`}>{cpuScore}</span>
-          <span className="text-[10px] font-tech uppercase tracking-widest text-white/80 drop-shadow-[0_1px_3px_rgba(0,0,0,0.65)]">{opponentLabel}</span>
+      {!isTrainingMode && (
+        <div className="absolute top-[102px] left-0 w-full text-center">
+          <div
+            className="inline-flex items-center gap-2.5 px-5 py-1"
+            style={{
+              background: 'linear-gradient(90deg, transparent, rgba(10, 10, 15, 0.8), transparent)',
+            }}
+          >
+            <span className="text-[10px] font-tech uppercase tracking-widest text-white/80 drop-shadow-[0_1px_3px_rgba(0,0,0,0.65)]">{playerOneLabel}</span>
+            <span className={`font-tech text-lg font-bold ${playerScore > cpuScore ? 'text-[#00f0ff] neon-text-cyan' : 'text-white/60'}`}>{playerScore}</span>
+            <span className="text-white/15 font-tech">|</span>
+            <span className={`font-tech text-lg font-bold ${cpuScore > playerScore ? 'text-[#ff2d7b] neon-text-magenta' : 'text-white/60'}`}>{cpuScore}</span>
+            <span className="text-[10px] font-tech uppercase tracking-widest text-white/80 drop-shadow-[0_1px_3px_rgba(0,0,0,0.65)]">{opponentLabel}</span>
+          </div>
         </div>
-      </div>
+      )}
 
       {/* ─── Center Callout ─── */}
       {centerCallout && gamePhase === 'fighting' && (
@@ -928,7 +1003,9 @@ const UI = () => {
           />
 
           <div className="relative z-10 flex flex-col items-center">
-            <div className="mb-3 text-[10px] font-tech uppercase tracking-[0.5em] text-white/50">Match Complete</div>
+            <div className="mb-3 text-[10px] font-tech uppercase tracking-[0.5em] text-white/50">
+              {matchOverlayLabel}
+            </div>
             <div className="text-5xl font-display mb-6 animate-slide-up">
               {playerWon ? (
                 <span className="neon-text-cyan">{winnerMessage}</span>
@@ -945,18 +1022,56 @@ const UI = () => {
             <div className="font-tech text-xs uppercase tracking-[0.4em] text-[#ffe600] mb-10">
               Score {calculateFinalScore().toLocaleString()}
             </div>
+            {isArcadeMode && arcadeRun && (
+              <div className="mb-8 max-w-xl text-center space-y-2">
+                <div className="text-[10px] font-tech uppercase tracking-[0.32em] text-white/55">
+                  Cleared {arcadeClearedCount}/{arcadeTotalEncounters} fights · Grade {arcadeGrade}
+                </div>
+                {arcadeRun.lastMatchScore > 0 && (
+                  <div className="text-sm font-tech text-[#ffe600]/85">
+                    Last clear +{arcadeRun.lastMatchScore.toLocaleString()}
+                  </div>
+                )}
+                {arcadeCanAdvance && nextArcadeEncounter && (
+                  <div className="text-xs text-white/60">
+                    Next fight: <span className="text-white">{nextArcadeEncounter.title}</span> on{" "}
+                    <span className="text-white">{nextArcadeEncounter.arenaId}</span>.
+                  </div>
+                )}
+                {arcadeRunResolved && currentArcadeEncounter && (
+                  <div className="text-xs text-white/60">
+                    {arcadeRun.status === "won"
+                      ? "The gauntlet is clear. Restart the run or head back to the menu."
+                      : `You were stopped on ${currentArcadeEncounter.title}. Restart the run to take another shot.`}
+                  </div>
+                )}
+              </div>
+            )}
 
             <div className="flex gap-4">
-              <button
-                className="font-tech font-bold uppercase tracking-wider text-sm px-8 py-3 clip-angular text-black transition-all hover:scale-105"
-                style={{
-                  background: 'linear-gradient(135deg, #39ff14, #00f0ff)',
-                  boxShadow: '0 0 20px rgba(57, 255, 20, 0.3)',
-                }}
-                onClick={restartMatch}
-              >
-                Run It Back
-              </button>
+              {arcadeCanAdvance ? (
+                <button
+                  className="font-tech font-bold uppercase tracking-wider text-sm px-8 py-3 clip-angular text-black transition-all hover:scale-105"
+                  style={{
+                    background: "linear-gradient(135deg, #39ff14, #00f0ff)",
+                    boxShadow: "0 0 20px rgba(57, 255, 20, 0.3)",
+                  }}
+                  onClick={continueArcade}
+                >
+                  Next Fight
+                </button>
+              ) : (
+                <button
+                  className="font-tech font-bold uppercase tracking-wider text-sm px-8 py-3 clip-angular text-black transition-all hover:scale-105"
+                  style={{
+                    background: "linear-gradient(135deg, #39ff14, #00f0ff)",
+                    boxShadow: "0 0 20px rgba(57, 255, 20, 0.3)",
+                  }}
+                  onClick={restartMatch}
+                >
+                  {isArcadeMode ? "Restart Gauntlet" : "Run It Back"}
+                </button>
+              )}
 
               <button
                 className="font-tech font-bold uppercase tracking-wider text-sm px-8 py-3 clip-angular bg-white/5 text-white/70 border border-white/10 transition-all hover:bg-white/10 hover:text-white"
@@ -1058,7 +1173,7 @@ const UI = () => {
       {/* ═══════════════════════════════════════════
           ─── PAUSE MENU ───
           ═══════════════════════════════════════════ */}
-      {paused && gamePhase === 'fighting' && (
+      {paused && isActiveCombat && (
         <div
           className="absolute inset-0 flex flex-col items-center justify-center gap-8 pointer-events-auto"
           style={{
@@ -1084,7 +1199,7 @@ const UI = () => {
                 resetRound();
               }}
             >
-              Restart Round
+              {isTrainingMode ? "Reset Drill" : "Restart Round"}
             </button>
             <button
               className="px-8 py-3 clip-angular font-tech font-bold uppercase tracking-wider text-sm bg-white/5 text-white/60 border border-white/10 transition-all hover:bg-white/10 hover:text-white/80"
